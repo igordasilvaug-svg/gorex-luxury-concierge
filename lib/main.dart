@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
@@ -6,8 +8,11 @@ import 'state/app_state.dart';
 import 'screens/login_screen.dart';
 import 'screens/shell/app_shell.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize French (Belgium) locale data so DateFormat('...', 'fr_BE')
+  // works on every platform (web, Android, tests).
+  await initializeDateFormatting('fr_BE', null);
   runApp(const GorexApp());
 }
 
@@ -22,6 +27,13 @@ class GorexApp extends StatelessWidget {
         title: 'GOREX LUXURY CONCIERGE',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
+        locale: const Locale('fr', 'BE'),
+        supportedLocales: const [Locale('fr', 'BE'), Locale('fr'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         home: const _Root(),
       ),
     );

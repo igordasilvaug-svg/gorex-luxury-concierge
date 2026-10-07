@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.8
 
   # State management
@@ -27,7 +29,7 @@ dependencies:
   printing: ^5.13.4
 
   # Utilities
-  intl: ^0.19.0
+  intl: ^0.20.2
   url_launcher: ^6.3.1
 
 dev_dependencies:
