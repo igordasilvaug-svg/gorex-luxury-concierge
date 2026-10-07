@@ -64,6 +64,16 @@ class FinanceDocument {
   /// Dernière mise à jour du statut Peppol (polling / webhook)
   final DateTime? peppolLastUpdate;
 
+  // ─── Relances & encaissement ───
+  /// Niveau de relance envoyé pour une facture impayée
+  final ReminderLevel reminderLevel;
+  /// Date du dernier envoi de relance
+  final DateTime? lastReminderAt;
+  /// Date à laquelle le paiement a été rapproché
+  final DateTime? paidAt;
+  /// Méthode de rapprochement du paiement
+  final PaymentMatchMethod? paymentMethod;
+
   const FinanceDocument({
     required this.id,
     required this.reference,
@@ -86,12 +96,35 @@ class FinanceDocument {
     this.structuredCommunication,
     this.peppolProviderReference,
     this.peppolLastUpdate,
+    this.reminderLevel = ReminderLevel.none,
+    this.lastReminderAt,
+    this.paidAt,
+    this.paymentMethod,
   });
 
   double get subtotal => lines.fold(0.0, (s, l) => s + l.total);
   double get taxAmount => subtotal * (taxPercent / 100);
   double get total => subtotal + taxAmount;
   double get balance => total - amountPaid;
+
+  /// Nombre de jours de retard (0 si non échue ou payée).
+  int get daysOverdue {
+    final due = dueDate;
+    if (due == null) return 0;
+    if (status == InvoiceStatus.paid || status == InvoiceStatus.cancelled) {
+      return 0;
+    }
+    final d = DateTime.now().difference(due).inDays;
+    return d > 0 ? d : 0;
+  }
+
+  /// Une facture est en retard si échue, impayée et non annulée.
+  bool get isOverdue =>
+      type == FinanceDocType.invoice &&
+      status != InvoiceStatus.paid &&
+      status != InvoiceStatus.cancelled &&
+      dueDate != null &&
+      DateTime.now().isAfter(dueDate!);
 
   FinanceDocument copyWith({
     InvoiceStatus? status,
@@ -105,6 +138,10 @@ class FinanceDocument {
     String? structuredCommunication,
     String? peppolProviderReference,
     DateTime? peppolLastUpdate,
+    ReminderLevel? reminderLevel,
+    DateTime? lastReminderAt,
+    DateTime? paidAt,
+    PaymentMatchMethod? paymentMethod,
   }) => FinanceDocument(
     id: id,
     reference: reference,
@@ -129,6 +166,10 @@ class FinanceDocument {
     peppolProviderReference:
         peppolProviderReference ?? this.peppolProviderReference,
     peppolLastUpdate: peppolLastUpdate ?? this.peppolLastUpdate,
+    reminderLevel: reminderLevel ?? this.reminderLevel,
+    lastReminderAt: lastReminderAt ?? this.lastReminderAt,
+    paidAt: paidAt ?? this.paidAt,
+    paymentMethod: paymentMethod ?? this.paymentMethod,
   );
 
   Map<String, dynamic> toMap() => {
@@ -153,6 +194,10 @@ class FinanceDocument {
     'structuredCommunication': structuredCommunication,
     'peppolProviderReference': peppolProviderReference,
     'peppolLastUpdate': peppolLastUpdate?.toIso8601String(),
+    'reminderLevel': reminderLevel.name,
+    'lastReminderAt': lastReminderAt?.toIso8601String(),
+    'paidAt': paidAt?.toIso8601String(),
+    'paymentMethod': paymentMethod?.name,
   };
 
   factory FinanceDocument.fromMap(Map<String, dynamic> m) => FinanceDocument(
@@ -186,6 +231,18 @@ class FinanceDocument {
     peppolProviderReference: m['peppolProviderReference'] as String?,
     peppolLastUpdate: m['peppolLastUpdate'] != null
         ? DateTime.tryParse(m['peppolLastUpdate'] as String)
+        : null,
+    reminderLevel: ReminderLevel.fromName(
+      m['reminderLevel'] as String? ?? '',
+    ),
+    lastReminderAt: m['lastReminderAt'] != null
+        ? DateTime.tryParse(m['lastReminderAt'] as String)
+        : null,
+    paidAt: m['paidAt'] != null
+        ? DateTime.tryParse(m['paidAt'] as String)
+        : null,
+    paymentMethod: m['paymentMethod'] != null
+        ? PaymentMatchMethod.fromName(m['paymentMethod'] as String)
         : null,
   );
 }
@@ -228,5 +285,64 @@ class Expense {
     amount: (m['amount'] as num).toDouble(),
     date: DateTime.parse(m['date'] as String),
     category: m['category'] as String,
+  );
+}
+
+/// Transaction bancaire (relevé) à rapprocher d'une facture.
+class BankTransaction {
+  final String id;
+  final DateTime date;
+  final double amount; // positif = crédit (encaissement)
+  final String counterparty;
+  final String communication; // communication libre / OGM / référence
+  final String? iban;
+  final bool matched;
+  final String? matchedDocumentId;
+
+  const BankTransaction({
+    required this.id,
+    required this.date,
+    required this.amount,
+    required this.counterparty,
+    this.communication = '',
+    this.iban,
+    this.matched = false,
+    this.matchedDocumentId,
+  });
+
+  BankTransaction copyWith({
+    bool? matched,
+    String? matchedDocumentId,
+  }) => BankTransaction(
+    id: id,
+    date: date,
+    amount: amount,
+    counterparty: counterparty,
+    communication: communication,
+    iban: iban,
+    matched: matched ?? this.matched,
+    matchedDocumentId: matchedDocumentId ?? this.matchedDocumentId,
+  );
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'date': date.toIso8601String(),
+    'amount': amount,
+    'counterparty': counterparty,
+    'communication': communication,
+    'iban': iban,
+    'matched': matched,
+    'matchedDocumentId': matchedDocumentId,
+  };
+
+  factory BankTransaction.fromMap(Map<String, dynamic> m) => BankTransaction(
+    id: m['id'] as String,
+    date: DateTime.parse(m['date'] as String),
+    amount: (m['amount'] as num).toDouble(),
+    counterparty: m['counterparty'] as String? ?? '',
+    communication: m['communication'] as String? ?? '',
+    iban: m['iban'] as String?,
+    matched: m['matched'] as bool? ?? false,
+    matchedDocumentId: m['matchedDocumentId'] as String?,
   );
 }

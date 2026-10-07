@@ -22,8 +22,7 @@ enum ClientCategory {
 }
 
 /// Statut d'envoi d'une facture via le réseau Peppol
-enum PeppolStatus {
-  notApplicable('Non applicable', ''),
+enum PeppolStatus {  notApplicable('Non applicable', ''),
   ready('Prêt à envoyer', 'READY'),
   sent('Envoyé', 'SENT'),
   delivered('Distribué', 'DELIVERED'),
@@ -37,6 +36,43 @@ enum PeppolStatus {
     (e) => e.name == name,
     orElse: () => PeppolStatus.notApplicable,
   );
+}
+
+/// Niveau de relance pour une facture impayée
+enum ReminderLevel {
+  none('Aucune', 0),
+  first('1ʳᵉ relance', 1),
+  second('2ᵉ relance', 2),
+  finalNotice('Mise en demeure', 3);
+
+  final String label;
+  final int level;
+  const ReminderLevel(this.label, this.level);
+
+  static ReminderLevel fromName(String name) => ReminderLevel.values.firstWhere(
+    (e) => e.name == name,
+    orElse: () => ReminderLevel.none,
+  );
+
+  ReminderLevel get next =>
+      ReminderLevel.values[(level + 1).clamp(0, ReminderLevel.values.length - 1)];
+}
+
+/// Méthode de rapprochement d'un paiement
+enum PaymentMatchMethod {
+  structuredCommunication('Communication structurée', 'OGM/VCS'),
+  reference('Référence facture', 'REF'),
+  manual('Saisie manuelle', 'MANUAL');
+
+  final String label;
+  final String code;
+  const PaymentMatchMethod(this.label, this.code);
+
+  static PaymentMatchMethod fromName(String name) =>
+      PaymentMatchMethod.values.firstWhere(
+        (e) => e.name == name,
+        orElse: () => PaymentMatchMethod.manual,
+      );
 }
 
 /// Niveaux de confidentialité

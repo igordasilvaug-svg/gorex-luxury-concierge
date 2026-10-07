@@ -621,11 +621,13 @@ class SeedOperations {
       clientId: 'c_001',
       clientName: 'Dimitri Kalashov',
       requestId: 'r_001',
-      date: _d(-1),
-      dueDate: _d(29),
-      status: InvoiceStatus.sent,
+      date: _d(-45),
+      dueDate: _d(-15),
+      status: InvoiceStatus.overdue,
       amountPaid: 0,
       taxPercent: 21,
+      structuredCommunication: '+++000/0000/00001+++',
+      vatMention: 'TVA belge 21 %',
       lines: const [
         FinanceLine(
           description: 'Jet privé Nice → Bruxelles',
@@ -702,8 +704,7 @@ class SeedOperations {
     ),
   ];
 
-  static List<Expense> expenses() => [
-    Expense(
+  static List<Expense> expenses() => [    Expense(
       id: 'e_001',
       label: 'Jet privé (coût fournisseur)',
       providerName: 'Sky Private Jet',
@@ -738,6 +739,65 @@ class SeedOperations {
       amount: 600,
       date: _d(-5),
       category: 'Medical',
+    ),
+  ];
+
+  // ─────────────────────── RELEVÉ BANCAIRE (rapprochement) ───────────────────────
+  /// Crédits bancaires de démonstration, dont certains déjà rattachés à une
+  /// facture (communication structurée OGM) et d'autres à rapprocher.
+  static List<BankTransaction> bankTransactions() => [
+    // Crédit correspondant à la facture GRX-INV-2025-0002 (déjà payée).
+    BankTransaction(
+      id: 'bt_001',
+      date: _d(-1, 9),
+      amount: 62700,
+      counterparty: 'Délégation Sportive Nationale',
+      communication:
+          '+++000/0000/00002+++ GRX-INV-2025-0002',
+      iban: 'BE71 0961 2345 6769',
+      matched: true,
+      matchedDocumentId: 'f_002',
+    ),
+    // Crédit correspondant à l'acompte Lady Hastings (f_004).
+    BankTransaction(
+      id: 'bt_002',
+      date: _d(-2, 14),
+      amount: 900,
+      counterparty: 'Eleanor Hastings',
+      communication: 'Acompte table VIP — GRX-DEP-2025-0004',
+      iban: 'BE43 0689 9999 9999',
+      matched: true,
+      matchedDocumentId: 'f_004',
+    ),
+    // Crédit non rapproché : OGM de la facture GRX-INV-2025-0001.
+    BankTransaction(
+      id: 'bt_003',
+      date: _d(0, 11),
+      amount: 44170,
+      counterparty: 'D. Kalashov',
+      communication: '+++000/0000/00001+++',
+      iban: 'BE68 5390 0754 7034',
+      matched: false,
+    ),
+    // Virement sans référence mais montant correspondant au solde f_001.
+    BankTransaction(
+      id: 'bt_004',
+      date: _d(0, 16),
+      amount: 44170,
+      counterparty: 'Kalashov Dimitri',
+      communication: 'Virement',
+      iban: 'BE68 5390 0754 7034',
+      matched: false,
+    ),
+    // Crédit libre sans correspondance évidente.
+    BankTransaction(
+      id: 'bt_005',
+      date: _d(-1, 10),
+      amount: 2500,
+      counterparty: 'Virement divers',
+      communication: 'Consulting',
+      iban: 'BE11 2222 3333 4444',
+      matched: false,
     ),
   ];
 

@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/billing/peppol_service.dart';
 import '../core/billing/peppol_ubl_generator.dart';
+import '../core/billing/reconciliation_service.dart';
+import '../core/billing/reminder_service.dart';
 import '../core/billing/vat_service.dart';
 import '../data/seed_data.dart';
 import '../data/seed_operations.dart';
@@ -42,6 +44,8 @@ class AppState extends ChangeNotifier {
   List<Itinerary> itineraries = [];
   List<FinanceDocument> financeDocs = [];
   List<Expense> expenses = [];
+  /// Relevé bancaire importé (transactions à rapprocher des factures).
+  List<BankTransaction> bankTransactions = [];
   List<Conversation> conversations = [];
   List<Appointment> appointments = [];
   List<Prospect> prospects = [];
@@ -79,6 +83,7 @@ class AppState extends ChangeNotifier {
     itineraries = SeedOperations.itineraries();
     financeDocs = SeedOperations.financeDocs();
     expenses = SeedOperations.expenses();
+    bankTransactions = SeedOperations.bankTransactions();
     conversations = SeedOperations.conversations();
     appointments = SeedOperations.appointments();
     prospects = SeedOperations.prospects();
@@ -115,6 +120,7 @@ class AppState extends ChangeNotifier {
     itineraries = _mapList(m['itineraries'], Itinerary.fromMap);
     financeDocs = _mapList(m['financeDocs'], FinanceDocument.fromMap);
     expenses = _mapList(m['expenses'], Expense.fromMap);
+    bankTransactions = _mapList(m['bankTransactions'], BankTransaction.fromMap);
     conversations = _mapList(m['conversations'], Conversation.fromMap);
     appointments = _mapList(m['appointments'], Appointment.fromMap);
     prospects = _mapList(m['prospects'], Prospect.fromMap);
@@ -143,6 +149,7 @@ class AppState extends ChangeNotifier {
         'itineraries': itineraries.map((e) => e.toMap()).toList(),
         'financeDocs': financeDocs.map((e) => e.toMap()).toList(),
         'expenses': expenses.map((e) => e.toMap()).toList(),
+        'bankTransactions': bankTransactions.map((e) => e.toMap()).toList(),
         'conversations': conversations.map((e) => e.toMap()).toList(),
         'appointments': appointments.map((e) => e.toMap()).toList(),
         'prospects': prospects.map((e) => e.toMap()).toList(),
@@ -946,6 +953,182 @@ class AppState extends ChangeNotifier {
     await _persist();
     notifyListeners();
   }
+
+  // ─────────────────────── COMPTABILITÉ & ENCAISSEMENT ───────────────────────
+  /// Enregistre le paiement (partiel ou total) d'une facture.
+  Future<void> markInvoicePaid(
+    String docId, {
+    double? amount,
+    PaymentMatchMethod method = PaymentMatchMethod.manual,
+    DateTime? date,
+  }) async {
+    final i = financeDocs.indexWhere((e) => e.id == docId);
+    if (i < 0) return;
+    final d = financeDocs[i];
+    final newPaid = amount == null ? d.total : (d.amountPaid + amount);
+    final paid = newPaid >= d.total - 0.005;
+    financeDocs[i] = d.copyWith(
+      amountPaid: newPaid.clamp(0, d.total),
+      status: paid ? InvoiceStatus.paid : d.status,
+      paidAt: paid ? (date ?? DateTime.now()) : null,
+      paymentMethod: method,
+    );
+    log(
+      'Encaissement',
+      d.reference,
+      detail: paid
+          ? 'Soldée · ${method.label}'
+          : 'Partiel · reste ${(d.total - newPaid).toStringAsFixed(2)} €',
+    );
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Rapproche une transaction bancaire d'une facture (paiement + lien).
+  Future<void> reconcileTransaction(
+    String transactionId,
+    String docId, {
+    PaymentMatchMethod method = PaymentMatchMethod.manual,
+  }) async {
+    final ti = bankTransactions.indexWhere((t) => t.id == transactionId);
+    if (ti < 0) return;
+    final t = bankTransactions[ti];
+    bankTransactions[ti] = t.copyWith(
+      matched: true,
+      matchedDocumentId: docId,
+    );
+    await markInvoicePaid(
+      docId,
+      amount: t.amount,
+      method: method,
+      date: t.date,
+    );
+    log(
+      'Rapprochement bancaire',
+      t.counterparty,
+      detail: '${t.amount.toStringAsFixed(2)} € → facture',
+    );
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Détache une transaction précédemment rapprochée.
+  Future<void> unmatchTransaction(String transactionId) async {
+    final ti = bankTransactions.indexWhere((t) => t.id == transactionId);
+    if (ti < 0) return;
+    bankTransactions[ti] = bankTransactions[ti].copyWith(
+      matched: false,
+      matchedDocumentId: null,
+    );
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Rapprochement automatique : associe les crédits non rapprochés aux
+  /// factures impayées via communication structurée / référence / montant.
+  /// Retourne le nombre de rapprochements effectués.
+  Future<int> autoReconcile({double threshold = 0.5}) async {
+    final open = bankTransactions.where((t) => !t.matched && t.amount > 0).toList();
+    if (open.isEmpty) return 0;
+    final matches = ReconciliationService.autoMatch(
+      open,
+      financeDocs,
+      threshold: threshold,
+    );
+    var n = 0;
+    for (final m in matches) {
+      if (m.matched) {
+        await reconcileTransaction(
+          m.transaction.id,
+          m.document!.id,
+          method: m.method,
+        );
+        n++;
+      }
+    }
+    if (n > 0) log('Rapprochement auto', '$n transaction(s)');
+    return n;
+  }
+
+  /// Envoie (ou marque comme envoyée) la relance suivante d'une facture.
+  Future<ReminderPlan?> sendReminder(String docId) async {
+    final i = financeDocs.indexWhere((e) => e.id == docId);
+    if (i < 0) return null;
+    final d = financeDocs[i];
+    final p = ReminderService.plan(d);
+    if (!p.due) return p;
+    financeDocs[i] = d.copyWith(
+      reminderLevel: p.nextLevel,
+      lastReminderAt: DateTime.now(),
+      status: d.status == InvoiceStatus.paid ? d.status : InvoiceStatus.overdue,
+    );
+    log(
+      'Relance facture',
+      d.reference,
+      detail: '${p.nextLevel.label} · ${p.daysOverdue} j de retard',
+    );
+    await _persist();
+    notifyListeners();
+    return p;
+  }
+
+  /// Relance toutes les factures échues nécessitant une action.
+  /// Retourne le nombre de relances envoyées.
+  Future<int> sendAllDueReminders() async {
+    final plans = ReminderService.pending(financeDocs);
+    for (final p in plans) {
+      await sendReminder(p.document.id);
+    }
+    return plans.length;
+  }
+
+  /// Email de relance (sujet + corps) pour une facture.
+  ({String subject, String body}) buildReminderEmail(
+    FinanceDocument d,
+    ReminderLevel level,
+  ) => ReminderService.buildEmail(
+    d,
+    level,
+    companyName: company.brandName.isNotEmpty
+        ? company.brandName
+        : company.legalName,
+    companyVat: company.vatNumber,
+    iban: company.iban,
+  );
+
+  /// Factures échues (impayées) triées par ancienneté.
+  List<FinanceDocument> get overdueInvoices {
+    final list = financeDocs.where((d) => d.isOverdue).toList()
+      ..sort((a, b) => b.daysOverdue.compareTo(a.daysOverdue));
+    return list;
+  }
+
+  int get overdueCount => overdueInvoices.length;
+
+  double get overdueAmount =>
+      overdueInvoices.fold(0.0, (s, d) => s + d.balance);
+
+  /// Montant déjà encaissé (factures soldées) pour l'exercice courant.
+  double get collectedAmount => financeDocs
+      .where(
+        (d) =>
+            d.type == FinanceDocType.invoice && d.status == InvoiceStatus.paid,
+      )
+      .fold(0.0, (s, d) => s + d.amountPaid);
+
+  /// Transactions bancaires non encore rapprochées.
+  List<BankTransaction> get unmatchedTransactions =>
+      bankTransactions.where((t) => !t.matched).toList();
+
+  double get unmatchedAmount =>
+      unmatchedTransactions.fold(0.0, (s, t) => s + t.amount);
+
+  /// Journaux de vente de l'exercice (factures) — pour export comptable.
+  List<FinanceDocument> salesJournal({int? year}) => financeDocs
+      .where((d) => d.type == FinanceDocType.invoice)
+      .where((d) => year == null || d.date.year == year)
+      .toList()
+    ..sort((a, b) => a.date.compareTo(b.date));
 
   Future<void> updateFinanceDoc(FinanceDocument d) async {
     final i = financeDocs.indexWhere((e) => e.id == d.id);

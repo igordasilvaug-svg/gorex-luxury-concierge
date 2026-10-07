@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/billing/reminder_service.dart';
 import '../../core/billing/vat_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -223,6 +224,15 @@ class _FinanceScreenState extends State<FinanceScreen> {
                               const SizedBox(height: 5),
                               _peppolPill(d.peppolStatus),
                             ],
+                            if (d.isOverdue) ...[
+                              const SizedBox(height: 5),
+                              StatusPill(
+                                label:
+                                    'En retard · ${d.daysOverdue} j${d.reminderLevel.level > 0 ? ' · ${d.reminderLevel.label}' : ''}',
+                                color: AppColors.urgent,
+                                icon: Icons.warning_amber_outlined,
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -405,6 +415,52 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 icon: const Icon(Icons.code, size: 15),
                 label: const Text('VOIR LE FICHIER UBL (PEPPOL)'),
               ),
+              if (d.type == FinanceDocType.invoice) ...[
+                const SizedBox(height: 10),
+                if (d.status != InvoiceStatus.paid &&
+                    d.status != InvoiceStatus.cancelled)
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await s.markInvoicePaid(d.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${d.reference} marquée comme payée.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.paid_outlined, size: 15),
+                    label: const Text('MARQUER COMME PAYÉE'),
+                  ),
+                if (d.isOverdue) ...[
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final plan = ReminderService.plan(d);
+                      Navigator.pop(ctx);
+                      await s.sendReminder(d.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Relance ${plan.nextLevel.label} enregistrée '
+                              '(${d.daysOverdue} j de retard).',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.outgoing_mail, size: 15),
+                    label: Text(
+                      'RELANCER (${ReminderService.plan(d).nextLevel.label.toUpperCase()})',
+                    ),
+                  ),
+                ],
+              ],
               if (d.peppolStatus != PeppolStatus.notApplicable) ...[
                 const SizedBox(height: 10),
                 if (d.peppolStatus == PeppolStatus.ready ||

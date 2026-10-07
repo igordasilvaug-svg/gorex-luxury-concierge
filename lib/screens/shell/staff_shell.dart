@@ -13,6 +13,7 @@ import '../itineraries/itineraries_screen.dart';
 import '../bookings/bookings_screen.dart';
 import '../providers/providers_screen.dart';
 import '../finance/finance_screen.dart';
+import '../finance/accounting_screen.dart';
 import '../crm/crm_screen.dart';
 import '../agenda/agenda_screen.dart';
 import '../communication/communication_screen.dart';
@@ -89,6 +90,13 @@ class _StaffShellState extends State<StaffShell> {
         Icons.account_balance_outlined,
         Icons.account_balance,
         const FinanceScreen(),
+        permission: 'finance',
+      ),
+      _NavItem(
+        'Comptabilité',
+        Icons.receipt_long_outlined,
+        Icons.receipt_long,
+        const AccountingScreen(),
         permission: 'finance',
       ),
       _NavItem(
