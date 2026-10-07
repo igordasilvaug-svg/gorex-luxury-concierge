@@ -10,6 +10,7 @@ import '../../models/finance.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common.dart';
 import '../documents/document_service.dart';
+import '../settings/peppol_settings_screen.dart';
 
 class FinanceScreen extends StatefulWidget {
   const FinanceScreen({super.key});
@@ -41,9 +42,32 @@ class _FinanceScreenState extends State<FinanceScreen> {
           children: [
             Text('Finance', style: AppTypography.displayMedium),
             const SizedBox(height: 5),
-            Text(
-              'Devis · factures · marges · commissions · rentabilité',
-              style: AppTypography.caption,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Devis · factures · marges · commissions · rentabilité',
+                    style: AppTypography.caption,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Configuration Peppol',
+                  icon: Icon(
+                    s.peppol.isConfigured
+                        ? Icons.cloud_done_outlined
+                        : Icons.cloud_off_outlined,
+                    size: 18,
+                    color: s.peppol.isConfigured
+                        ? AppColors.statusConfirmed
+                        : AppColors.grey,
+                  ),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PeppolSettingsScreen(),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             const GoldDivider(width: 60),
@@ -324,25 +348,39 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   DocumentService.exportFinanceDoc(context, s, d);
                 },
               ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => _showUbl(context, s, d),
+                icon: const Icon(Icons.code, size: 15),
+                label: const Text('VOIR LE FICHIER UBL (PEPPOL)'),
+              ),
               if (d.peppolStatus != PeppolStatus.notApplicable) ...[
                 const SizedBox(height: 10),
-                if (d.peppolStatus == PeppolStatus.ready)
+                if (d.peppolStatus == PeppolStatus.ready ||
+                    d.peppolStatus == PeppolStatus.failed)
                   OutlinedButton.icon(
                     onPressed: () async {
                       Navigator.pop(ctx);
-                      await s.sendViaPeppol(d.id);
+                      final res = await s.sendViaPeppol(d.id);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Facture transmise via le réseau Peppol.',
-                            ),
+                          SnackBar(
+                            content: Text(res.message),
+                            backgroundColor: res.success
+                                ? null
+                                : AppColors.urgent,
                           ),
                         );
                       }
                     },
                     icon: const Icon(Icons.send_outlined, size: 15),
-                    label: const Text('TRANSMETTRE VIA PEPPOL'),
+                    label: Text(
+                      d.peppolStatus == PeppolStatus.failed
+                          ? 'RÉESSAYER LA TRANSMISSION PEPPOL'
+                          : (s.peppol.isConfigured
+                                ? 'TRANSMETTRE VIA PEPPOL (RÉEL)'
+                                : 'TRANSMETTRE VIA PEPPOL (SIMULATION)'),
+                    ),
                   ),
                 if (d.peppolStatus == PeppolStatus.sent)
                   OutlinedButton.icon(
@@ -380,6 +418,61 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   ),
               ],
               const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Aperçu du document UBL 2.1 (Peppol BIS Billing 3.0) transmis.
+  void _showUbl(BuildContext context, AppState s, FinanceDocument d) {
+    final ubl = s.generateUbl(d.id);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceElevated,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        builder: (_, controller) => SingleChildScrollView(
+          controller: controller,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Fichier UBL — ${ubl.filename}', style: AppTypography.headline),
+              const SizedBox(height: 4),
+              Text(
+                'UBL 2.1 · Peppol BIS Billing 3.0 (EN 16931)',
+                style: AppTypography.caption,
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.blackSoft,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: AppColors.divider, width: 0.6),
+                ),
+                child: SelectableText(
+                  ubl.xml,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10.5,
+                    color: AppColors.greyLight,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              GoldButton(
+                label: 'Fermer',
+                fullWidth: true,
+                onPressed: () => Navigator.pop(ctx),
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),

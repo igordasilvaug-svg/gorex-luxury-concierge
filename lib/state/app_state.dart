@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/billing/peppol_service.dart';
+import '../core/billing/peppol_ubl_generator.dart';
 import '../core/billing/vat_service.dart';
 import '../data/seed_data.dart';
 import '../data/seed_operations.dart';
@@ -13,6 +15,7 @@ import '../models/crm_agenda.dart';
 import '../models/enums.dart';
 import '../models/finance.dart';
 import '../models/itinerary.dart';
+import '../models/peppol_config.dart';
 import '../models/provider_booking.dart';
 import '../models/service_request.dart';
 import '../models/subscription_tier.dart';
@@ -27,6 +30,9 @@ class AppState extends ChangeNotifier {
 
   /// Coordonnées officielles de l'émetteur (Gorex Group) — facturation.
   CompanyProfile company = const CompanyProfile();
+
+  /// Configuration de l'Access Point Peppol (facturation électronique).
+  PeppolConfig peppol = const PeppolConfig();
 
   List<AppUser> users = [];
   List<Client> clients = [];
@@ -95,6 +101,11 @@ class AppState extends ChangeNotifier {
         Map<String, dynamic>.from(m['company'] as Map),
       );
     }
+    if (m['peppol'] != null) {
+      peppol = PeppolConfig.fromMap(
+        Map<String, dynamic>.from(m['peppol'] as Map),
+      );
+    }
     users = _mapList(m['users'], AppUser.fromMap);
     clients = _mapList(m['clients'], Client.fromMap);
     tiers = _mapList(m['tiers'], SubscriptionTier.fromMap);
@@ -122,6 +133,7 @@ class AppState extends ChangeNotifier {
       _storageKey,
       jsonEncode({
         'company': company.toMap(),
+        'peppol': peppol.toMap(),
         'users': users.map((e) => e.toMap()).toList(),
         'clients': clients.map((e) => e.toMap()).toList(),
         'tiers': tiers.map((e) => e.toMap()).toList(),
@@ -759,16 +771,65 @@ class AppState extends ChangeNotifier {
     return d;
   }
 
-  /// Marque une facture comme envoyée via le réseau Peppol.
-  Future<void> sendViaPeppol(String docId) async {
+  /// Transmet une facture via l'Access Point Peppol configuré.
+  /// Si l'Access Point n'est pas configuré, l'envoi est simulé.
+  Future<PeppolSendResult> sendViaPeppol(String docId) async {
     final i = financeDocs.indexWhere((e) => e.id == docId);
-    if (i < 0) return;
+    if (i < 0) {
+      return const PeppolSendResult(
+        success: false,
+        message: 'Document introuvable.',
+      );
+    }
     final d = financeDocs[i];
-    financeDocs[i] = d.copyWith(
-      peppolStatus: PeppolStatus.sent,
-      status: d.status == InvoiceStatus.draft ? InvoiceStatus.sent : d.status,
+    final result = await PeppolService.send(
+      document: d,
+      client: clientById(d.clientId),
+      company: company,
+      config: peppol,
     );
-    log('Envoi Peppol', d.reference, detail: 'Facture électronique transmise');
+    if (result.success) {
+      financeDocs[i] = d.copyWith(
+        peppolStatus: PeppolStatus.sent,
+        status: d.status == InvoiceStatus.draft ? InvoiceStatus.sent : d.status,
+      );
+      log(
+        'Envoi Peppol',
+        d.reference,
+        detail: result.simulated
+            ? 'Simulation (Access Point non configuré)'
+            : 'Transmis · ${result.providerReference ?? 'OK'}',
+      );
+    } else {
+      financeDocs[i] = d.copyWith(peppolStatus: PeppolStatus.failed);
+      log('Échec Peppol', d.reference, detail: result.message);
+    }
+    await _persist();
+    notifyListeners();
+    return result;
+  }
+
+  /// Génère le XML UBL 2.1 (Peppol BIS Billing 3.0) d'une facture.
+  UblResult generateUbl(String docId) {
+    final d = financeById(docId);
+    if (d == null) {
+      return const UblResult('', '');
+    }
+    return PeppolUblGenerator.generate(
+      f: d,
+      client: clientById(d.clientId),
+      company: company,
+    );
+  }
+
+  /// Teste la connexion à l'Access Point Peppol.
+  Future<PeppolSendResult> testPeppolConnection() =>
+      PeppolService.testConnection(peppol);
+
+  /// Met à jour la configuration de l'Access Point Peppol.
+  Future<void> updatePeppol(PeppolConfig config) async {
+    peppol = config;
+    log('Configuration Peppol', config.enabled ? 'Activée' : 'Désactivée');
     await _persist();
     notifyListeners();
   }

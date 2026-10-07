@@ -20,6 +20,7 @@ import '../team/team_screen.dart';
 import '../access/staff_access_screen.dart';
 import '../clients/clients_screen.dart';
 import '../settings/company_settings_screen.dart';
+import '../settings/peppol_settings_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import 'app_shell.dart';
 
@@ -95,6 +96,13 @@ class _StaffShellState extends State<StaffShell> {
         Icons.apartment_outlined,
         Icons.apartment,
         const CompanySettingsScreen(),
+        permission: 'finance',
+      ),
+      _NavItem(
+        'Access Point Peppol',
+        Icons.cloud_outlined,
+        Icons.cloud,
+        const PeppolSettingsScreen(),
         permission: 'finance',
       ),
       _NavItem(

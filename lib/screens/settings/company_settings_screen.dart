@@ -7,6 +7,7 @@ import '../../core/theme/app_typography.dart';
 import '../../models/company_profile.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common.dart';
+import 'peppol_settings_screen.dart';
 
 /// Paramètres société — coordonnées officielles de l'émetteur (Gorex Group).
 /// Ces informations alimentent automatiquement les factures et devis
@@ -275,7 +276,18 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                 const SizedBox(height: 10),
                 _peppolNotice(s.company),
 
-                const SizedBox(height: 26),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PeppolSettingsScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.cloud_outlined, size: 15),
+                  label: const Text('CONFIGURER L\'ACCESS POINT PEPPOL'),
+                ),
+
+                const SizedBox(height: 20),
                 GoldButton(
                   label: 'Enregistrer',
                   icon: Icons.check,
