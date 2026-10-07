@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'state/app_state.dart';
 import 'screens/login_screen.dart';
+import 'screens/force_password_change_screen.dart';
 import 'screens/shell/app_shell.dart';
 
 Future<void> main() async {
@@ -71,6 +72,10 @@ class _Root extends StatelessWidget {
         ),
       );
     }
-    return state.currentUser == null ? const LoginScreen() : const AppShell();
+    if (state.currentUser == null) return const LoginScreen();
+    if (state.currentUser!.mustChangePassword) {
+      return const ForcePasswordChangeScreen();
+    }
+    return const AppShell();
   }
 }

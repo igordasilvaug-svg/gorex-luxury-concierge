@@ -137,15 +137,36 @@ class AppState extends ChangeNotifier {
   // ─────────────────────────── AUTH ───────────────────────────
   AppUser? authenticate(String email, String password) {
     final e = email.trim().toLowerCase();
-    for (final u in users) {
+    for (var i = 0; i < users.length; i++) {
+      final u = users[i];
       if (u.email.toLowerCase() == e && u.password == password && u.active) {
-        currentUser = u;
-        log('Connexion', u.email);
+        final updated = u.copyWith(lastLogin: DateTime.now());
+        users[i] = updated;
+        currentUser = updated;
+        log('Connexion', updated.email);
+        _persist();
         notifyListeners();
-        return u;
+        return updated;
       }
     }
     return null;
+  }
+
+  /// Change le mot de passe de l'utilisateur connecté (client VIP ou personnel)
+  Future<void> changeOwnPassword(String newPassword) async {
+    final u = currentUser;
+    if (u == null) return;
+    final i = users.indexWhere((e) => e.id == u.id);
+    if (i < 0) return;
+    final updated = users[i].copyWith(
+      password: newPassword,
+      mustChangePassword: false,
+    );
+    users[i] = updated;
+    currentUser = updated;
+    log('Changement mot de passe', updated.email);
+    await _persist();
+    notifyListeners();
   }
 
   void logout() {
@@ -176,6 +197,8 @@ class AppState extends ChangeNotifier {
       case 'finance':
         return role == UserRole.ceo || role == UserRole.finance;
       case 'team':
+        return role == UserRole.ceo || role == UserRole.conciergeManager;
+      case 'user_access':
         return role == UserRole.ceo || role == UserRole.conciergeManager;
       case 'subscriptions':
         return role == UserRole.ceo;
@@ -479,6 +502,99 @@ class AppState extends ChangeNotifier {
     await _persist();
     notifyListeners();
     return c;
+  }
+
+  // ─────────────────────────── ACCÈS & UTILISATEURS ───────────────────────────
+  /// Liste des comptes personnel (hors clients VIP)
+  List<AppUser> get staffUsers => users.where((u) => u.role.isStaff).toList();
+
+  /// Liste des comptes clients VIP
+  List<AppUser> get clientUsers =>
+      users.where((u) => u.role == UserRole.vipClient).toList();
+
+  bool emailExists(String email, {String? exceptId}) {
+    final e = email.trim().toLowerCase();
+    return users.any(
+      (u) => u.email.toLowerCase() == e && u.id != exceptId,
+    );
+  }
+
+  /// Crée un accès (personnel ou client VIP)
+  Future<AppUser> createUser({
+    required String fullName,
+    required String email,
+    required String password,
+    required UserRole role,
+    String? title,
+    String? phone,
+    String? clientId,
+  }) async {
+    final u = AppUser(
+      id: 'u_${DateTime.now().microsecondsSinceEpoch}',
+      fullName: fullName,
+      email: email.trim(),
+      password: password,
+      role: role,
+      title: title,
+      phone: phone,
+      clientId: clientId,
+      active: true,
+      createdAt: DateTime.now(),
+      mustChangePassword: true,
+    );
+    users.insert(0, u);
+    log(
+      'Création accès',
+      u.email,
+      detail: '${u.fullName} · ${u.role.label}',
+    );
+    await _persist();
+    notifyListeners();
+    return u;
+  }
+
+  /// Met à jour un accès existant
+  Future<void> updateUser(AppUser updated) async {
+    final i = users.indexWhere((e) => e.id == updated.id);
+    if (i < 0) return;
+    users[i] = updated;
+    if (currentUser?.id == updated.id) currentUser = updated;
+    log('Mise à jour accès', updated.email);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Active / désactive un accès
+  Future<void> setUserActive(String id, bool active) async {
+    final i = users.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    final u = users[i];
+    users[i] = u.copyWith(active: active);
+    log(active ? 'Activation accès' : 'Désactivation accès', u.email);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Réinitialise le mot de passe (force le changement à la prochaine connexion)
+  Future<void> resetUserPassword(String id, String newPassword) async {
+    final i = users.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    final u = users[i];
+    users[i] = u.copyWith(password: newPassword, mustChangePassword: true);
+    log('Réinitialisation mot de passe', u.email);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Supprime définitivement un accès
+  Future<void> deleteUser(String id) async {
+    final i = users.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    final u = users[i];
+    users.removeAt(i);
+    log('Suppression accès', u.email);
+    await _persist();
+    notifyListeners();
   }
 
   // ─────────────────────────── SUBSCRIPTIONS ───────────────────────────

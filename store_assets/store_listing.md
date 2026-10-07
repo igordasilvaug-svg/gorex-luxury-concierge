@@ -73,6 +73,9 @@ POUR L'ÉQUIPE GOREX
 • CRM VIP, agenda, communication et gestion des abonnements configurables.
 • Rôles et permissions (CEO, Luxury Concierge Manager, Senior Concierge, Concierge, Travel
   Manager, Lifestyle Manager, Security Coordinator, Finance).
+• Gestion des accès : création de comptes personnel et clients VIP directement depuis
+  l'application (réservé à la Direction / Manager), activation/désactivation, réinitialisation
+  de mot de passe et changement obligatoire à la première connexion.
 
 CONFIDENTIALITÉ ET SÉCURITÉ
 • Authentification forte et gestion des rôles et permissions.

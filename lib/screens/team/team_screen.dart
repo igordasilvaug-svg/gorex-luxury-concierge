@@ -6,6 +6,7 @@ import '../../core/theme/app_typography.dart';
 import '../../models/enums.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common.dart';
+import '../access/staff_access_screen.dart';
 
 class TeamScreen extends StatelessWidget {
   const TeamScreen({super.key});
@@ -25,11 +26,38 @@ class TeamScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Équipe & permissions', style: AppTypography.displayMedium),
-            const SizedBox(height: 5),
-            Text(
-              '${staff.length} membres · rôles différenciés et permissions',
-              style: AppTypography.caption,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Équipe & permissions',
+                        style: AppTypography.displayMedium,
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        '${staff.length} membres · rôles différenciés et permissions',
+                        style: AppTypography.caption,
+                      ),
+                    ],
+                  ),
+                ),
+                if (s.can('user_access'))
+                  GoldButton(
+                    label: 'Gérer les accès',
+                    icon: Icons.admin_panel_settings_outlined,
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const Scaffold(
+                          body: StaffAccessScreen(),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 10),
             const GoldDivider(width: 60),

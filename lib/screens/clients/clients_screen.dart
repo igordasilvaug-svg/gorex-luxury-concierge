@@ -7,6 +7,7 @@ import '../../models/client.dart';
 
 import '../../state/app_state.dart';
 import '../../widgets/common.dart';
+import '../access/member_form_screen.dart';
 import '../documents/document_service.dart';
 
 class ClientsScreen extends StatefulWidget {
@@ -285,10 +286,44 @@ class _ClientCard extends StatelessWidget {
                 icon: const Icon(Icons.picture_as_pdf_outlined, size: 15),
                 label: const Text('EXPORTER FICHE CLIENT (PDF)'),
               ),
+              if (s.can('user_access')) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => _createClientAccess(context, s),
+                  icon: const Icon(Icons.vpn_key_outlined, size: 15),
+                  label: Text(
+                    _hasAccess(s)
+                        ? 'ACCÈS CLIENT EXISTANT'
+                        : 'CRÉER UN ACCÈS CLIENT VIP',
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  bool _hasAccess(AppState s) =>
+      s.clientUsers.any((u) => u.clientId == client.id);
+
+  void _createClientAccess(BuildContext context, AppState s) {
+    final existing = s.clientUsers.where((u) => u.clientId == client.id).toList();
+    if (existing.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Ce client possède déjà un accès : ${existing.first.email}',
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MemberFormScreen(clientId: client.id),
       ),
     );
   }

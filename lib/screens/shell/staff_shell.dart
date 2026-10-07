@@ -17,6 +17,7 @@ import '../crm/crm_screen.dart';
 import '../agenda/agenda_screen.dart';
 import '../communication/communication_screen.dart';
 import '../team/team_screen.dart';
+import '../access/staff_access_screen.dart';
 import '../clients/clients_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import 'app_shell.dart';
@@ -115,6 +116,13 @@ class _StaffShellState extends State<StaffShell> {
         Icons.badge,
         const TeamScreen(),
         permission: 'team',
+      ),
+      _NavItem(
+        'Accès personnel',
+        Icons.admin_panel_settings_outlined,
+        Icons.admin_panel_settings,
+        const StaffAccessScreen(),
+        permission: 'user_access',
       ),
       _NavItem(
         'Abonnements',
