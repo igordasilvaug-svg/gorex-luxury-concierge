@@ -27,7 +27,9 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
   late TextEditingController _legalEntityId;
   late TextEditingController _scheme;
   late TextEditingController _timeout;
+  late TextEditingController _webhookUrl;
   bool _enabled = false;
+  bool _autoRefresh = false;
   bool _obscure = true;
   bool _saving = false;
   bool _testing = false;
@@ -42,7 +44,9 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
     _legalEntityId = TextEditingController(text: c.senderLegalEntityId);
     _scheme = TextEditingController(text: c.defaultScheme);
     _timeout = TextEditingController(text: c.timeoutSeconds.toString());
+    _webhookUrl = TextEditingController(text: c.webhookUrl);
     _enabled = c.enabled;
+    _autoRefresh = c.autoRefresh;
   }
 
   @override
@@ -54,6 +58,7 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
       _legalEntityId,
       _scheme,
       _timeout,
+      _webhookUrl,
     ]) {
       c.dispose();
     }
@@ -68,6 +73,8 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
     senderLegalEntityId: _legalEntityId.text.trim(),
     defaultScheme: _scheme.text.trim().isEmpty ? '0208' : _scheme.text.trim(),
     timeoutSeconds: int.tryParse(_timeout.text.trim()) ?? 30,
+    webhookUrl: _webhookUrl.text.trim(),
+    autoRefresh: _autoRefresh,
   );
 
   Future<void> _save() async {
@@ -251,6 +258,37 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
                       ),
                     ),
                   ],
+                ),
+
+                _section('Suivi de statut'),
+                _field(
+                  'URL de webhook (notifications)',
+                  _webhookUrl,
+                  hint: 'https://votre-domaine/gorex/peppol-webhook',
+                  keyboard: TextInputType.url,
+                ),
+                Text(
+                  'Déclarez cette URL chez votre Access Point pour recevoir les '
+                  'changements de statut (accepté / distribué / rejeté) en temps '
+                  'réel. Sans webhook, utilisez le rafraîchissement manuel.',
+                  style: AppTypography.caption.copyWith(fontSize: 10.5),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _autoRefresh,
+                  activeThumbColor: AppColors.champagne,
+                  title: Text(
+                    'Rafraîchissement automatique',
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.offWhite,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Interroge l\'Access Point au chargement de l\'écran Finance.',
+                    style: AppTypography.caption.copyWith(fontSize: 10.5),
+                  ),
+                  onChanged: (v) => setState(() => _autoRefresh = v),
                 ),
 
                 const SizedBox(height: 8),

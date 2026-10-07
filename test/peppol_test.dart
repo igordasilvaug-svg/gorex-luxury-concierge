@@ -268,6 +268,158 @@ void main() {
     });
   });
 
+  group('PeppolService — mapping de statut (suivi asynchrone)', () {
+    test('delivered events map to delivered', () {
+      expect(
+        PeppolService.parseStatusFromBody('{"status":"DELIVERED"}'),
+        PeppolStatus.delivered,
+      );
+      expect(
+        PeppolService.parseStatusFromBody('{"status":"ACCEPTED"}'),
+        PeppolStatus.delivered,
+      );
+      expect(
+        PeppolService.parseStatusFromBody(
+          '{"document_submission_status":"IN_PROGRESS","events":[{"event_type":"DELIVERED"}]}',
+        ),
+        PeppolStatus.delivered,
+      );
+    });
+
+    test('failure events map to failed', () {
+      expect(
+        PeppolService.parseStatusFromBody('{"status":"FAILED"}'),
+        PeppolStatus.failed,
+      );
+      expect(
+        PeppolService.parseStatusFromBody('{"status":"REJECTED"}'),
+        PeppolStatus.failed,
+      );
+    });
+
+    test('sent / processing map to sent', () {
+      expect(
+        PeppolService.parseStatusFromBody('{"status":"SENT"}'),
+        PeppolStatus.sent,
+      );
+      expect(
+        PeppolService.parseStatusFromBody('{"status":"PROCESSING"}'),
+        PeppolStatus.sent,
+      );
+    });
+
+    test('empty or invalid body returns null', () {
+      expect(PeppolService.parseStatusFromBody(''), isNull);
+      expect(PeppolService.parseStatusFromBody('not json'), isNull);
+    });
+  });
+
+  group('AppState — suivi asynchrone Peppol', () {
+    test('refreshPeppolStatus simulates progression sent → delivered', () async {
+      final s = await _ready();
+      s.authenticate('ceo@gorex.com', 'gorex2025');
+      final client = s.clientById('c_001')!;
+      final doc = await s.createFinanceDoc(
+        FinanceDocument(
+          id: '',
+          reference: '',
+          type: FinanceDocType.invoice,
+          clientId: client.id,
+          clientName: client.fullName,
+          date: DateTime.now(),
+          lines: const [FinanceLine(description: 'X', unitPrice: 100)],
+        ),
+      );
+      await s.sendViaPeppol(doc.id); // simulated → sent
+      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.sent);
+      final st = await s.refreshPeppolStatus(doc.id);
+      expect(st, PeppolStatus.delivered);
+      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.delivered);
+      expect(s.financeById(doc.id)!.peppolLastUpdate, isNotNull);
+    });
+
+    test('ingestPeppolWebhook updates status by provider reference', () async {
+      final s = await _ready();
+      s.authenticate('ceo@gorex.com', 'gorex2025');
+      await s.updatePeppol(
+        const PeppolConfig(
+          enabled: true,
+          apiBaseUrl: 'http://127.0.0.1:1',
+          apiKey: 'x',
+          senderPeppolId: '0208:0403203462',
+          timeoutSeconds: 2,
+        ),
+      );
+      final client = s.clientById('c_001')!;
+      final doc = await s.createFinanceDoc(
+        FinanceDocument(
+          id: '',
+          reference: '',
+          type: FinanceDocType.invoice,
+          clientId: client.id,
+          clientName: client.fullName,
+          date: DateTime.now(),
+          lines: const [FinanceLine(description: 'X', unitPrice: 100)],
+        ),
+      );
+      await s.sendViaPeppol(doc.id); // unreachable → failed, ref null
+      // Inject a manual provider reference then apply a webhook
+      await s.updateFinanceDoc(
+        s.financeById(doc.id)!.copyWith(peppolProviderReference: 'SUB-123'),
+      );
+      final ok = await s.ingestPeppolWebhook(
+        {'document_submission_guid': 'SUB-123', 'status': 'DELIVERED'},
+      );
+      expect(ok, isTrue);
+      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.delivered);
+    });
+
+    test('ingestPeppolWebhook ignores unknown references', () async {
+      final s = await _ready();
+      s.authenticate('ceo@gorex.com', 'gorex2025');
+      final ok = await s.ingestPeppolWebhook(
+        {'document_submission_guid': 'NOPE', 'status': 'DELIVERED'},
+      );
+      expect(ok, isFalse);
+    });
+
+    test('refreshAllPeppolStatuses reports updated count', () async {
+      final s = await _ready();
+      s.authenticate('ceo@gorex.com', 'gorex2025');
+      final client = s.clientById('c_001')!;
+      for (var k = 0; k < 2; k++) {
+        final doc = await s.createFinanceDoc(
+          FinanceDocument(
+            id: '',
+            reference: '',
+            type: FinanceDocType.invoice,
+            clientId: client.id,
+            clientName: client.fullName,
+            date: DateTime.now(),
+            lines: const [FinanceLine(description: 'X', unitPrice: 100)],
+          ),
+        );
+        await s.sendViaPeppol(doc.id);
+      }
+      final updated = await s.refreshAllPeppolStatuses();
+      expect(updated, greaterThanOrEqualTo(2));
+    });
+
+    test('peppol config persists webhook + autoRefresh', () async {
+      final s = await _ready();
+      s.authenticate('ceo@gorex.com', 'gorex2025');
+      await s.updatePeppol(
+        const PeppolConfig(
+          enabled: true,
+          webhookUrl: 'https://x/hook',
+          autoRefresh: true,
+        ),
+      );
+      expect(s.peppol.webhookUrl, 'https://x/hook');
+      expect(s.peppol.autoRefresh, isTrue);
+    });
+  });
+
   group('Écran Access Point Peppol', () {
     testWidgets('renders for CEO', (tester) async {
       final s = await _ready();

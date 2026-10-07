@@ -21,6 +21,22 @@ class FinanceScreen extends StatefulWidget {
 
 class _FinanceScreenState extends State<FinanceScreen> {
   FinanceDocType? _filter;
+  bool _autoRefreshed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAutoRefresh());
+  }
+
+  /// Rafraîchit les statuts Peppol au chargement si l'option est activée.
+  Future<void> _maybeAutoRefresh() async {
+    if (_autoRefreshed || !mounted) return;
+    final s = context.read<AppState>();
+    if (!s.peppol.autoRefresh) return;
+    _autoRefreshed = true;
+    await s.refreshAllPeppolStatuses();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +65,24 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     'Devis · factures · marges · commissions · rentabilité',
                     style: AppTypography.caption,
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Actualiser les statuts Peppol',
+                  icon: const Icon(Icons.sync, size: 18, color: AppColors.grey),
+                  onPressed: () async {
+                    final n = await s.refreshAllPeppolStatuses();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            n == 0
+                                ? 'Statuts Peppol à jour.'
+                                : '$n statut(s) Peppol mis à jour.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
                 ),
                 IconButton(
                   tooltip: 'Configuration Peppol',
@@ -335,6 +369,23 @@ class _FinanceScreenState extends State<FinanceScreen> {
                           ? 'Non applicable'
                           : d.peppolStatus.label,
                     ),
+                    if (d.peppolProviderReference != null) ...[
+                      const Divider(height: 1),
+                      InfoRow(
+                        label: 'Réf. fournisseur',
+                        value: d.peppolProviderReference!,
+                      ),
+                    ],
+                    if (d.peppolLastUpdate != null) ...[
+                      const Divider(height: 1),
+                      InfoRow(
+                        label: 'Maj statut',
+                        value: DateFormat(
+                          'dd/MM/yyyy HH:mm',
+                          'fr_BE',
+                        ).format(d.peppolLastUpdate!),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -415,6 +466,30 @@ class _FinanceScreenState extends State<FinanceScreen> {
                         ),
                       ),
                     ],
+                  ),
+                if (d.peppolStatus == PeppolStatus.sent ||
+                    d.peppolStatus == PeppolStatus.failed)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final st = await s.refreshPeppolStatus(d.id);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                st == null
+                                    ? 'Statut indisponible.'
+                                    : 'Statut Peppol : ${st.label}',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.refresh, size: 15),
+                      label: const Text('RAFRAÎCHIR LE STATUT'),
+                    ),
                   ),
               ],
               const SizedBox(height: 12),

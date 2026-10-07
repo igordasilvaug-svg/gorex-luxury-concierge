@@ -26,6 +26,13 @@ class PeppolConfig {
   /// Délai d'attente des requêtes HTTP (secondes).
   final int timeoutSeconds;
 
+  /// URL du webhook public où l'Access Point notifie les changements de statut.
+  /// (À déclarer côté fournisseur.)
+  final String webhookUrl;
+
+  /// Rafraîchissement automatique du statut des factures en attente.
+  final bool autoRefresh;
+
   const PeppolConfig({
     this.enabled = false,
     this.apiBaseUrl = 'https://api.storecove.com/api/v2',
@@ -34,6 +41,8 @@ class PeppolConfig {
     this.senderLegalEntityId = '',
     this.defaultScheme = '0208',
     this.timeoutSeconds = 30,
+    this.webhookUrl = '',
+    this.autoRefresh = false,
   });
 
   bool get isConfigured =>
@@ -50,6 +59,8 @@ class PeppolConfig {
     String? senderLegalEntityId,
     String? defaultScheme,
     int? timeoutSeconds,
+    String? webhookUrl,
+    bool? autoRefresh,
   }) => PeppolConfig(
     enabled: enabled ?? this.enabled,
     apiBaseUrl: apiBaseUrl ?? this.apiBaseUrl,
@@ -58,6 +69,8 @@ class PeppolConfig {
     senderLegalEntityId: senderLegalEntityId ?? this.senderLegalEntityId,
     defaultScheme: defaultScheme ?? this.defaultScheme,
     timeoutSeconds: timeoutSeconds ?? this.timeoutSeconds,
+    webhookUrl: webhookUrl ?? this.webhookUrl,
+    autoRefresh: autoRefresh ?? this.autoRefresh,
   );
 
   Map<String, dynamic> toMap() => {
@@ -68,6 +81,8 @@ class PeppolConfig {
     'senderLegalEntityId': senderLegalEntityId,
     'defaultScheme': defaultScheme,
     'timeoutSeconds': timeoutSeconds,
+    'webhookUrl': webhookUrl,
+    'autoRefresh': autoRefresh,
   };
 
   factory PeppolConfig.fromMap(Map<String, dynamic> m) => PeppolConfig(
@@ -78,5 +93,7 @@ class PeppolConfig {
     senderLegalEntityId: m['senderLegalEntityId'] as String? ?? '',
     defaultScheme: m['defaultScheme'] as String? ?? '0208',
     timeoutSeconds: (m['timeoutSeconds'] as num?)?.toInt() ?? 30,
+    webhookUrl: m['webhookUrl'] as String? ?? '',
+    autoRefresh: m['autoRefresh'] as bool? ?? false,
   );
 }

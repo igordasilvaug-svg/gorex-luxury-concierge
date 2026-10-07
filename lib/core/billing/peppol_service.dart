@@ -146,6 +146,91 @@ class PeppolService {
     }
   }
 
+  /// Interroge l'Access Point pour obtenir le statut d'une soumission.
+  ///
+  /// Retourne le statut Peppol mappé depuis la réponse du fournisseur,
+  /// ou `null` si le statut ne peut pas être déterminé.
+  static Future<PeppolStatus?> getSubmissionStatus({
+    required PeppolConfig config,
+    required String providerReference,
+  }) async {
+    if (!config.isConfigured || providerReference.isEmpty) return null;
+    final uri = Uri.parse(
+      '${config.apiBaseUrl.replaceAll(RegExp(r'/+$'), '')}'
+      '/document_submissions/$providerReference',
+    );
+    try {
+      final resp = await http
+          .get(
+            uri,
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': 'Bearer ${config.apiKey}',
+            },
+          )
+          .timeout(Duration(seconds: config.timeoutSeconds));
+      if (resp.statusCode < 200 || resp.statusCode >= 300) return null;
+      return parseStatusFromBody(resp.body);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Mappe un corps JSON (Storecove / générique) vers un [PeppolStatus].
+  static PeppolStatus? parseStatusFromBody(String body) {
+    if (body.trim().isEmpty) return null;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) return null;
+      // Storecove : document_submission_status + events[]
+      final raw =
+          (decoded['document_submission_status'] ??
+                  decoded['status'] ??
+                  decoded['state'] ??
+                  decoded['delivery_status'])
+              ?.toString()
+              .toUpperCase();
+      final events = decoded['events'];
+      String? lastEvent;
+      if (events is List && events.isNotEmpty) {
+        final last = events.last;
+        if (last is Map) {
+          lastEvent = (last['event_type'] ?? last['type'] ?? last['status'])
+              ?.toString()
+              .toUpperCase();
+        }
+      }
+      return _mapStatus(raw, lastEvent);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static PeppolStatus _mapStatus(String? raw, String? lastEvent) {
+    final s = '${raw ?? ''} ${lastEvent ?? ''}'.toUpperCase();
+    if (s.contains('DELIVER') ||
+        s.contains('ACCEPT') ||
+        s.contains('RECEIVED') ||
+        s.contains('COMPLETED')) {
+      return PeppolStatus.delivered;
+    }
+    if (s.contains('FAIL') ||
+        s.contains('ERROR') ||
+        s.contains('REJECT') ||
+        s.contains('UNDELIVER')) {
+      return PeppolStatus.failed;
+    }
+    if (s.contains('SENT') ||
+        s.contains('SUBMIT') ||
+        s.contains('SEND') ||
+        s.contains('IN_PROGRESS') ||
+        s.contains('PROCESSING') ||
+        s.contains('PENDING')) {
+      return PeppolStatus.sent;
+    }
+    return PeppolStatus.sent;
+  }
+
   /// Teste la connexion à l'Access Point (liste des entités légales).
   static Future<PeppolSendResult> testConnection(PeppolConfig config) async {
     if (!config.isConfigured) {

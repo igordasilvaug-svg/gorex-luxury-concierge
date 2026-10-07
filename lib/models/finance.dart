@@ -59,6 +59,10 @@ class FinanceDocument {
   final String? clientVatNumber;
   /// Communication structurée (OGM/VCS) pour le virement
   final String? structuredCommunication;
+  /// Référence renvoyée par l'Access Point Peppol (identifiant de suivi)
+  final String? peppolProviderReference;
+  /// Dernière mise à jour du statut Peppol (polling / webhook)
+  final DateTime? peppolLastUpdate;
 
   const FinanceDocument({
     required this.id,
@@ -80,6 +84,8 @@ class FinanceDocument {
     this.vatMention,
     this.clientVatNumber,
     this.structuredCommunication,
+    this.peppolProviderReference,
+    this.peppolLastUpdate,
   });
 
   double get subtotal => lines.fold(0.0, (s, l) => s + l.total);
@@ -97,6 +103,8 @@ class FinanceDocument {
     String? vatMention,
     String? clientVatNumber,
     String? structuredCommunication,
+    String? peppolProviderReference,
+    DateTime? peppolLastUpdate,
   }) => FinanceDocument(
     id: id,
     reference: reference,
@@ -118,6 +126,9 @@ class FinanceDocument {
     clientVatNumber: clientVatNumber ?? this.clientVatNumber,
     structuredCommunication:
         structuredCommunication ?? this.structuredCommunication,
+    peppolProviderReference:
+        peppolProviderReference ?? this.peppolProviderReference,
+    peppolLastUpdate: peppolLastUpdate ?? this.peppolLastUpdate,
   );
 
   Map<String, dynamic> toMap() => {
@@ -140,6 +151,8 @@ class FinanceDocument {
     'vatMention': vatMention,
     'clientVatNumber': clientVatNumber,
     'structuredCommunication': structuredCommunication,
+    'peppolProviderReference': peppolProviderReference,
+    'peppolLastUpdate': peppolLastUpdate?.toIso8601String(),
   };
 
   factory FinanceDocument.fromMap(Map<String, dynamic> m) => FinanceDocument(
@@ -170,6 +183,10 @@ class FinanceDocument {
     vatMention: m['vatMention'] as String?,
     clientVatNumber: m['clientVatNumber'] as String?,
     structuredCommunication: m['structuredCommunication'] as String?,
+    peppolProviderReference: m['peppolProviderReference'] as String?,
+    peppolLastUpdate: m['peppolLastUpdate'] != null
+        ? DateTime.tryParse(m['peppolLastUpdate'] as String)
+        : null,
   );
 }
 

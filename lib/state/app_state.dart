@@ -792,6 +792,8 @@ class AppState extends ChangeNotifier {
       financeDocs[i] = d.copyWith(
         peppolStatus: PeppolStatus.sent,
         status: d.status == InvoiceStatus.draft ? InvoiceStatus.sent : d.status,
+        peppolProviderReference: result.providerReference,
+        peppolLastUpdate: DateTime.now(),
       );
       log(
         'Envoi Peppol',
@@ -801,12 +803,103 @@ class AppState extends ChangeNotifier {
             : 'Transmis · ${result.providerReference ?? 'OK'}',
       );
     } else {
-      financeDocs[i] = d.copyWith(peppolStatus: PeppolStatus.failed);
+      financeDocs[i] = d.copyWith(
+        peppolStatus: PeppolStatus.failed,
+        peppolLastUpdate: DateTime.now(),
+      );
       log('Échec Peppol', d.reference, detail: result.message);
     }
     await _persist();
     notifyListeners();
     return result;
+  }
+
+  /// Interroge l'Access Point pour actualiser le statut d'une facture
+  /// (confirmation de distribution asynchrone — polling).
+  Future<PeppolStatus?> refreshPeppolStatus(String docId) async {
+    final i = financeDocs.indexWhere((e) => e.id == docId);
+    if (i < 0) return null;
+    final d = financeDocs[i];
+    final ref = d.peppolProviderReference;
+    if (ref == null || ref.isEmpty) {
+      // En mode simulation, on simule la progression sent → delivered.
+      if (!peppol.isConfigured && d.peppolStatus == PeppolStatus.sent) {
+        financeDocs[i] = d.copyWith(
+          peppolStatus: PeppolStatus.delivered,
+          peppolLastUpdate: DateTime.now(),
+        );
+        log('Peppol (simulation)', d.reference, detail: 'Statut → Distribué');
+        await _persist();
+        notifyListeners();
+        return PeppolStatus.delivered;
+      }
+      return d.peppolStatus;
+    }
+    final status = await PeppolService.getSubmissionStatus(
+      config: peppol,
+      providerReference: ref,
+    );
+    if (status == null) return d.peppolStatus;
+    if (status != d.peppolStatus) {
+      financeDocs[i] = d.copyWith(
+        peppolStatus: status,
+        peppolLastUpdate: DateTime.now(),
+      );
+      log('Peppol statut', d.reference, detail: '→ ${status.label}');
+      await _persist();
+      notifyListeners();
+    }
+    return status;
+  }
+
+  /// Rafraîchit le statut de toutes les factures en cours (sent/failed).
+  /// Retourne le nombre de statuts mis à jour.
+  Future<int> refreshAllPeppolStatuses() async {
+    var updated = 0;
+    final pending = financeDocs
+        .where(
+          (d) =>
+              d.peppolStatus == PeppolStatus.sent ||
+              d.peppolStatus == PeppolStatus.failed,
+        )
+        .toList();
+    for (final d in pending) {
+      final before = d.peppolStatus;
+      final after = await refreshPeppolStatus(d.id);
+      if (after != null && after != before) updated++;
+    }
+    return updated;
+  }
+
+  /// Applique une notification webhook reçue de l'Access Point.
+  /// [payload] est le corps JSON brut ; [reference] identifie la facture
+  /// (référence interne ou référence fournisseur).
+  Future<bool> ingestPeppolWebhook(
+    Map<String, dynamic> payload, {
+    String? reference,
+  }) async {
+    final status = PeppolService.parseStatusFromBody(jsonEncode(payload));
+    if (status == null) return false;
+    final ref =
+        reference ??
+        (payload['document_submission_guid'] ??
+                payload['tracking_id'] ??
+                payload['guid'] ??
+                payload['reference'])
+            ?.toString();
+    if (ref == null || ref.isEmpty) return false;
+    final i = financeDocs.indexWhere(
+      (d) => d.peppolProviderReference == ref || d.reference == ref,
+    );
+    if (i < 0) return false;
+    financeDocs[i] = financeDocs[i].copyWith(
+      peppolStatus: status,
+      peppolLastUpdate: DateTime.now(),
+    );
+    log('Webhook Peppol', financeDocs[i].reference, detail: '→ ${status.label}');
+    await _persist();
+    notifyListeners();
+    return true;
   }
 
   /// Génère le XML UBL 2.1 (Peppol BIS Billing 3.0) d'une facture.
