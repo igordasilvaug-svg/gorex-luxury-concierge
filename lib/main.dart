@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'state/app_state.dart';
 import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/force_password_change_screen.dart';
 import 'screens/shell/app_shell.dart';
 
@@ -41,33 +42,37 @@ class GorexApp extends StatelessWidget {
   }
 }
 
-class _Root extends StatelessWidget {
+class _Root extends StatefulWidget {
   const _Root();
+
+  @override
+  State<_Root> createState() => _RootState();
+}
+
+class _RootState extends State<_Root> {
+  bool _splashDone = false;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+
+    // Séquence d'ouverture cinématographique (une seule fois par lancement)
+    if (!_splashDone) {
+      return SplashScreen(
+        onFinished: () {
+          if (mounted) setState(() => _splashDone = true);
+        },
+      );
+    }
+
     if (!state.ready) {
       return const Scaffold(
+        backgroundColor: Color(0xFF0A0A0B),
         body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 34,
-                height: 34,
-                child: CircularProgressIndicator(strokeWidth: 1.6),
-              ),
-              SizedBox(height: 22),
-              Text(
-                'GOREX',
-                style: TextStyle(
-                  letterSpacing: 8,
-                  fontSize: 15,
-                  color: Color(0xFFC6A15B),
-                ),
-              ),
-            ],
+          child: SizedBox(
+            width: 30,
+            height: 30,
+            child: CircularProgressIndicator(strokeWidth: 1.4),
           ),
         ),
       );

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../state/app_state.dart';
+import '../widgets/animations.dart';
 import '../widgets/common.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -59,9 +60,14 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Center(child: GorexBrand()),
+                const FadeSlideIn(
+                  duration: Duration(milliseconds: 700),
+                  child: Center(child: GorexBrand()),
+                ),
                 const SizedBox(height: 40),
-                Container(
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 160),
+                  child: Container(
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
                     gradient: AppColors.cardGradient,
@@ -131,32 +137,46 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
+                ),
                 const SizedBox(height: 26),
-                Text(
-                  'COMPTES DE DÉMONSTRATION',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.eyebrow,
+                const FadeSlideIn(
+                  delay: Duration(milliseconds: 320),
+                  child: Text(
+                    'COMPTES DE DÉMONSTRATION',
+                    textAlign: TextAlign.center,
+                    style: AppTypography.eyebrow,
+                  ),
                 ),
                 const SizedBox(height: 14),
-                _demoGrid(),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 400),
+                  child: _demoGrid(),
+                ),
                 const SizedBox(height: 28),
-                Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        'DISCRETION. ACCESS. EXCELLENCE.',
-                        style: AppTypography.eyebrow.copyWith(
-                          color: AppColors.greyDark,
+                const FadeSlideIn(
+                  delay: Duration(milliseconds: 520),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          'DISCRETION. ACCESS. EXCELLENCE.',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 4,
+                            color: AppColors.greyDark,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Gorex Group — Belgique',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.greyDark,
+                        SizedBox(height: 6),
+                        Text(
+                          'Gorex Group — Belgique',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.greyDark,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

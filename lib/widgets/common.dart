@@ -217,6 +217,10 @@ class KpiTile extends StatelessWidget {
   final IconData icon;
   final String? delta;
   final Color? accent;
+
+  /// Remplace l'affichage texte de [value] (ex. compteur animé).
+  final Widget? valueWidget;
+
   const KpiTile({
     super.key,
     required this.label,
@@ -224,6 +228,7 @@ class KpiTile extends StatelessWidget {
     required this.icon,
     this.delta,
     this.accent,
+    this.valueWidget,
   });
 
   @override
@@ -250,7 +255,8 @@ class KpiTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Text(value, style: AppTypography.numberLarge.copyWith(fontSize: 26)),
+          valueWidget ??
+              Text(value, style: AppTypography.numberLarge.copyWith(fontSize: 26)),
           const SizedBox(height: 3),
           Text(
             label.toUpperCase(),

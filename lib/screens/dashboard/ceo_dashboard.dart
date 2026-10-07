@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/enums.dart';
 import '../../state/app_state.dart';
+import '../../widgets/animations.dart';
 import '../../widgets/common.dart';
 import '../requests/request_detail_screen.dart';
 
@@ -30,13 +31,21 @@ class CeoDashboard extends StatelessWidget {
       title: 'Tableau de bord — Direction',
       subtitle: 'Vue consolidée du groupe · Confidentialité maximale',
       children: [
-        _kpiGrid(context, s, eur),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 60),
+          child: _kpiGrid(context, s, eur),
+        ),
         const SizedBox(height: 22),
         if (urgent.isNotEmpty) ...[
-          _urgentSection(context, s, urgent),
+          FadeSlideIn(
+            delay: const Duration(milliseconds: 180),
+            child: _urgentSection(context, s, urgent),
+          ),
           const SizedBox(height: 22),
         ],
-        LayoutBuilder(
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 260),
+          child: LayoutBuilder(
           builder: (context, c) {
             final wide = c.maxWidth > 780;
             final left = Column(
@@ -70,6 +79,7 @@ class CeoDashboard extends StatelessWidget {
               children: [left, const SizedBox(height: 18), right],
             );
           },
+        ),
         ),
       ],
     );
@@ -107,6 +117,11 @@ class CeoDashboard extends StatelessWidget {
         value: eur.format(s.totalRevenue),
         icon: Icons.trending_up,
         delta: 'HT',
+        valueWidget: GoldCountUp(
+          value: s.totalRevenue,
+          formatter: (v) => eur.format(v),
+          style: AppTypography.numberLarge.copyWith(fontSize: 26),
+        ),
       ),
       KpiTile(
         label: 'Marge',
@@ -115,18 +130,33 @@ class CeoDashboard extends StatelessWidget {
         delta: s.totalRevenue > 0
             ? '${(s.totalMargin / s.totalRevenue * 100).toStringAsFixed(0)}%'
             : '—',
+        valueWidget: GoldCountUp(
+          value: s.totalMargin,
+          formatter: (v) => eur.format(v),
+          style: AppTypography.numberLarge.copyWith(fontSize: 26),
+        ),
       ),
       KpiTile(
         label: 'Dépenses',
         value: eur.format(s.totalCost),
         icon: Icons.receipt_outlined,
         accent: AppColors.greyLight,
+        valueWidget: GoldCountUp(
+          value: s.totalCost,
+          formatter: (v) => eur.format(v),
+          style: AppTypography.numberLarge.copyWith(fontSize: 26),
+        ),
       ),
       KpiTile(
         label: 'Commissions',
         value: eur.format(s.totalCommissions),
         icon: Icons.percent,
         accent: AppColors.champagne,
+        valueWidget: GoldCountUp(
+          value: s.totalCommissions,
+          formatter: (v) => eur.format(v),
+          style: AppTypography.numberLarge.copyWith(fontSize: 26),
+        ),
       ),
     ];
     return LayoutBuilder(
@@ -425,11 +455,16 @@ class _DashboardScaffold extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: AppTypography.displayMedium),
+            FadeSlideIn(
+              child: Text(title, style: AppTypography.displayMedium),
+            ),
             const SizedBox(height: 6),
-            Text(subtitle, style: AppTypography.caption),
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 90),
+              child: Text(subtitle, style: AppTypography.caption),
+            ),
             const SizedBox(height: 10),
-            const GoldDivider(width: 60),
+            const GoldLineGrow(width: 60),
             const SizedBox(height: 22),
             ...children,
           ],
