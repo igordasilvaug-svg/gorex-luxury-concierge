@@ -19,6 +19,7 @@ import '../models/finance.dart';
 import '../models/itinerary.dart';
 import '../models/peppol_config.dart';
 import '../models/provider_booking.dart';
+import '../models/reminder_config.dart';
 import '../models/service_request.dart';
 import '../models/subscription_tier.dart';
 
@@ -35,6 +36,9 @@ class AppState extends ChangeNotifier {
 
   /// Configuration de l'Access Point Peppol (facturation électronique).
   PeppolConfig peppol = const PeppolConfig();
+
+  /// Configuration du moteur de relance automatique des impayés.
+  ReminderConfig reminderConfig = const ReminderConfig();
 
   List<AppUser> users = [];
   List<Client> clients = [];
@@ -111,6 +115,11 @@ class AppState extends ChangeNotifier {
         Map<String, dynamic>.from(m['peppol'] as Map),
       );
     }
+    if (m['reminderConfig'] != null) {
+      reminderConfig = ReminderConfig.fromMap(
+        Map<String, dynamic>.from(m['reminderConfig'] as Map),
+      );
+    }
     users = _mapList(m['users'], AppUser.fromMap);
     clients = _mapList(m['clients'], Client.fromMap);
     tiers = _mapList(m['tiers'], SubscriptionTier.fromMap);
@@ -140,6 +149,7 @@ class AppState extends ChangeNotifier {
       jsonEncode({
         'company': company.toMap(),
         'peppol': peppol.toMap(),
+        'reminderConfig': reminderConfig.toMap(),
         'users': users.map((e) => e.toMap()).toList(),
         'clients': clients.map((e) => e.toMap()).toList(),
         'tiers': tiers.map((e) => e.toMap()).toList(),
@@ -1055,7 +1065,7 @@ class AppState extends ChangeNotifier {
     final i = financeDocs.indexWhere((e) => e.id == docId);
     if (i < 0) return null;
     final d = financeDocs[i];
-    final p = ReminderService.plan(d);
+    final p = ReminderService.plan(d, minDays: reminderConfig.minDaysBetween);
     if (!p.due) return p;
     financeDocs[i] = d.copyWith(
       reminderLevel: p.nextLevel,
@@ -1075,11 +1085,66 @@ class AppState extends ChangeNotifier {
   /// Relance toutes les factures échues nécessitant une action.
   /// Retourne le nombre de relances envoyées.
   Future<int> sendAllDueReminders() async {
-    final plans = ReminderService.pending(financeDocs);
+    final plans = ReminderService.pending(
+      financeDocs,
+      minDays: reminderConfig.minDaysBetween,
+    );
     for (final p in plans) {
       await sendReminder(p.document.id);
     }
     return plans.length;
+  }
+
+  /// ── Moteur de relance automatique (planifié) ──
+  /// Indique si une exécution automatique est due (démarrage ou intervalle).
+  bool get reminderRunDue {
+    if (!reminderConfig.enabled) return false;
+    final last = reminderConfig.lastRunAt;
+    if (last == null) return true;
+    final elapsed = DateTime.now().difference(last);
+    return elapsed.inHours >= reminderConfig.intervalHours;
+  }
+
+  /// Exécute le moteur de relance automatique si les conditions sont réunies.
+  /// [force] court-circuite la vérification d'intervalle.
+  /// Retourne le nombre de relances envoyées (0 si rien à faire).
+  Future<int> runAutoReminders({bool force = false}) async {
+    if (!reminderConfig.enabled) return 0;
+    if (!force && !reminderRunDue) return 0;
+    final plans = ReminderService.pending(
+      financeDocs,
+      minDays: reminderConfig.minDaysBetween,
+    );
+    if (reminderConfig.autoSend) {
+      for (final p in plans) {
+        await sendReminder(p.document.id);
+      }
+    }
+    reminderConfig = reminderConfig.copyWith(
+      lastRunAt: DateTime.now(),
+      lastRunCount: plans.length,
+    );
+    log(
+      'Relances automatiques',
+      '${plans.length} relance(s)',
+      detail: reminderConfig.autoSend
+          ? 'Envoi automatique'
+          : 'Détection seule (envoi désactivé)',
+    );
+    await _persist();
+    notifyListeners();
+    return plans.length;
+  }
+
+  /// Met à jour la configuration du moteur de relance automatique.
+  Future<void> updateReminderConfig(ReminderConfig config) async {
+    reminderConfig = config;
+    log(
+      'Configuration relances',
+      config.enabled ? 'Activée' : 'Désactivée',
+    );
+    await _persist();
+    notifyListeners();
   }
 
   /// Email de relance (sujet + corps) pour une facture.

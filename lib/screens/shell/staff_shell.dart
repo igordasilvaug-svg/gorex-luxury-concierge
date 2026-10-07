@@ -22,6 +22,8 @@ import '../access/staff_access_screen.dart';
 import '../clients/clients_screen.dart';
 import '../settings/company_settings_screen.dart';
 import '../settings/peppol_settings_screen.dart';
+import '../settings/reminder_settings_screen.dart';
+import '../legal/privacy_policy_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import 'app_shell.dart';
 
@@ -114,6 +116,13 @@ class _StaffShellState extends State<StaffShell> {
         permission: 'finance',
       ),
       _NavItem(
+        'Relances automatiques',
+        Icons.notifications_active_outlined,
+        Icons.notifications_active,
+        const ReminderSettingsScreen(),
+        permission: 'finance',
+      ),
+      _NavItem(
         'CRM',
         Icons.trending_up_outlined,
         Icons.trending_up,
@@ -154,6 +163,12 @@ class _StaffShellState extends State<StaffShell> {
         Icons.workspace_premium,
         const SubscriptionsScreen(),
         permission: 'subscriptions',
+      ),
+      _NavItem(
+        'Confidentialité',
+        Icons.privacy_tip_outlined,
+        Icons.privacy_tip,
+        const PrivacyPolicyScreen(),
       ),
     ];
     return all

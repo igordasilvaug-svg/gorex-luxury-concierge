@@ -8,6 +8,7 @@ import '../../core/theme/app_typography.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common.dart';
 import '../documents/document_service.dart';
+import '../legal/privacy_policy_screen.dart';
 
 class ClientProfileScreen extends StatelessWidget {
   const ClientProfileScreen({super.key});
@@ -211,6 +212,17 @@ class ClientProfileScreen extends StatelessWidget {
               label: const Text('CONTACTER GOREX EN URGENCE'),
             ),
             const SizedBox(height: 18),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PrivacyPolicyScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.privacy_tip_outlined, size: 15),
+                label: const Text('POLITIQUE DE CONFIDENTIALITÉ'),
+              ),
+            ),
             Center(
               child: TextButton.icon(
                 onPressed: () => s.logout(),

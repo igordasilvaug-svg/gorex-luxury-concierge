@@ -55,9 +55,12 @@ class ReminderService {
   }
 
   /// Calcule le plan de relance d'une facture (faut-il relancer ? à quel niveau ?).
-  static ReminderPlan plan(FinanceDocument d) {
+  /// [minDays] permet de surcharger le délai minimum entre deux relances
+  /// (issu de la configuration du moteur automatique).
+  static ReminderPlan plan(FinanceDocument d, {int? minDays}) {
     final days = d.daysOverdue;
     final target = targetLevel(days);
+    final minGap = minDays ?? minDaysBetween;
 
     if (!d.isOverdue) {
       return ReminderPlan(
@@ -92,14 +95,14 @@ class ReminderService {
     final last = d.lastReminderAt;
     if (last != null) {
       final since = DateTime.now().difference(last).inDays;
-      if (since < minDaysBetween) {
+      if (since < minGap) {
         return ReminderPlan(
           document: d,
           nextLevel: d.reminderLevel.next,
           daysOverdue: days,
           due: false,
           reason: 'Dernière relance il y a $since jour(s) '
-              '(délai minimum $minDaysBetween jours).',
+              '(délai minimum $minGap jours).',
         );
       }
     }
@@ -113,10 +116,13 @@ class ReminderService {
   }
 
   /// Toutes les factures nécessitant une relance immédiate.
-  static List<ReminderPlan> pending(List<FinanceDocument> documents) {
+  static List<ReminderPlan> pending(
+    List<FinanceDocument> documents, {
+    int? minDays,
+  }) {
     final plans = documents
         .where((d) => d.type == FinanceDocType.invoice)
-        .map(plan)
+        .map((d) => plan(d, minDays: minDays))
         .where((p) => p.due)
         .toList()
       ..sort((a, b) => b.daysOverdue.compareTo(a.daysOverdue));

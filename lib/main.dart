@@ -52,10 +52,21 @@ class _Root extends StatefulWidget {
 
 class _RootState extends State<_Root> {
   bool _splashDone = false;
+  bool _remindersChecked = false;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+
+    // Moteur de relance automatique : exécution au démarrage (une seule fois).
+    if (state.ready && !_remindersChecked) {
+      _remindersChecked = true;
+      if (state.reminderConfig.enabled && state.reminderConfig.runOnStartup) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          state.runAutoReminders();
+        });
+      }
+    }
 
     // Séquence d'ouverture cinématographique (une seule fois par lancement)
     if (!_splashDone) {

@@ -12,6 +12,7 @@ import '../../models/enums.dart';
 import '../../models/finance.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common.dart';
+import '../settings/reminder_settings_screen.dart';
 
 /// Écran « Comptabilité » : rapprochement bancaire automatique,
 /// relances des factures impayées et export comptable (journal des ventes).
@@ -42,9 +43,32 @@ class _AccountingScreenState extends State<AccountingScreen> {
           children: [
             Text('Comptabilité', style: AppTypography.displayMedium),
             const SizedBox(height: 5),
-            Text(
-              'Encaissements · relances · export du journal des ventes',
-              style: AppTypography.caption,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Encaissements · relances · export du journal des ventes',
+                    style: AppTypography.caption,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Configuration des relances automatiques',
+                  icon: Icon(
+                    s.reminderConfig.enabled
+                        ? Icons.notifications_active_outlined
+                        : Icons.notifications_off_outlined,
+                    size: 18,
+                    color: s.reminderConfig.enabled
+                        ? AppColors.statusConfirmed
+                        : AppColors.grey,
+                  ),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ReminderSettingsScreen(),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             const GoldDivider(width: 60),
@@ -441,11 +465,15 @@ class _AccountingScreenState extends State<AccountingScreen> {
   // ═══════════════════════ RELANCES ═══════════════════════
   Widget _remindersTab(BuildContext context, AppState s, NumberFormat eur) {
     final overdue = s.overdueInvoices;
-    final due = ReminderService.pending(s.financeDocs);
+    final due = ReminderService.pending(
+      s.financeDocs,
+      minDays: s.reminderConfig.minDaysBetween,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (s.reminderConfig.enabled) _autoReminderBanner(context, s),
         SectionHeader(
           title: 'Factures échues',
           subtitle: overdue.isEmpty
@@ -483,6 +511,62 @@ class _AccountingScreenState extends State<AccountingScreen> {
           ),
         ...overdue.map((d) => _reminderCard(context, s, d, eur)),
       ],
+    );
+  }
+
+  Widget _autoReminderBanner(BuildContext context, AppState s) {
+    final cfg = s.reminderConfig;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.statusConfirmed.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: AppColors.statusConfirmed.withValues(alpha: 0.35),
+            width: 0.6,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.notifications_active_outlined,
+              size: 16,
+              color: AppColors.statusConfirmed,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                cfg.autoSend
+                    ? 'Relance automatique active · toutes les ${cfg.intervalHours} h'
+                    : 'Détection automatique active (envoi manuel)',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.offWhite,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                final n = await s.runAutoReminders(force: true);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        n == 0
+                            ? 'Aucune relance à envoyer.'
+                            : '$n relance(s) traitée(s).',
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Exécuter'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
