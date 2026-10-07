@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_typography.dart';
+import '../../widgets/animations.dart';
 
 class AppTheme {
   AppTheme._();
@@ -9,6 +10,15 @@ class AppTheme {
     final base = ThemeData.dark(useMaterial3: true);
     return base.copyWith(
       scaffoldBackgroundColor: AppColors.black,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: GoldPageTransitionsBuilder(),
+          TargetPlatform.iOS: GoldPageTransitionsBuilder(),
+          TargetPlatform.macOS: GoldPageTransitionsBuilder(),
+          TargetPlatform.windows: GoldPageTransitionsBuilder(),
+          TargetPlatform.linux: GoldPageTransitionsBuilder(),
+        },
+      ),
       colorScheme: const ColorScheme.dark(
         primary: AppColors.champagne,
         onPrimary: AppColors.black,

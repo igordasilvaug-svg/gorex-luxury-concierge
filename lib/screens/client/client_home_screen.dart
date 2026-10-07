@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/enums.dart';
 import '../../state/app_state.dart';
+import '../../widgets/animations.dart';
 import '../../widgets/common.dart';
 import 'ask_gorex_screen.dart';
 import 'client_requests_screen.dart';
@@ -132,8 +133,10 @@ class ClientHomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Urgence
-              InkWell(
+              // Urgence — halo pulsant discret
+              PulseGlow(
+                color: AppColors.urgent,
+                child: InkWell(
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -186,6 +189,7 @@ class ClientHomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              ),
               const SizedBox(height: 24),
 
               Row(
@@ -213,7 +217,7 @@ class ClientHomeScreen extends StatelessWidget {
                 LuxuryCard(
                   child: Row(
                     children: [
-                      InitialsAvatar(initials: concierge.initials, size: 46),
+                      AnimatedRingAvatar(initials: concierge.initials, size: 46),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(

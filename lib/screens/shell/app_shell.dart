@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../state/app_state.dart';
+import '../../widgets/animations.dart';
 import '../../widgets/common.dart';
 import 'client_shell.dart';
 import 'staff_shell.dart';
@@ -54,7 +55,7 @@ class UserBlock extends StatelessWidget {
     final user = state.currentUser!;
     return Row(
       children: [
-        InitialsAvatar(initials: user.initials, size: 36),
+        AnimatedRingAvatar(initials: user.initials, size: 36),
         if (expanded) ...[
           const SizedBox(width: 12),
           Expanded(

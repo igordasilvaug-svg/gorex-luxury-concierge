@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
+import 'widgets/animations.dart';
 import 'state/app_state.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
@@ -68,13 +69,7 @@ class _RootState extends State<_Root> {
     if (!state.ready) {
       return const Scaffold(
         backgroundColor: Color(0xFF0A0A0B),
-        body: Center(
-          child: SizedBox(
-            width: 30,
-            height: 30,
-            child: CircularProgressIndicator(strokeWidth: 1.4),
-          ),
-        ),
+        body: DashboardSkeleton(),
       );
     }
     if (state.currentUser == null) return const LoginScreen();

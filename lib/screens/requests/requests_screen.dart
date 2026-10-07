@@ -7,6 +7,7 @@ import '../../core/theme/app_typography.dart';
 import '../../models/enums.dart';
 import '../../models/service_request.dart';
 import '../../state/app_state.dart';
+import '../../widgets/animations.dart';
 import '../../widgets/common.dart';
 import 'request_detail_screen.dart';
 import 'new_request_screen.dart';
@@ -22,6 +23,17 @@ class _RequestsScreenState extends State<RequestsScreen> {
   String _query = '';
   RequestStatus? _statusFilter;
   ServiceDomain? _domainFilter;
+
+  /// Petit état de chargement (prêt à être branché sur un appel API réel).
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(const Duration(milliseconds: 550), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +167,9 @@ class _RequestsScreenState extends State<RequestsScreen> {
             ),
           ),
           Expanded(
-            child: list.isEmpty
+            child: _loading
+                ? const ListSkeleton(items: 5)
+                : list.isEmpty
                 ? const EmptyState(
                     icon: Icons.inbox_outlined,
                     title: 'Aucune demande',
@@ -163,9 +177,12 @@ class _RequestsScreenState extends State<RequestsScreen> {
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(24, 6, 24, 24),
-                    itemCount: list.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, i) => _RequestCard(request: list[i]),
+                    itemCount: list.length,
+                    itemBuilder: (context, i) => FadeSlideIn(
+                      delay: Duration(milliseconds: (i * 45).clamp(0, 400)),
+                      child: _RequestCard(request: list[i]),
+                    ),
                   ),
           ),
         ],
