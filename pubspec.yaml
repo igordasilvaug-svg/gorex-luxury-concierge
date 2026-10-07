@@ -1,0 +1,42 @@
+name: gorex_concierge
+description: "GOREX LUXURY CONCIERGE - Luxury Concierge • Executive Assistance • Travel • Lifestyle • Security"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management
+  provider: 6.1.5+1
+
+  # Local persistence
+  shared_preferences: 2.5.3
+  hive: 2.2.3
+  hive_flutter: 1.1.0
+
+  # Networking (API-ready)
+  http: 1.5.0
+
+  # Documents & export
+  pdf: ^3.11.1
+  printing: ^5.13.4
+
+  # Utilities
+  intl: ^0.19.0
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
