@@ -27,8 +27,9 @@ class AppUser {
   });
 
   String get initials {
-    if (avatarInitials != null && avatarInitials!.isNotEmpty)
+    if (avatarInitials != null && avatarInitials!.isNotEmpty) {
       return avatarInitials!;
+    }
     final parts = fullName.trim().split(' ');
     if (parts.length >= 2) {
       return '${parts.first[0]}${parts.last[0]}'.toUpperCase();

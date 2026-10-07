@@ -6,28 +6,58 @@ import 'package:provider/provider.dart';
 
 import 'package:gorex_concierge/state/app_state.dart';
 import 'package:gorex_concierge/screens/shell/client_shell.dart';
+import 'package:gorex_concierge/screens/dashboard/ceo_dashboard.dart';
+import 'package:gorex_concierge/screens/finance/finance_screen.dart';
+import 'package:gorex_concierge/screens/crm/crm_screen.dart';
+
+/// Regression tests: every screen using DateFormat('...', 'fr_BE') must render
+/// without a LocaleDataException (which previously caused a grey error screen).
+Future<AppState> _ready() async {
+  SharedPreferences.setMockInitialValues({});
+  final state = AppState();
+  await state.init();
+  return state;
+}
+
+Widget _host(AppState state, Widget child) => ChangeNotifierProvider<AppState>.value(
+      value: state,
+      child: MaterialApp(home: child),
+    );
 
 void main() {
-  testWidgets('client shell renders without exception', (tester) async {
+  setUpAll(() async {
     await initializeDateFormatting('fr_BE', null);
-    SharedPreferences.setMockInitialValues({});
-    final state = AppState();
-    await state.init();
+  });
+
+  testWidgets('ClientShell renders without exception', (tester) async {
+    final state = await _ready();
     state.authenticate('client@gorex.com', 'gorex2025');
-
-    await tester.pumpWidget(
-      ChangeNotifierProvider<AppState>.value(
-        value: state,
-        child: const MaterialApp(home: ClientShell()),
-      ),
-    );
+    await tester.pumpWidget(_host(state, const ClientShell()));
     await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.takeException(), isNull);
+  });
 
-    final err = tester.takeException();
-    if (err != null) {
-      // ignore: avoid_print
-      print('EXCEPTION: $err');
-    }
-    expect(err, isNull);
+  testWidgets('CEO dashboard renders without exception', (tester) async {
+    final state = await _ready();
+    state.authenticate('ceo@gorex.com', 'gorex2025');
+    await tester.pumpWidget(_host(state, const Scaffold(body: CeoDashboard())));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Finance screen renders without exception', (tester) async {
+    final state = await _ready();
+    state.authenticate('ceo@gorex.com', 'gorex2025');
+    await tester.pumpWidget(_host(state, const Scaffold(body: FinanceScreen())));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('CRM screen renders without exception', (tester) async {
+    final state = await _ready();
+    state.authenticate('ceo@gorex.com', 'gorex2025');
+    await tester.pumpWidget(_host(state, const Scaffold(body: CrmScreen())));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.takeException(), isNull);
   });
 }

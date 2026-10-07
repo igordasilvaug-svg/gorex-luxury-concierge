@@ -38,10 +38,12 @@ class _RequestsScreenState extends State<RequestsScreen> {
           )
           .toList();
     }
-    if (_statusFilter != null)
+    if (_statusFilter != null) {
       list = list.where((r) => r.status == _statusFilter).toList();
-    if (_domainFilter != null)
+    }
+    if (_domainFilter != null) {
       list = list.where((r) => r.domain == _domainFilter).toList();
+    }
     list.sort((a, b) {
       final u = b.urgency.weight.compareTo(a.urgency.weight);
       if (u != 0) return u;
