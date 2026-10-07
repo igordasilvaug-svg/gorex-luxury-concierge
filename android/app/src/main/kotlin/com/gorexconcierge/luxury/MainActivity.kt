@@ -1,4 +1,4 @@
-package com.gorexconcierge.gorex_concierge
+package com.gorexconcierge.luxury
 
 import io.flutter.embedding.android.FlutterActivity
 
