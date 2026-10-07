@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../../core/billing/vat_service.dart';
 import '../../models/enums.dart';
 import '../../models/finance.dart';
 import '../../models/itinerary.dart';
@@ -330,6 +331,8 @@ class DocumentService {
     FinanceDocument f,
   ) async {
     final client = s.clientById(f.clientId);
+    final company = s.company;
+    final vat = VatService.computeVat(client);
     final doc = pw.Document();
     final title = f.type == FinanceDocType.quote ? 'Devis' : 'Facture';
     doc.addPage(
@@ -356,22 +359,34 @@ class DocumentService {
                   ),
                   pw.SizedBox(height: 3),
                   pw.Text(
-                    'GOREX LUXURY CONCIERGE',
+                    company.brandName,
                     style: pw.TextStyle(
                       fontSize: 10,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
                   pw.Text(
-                    'Gorex Group SA',
+                    company.legalName,
                     style: pw.TextStyle(fontSize: 9, color: _dark),
                   ),
                   pw.Text(
-                    'Bruxelles, Belgique',
+                    company.fullAddress,
                     style: pw.TextStyle(fontSize: 9, color: _dark),
                   ),
                   pw.Text(
-                    'TVA BE 0000.000.000',
+                    'N° entreprise (BCE) : ${company.companyNumber}',
+                    style: pw.TextStyle(fontSize: 8, color: _grey),
+                  ),
+                  pw.Text(
+                    'TVA : ${VatService.formatVat(company.vatNumber)}',
+                    style: pw.TextStyle(fontSize: 8, color: _grey),
+                  ),
+                  pw.Text(
+                    'IBAN : ${company.iban} · BIC : ${company.bic}',
+                    style: pw.TextStyle(fontSize: 8, color: _grey),
+                  ),
+                  pw.Text(
+                    'Peppol : ${company.peppolId}',
                     style: pw.TextStyle(fontSize: 8, color: _grey),
                   ),
                 ],
@@ -395,6 +410,11 @@ class DocumentService {
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
+                  if (client?.companyName != null)
+                    pw.Text(
+                      client!.companyName!,
+                      style: pw.TextStyle(fontSize: 9, color: _dark),
+                    ),
                   if (client != null)
                     pw.Text(
                       client.code,
@@ -402,8 +422,19 @@ class DocumentService {
                     ),
                   if (client != null)
                     pw.Text(
-                      '${client.city}, ${client.country}',
+                      client.billingAddress ?? '${client.city}, ${client.country}',
                       style: pw.TextStyle(fontSize: 9, color: _dark),
+                    ),
+                  if (f.clientVatNumber != null &&
+                      f.clientVatNumber!.isNotEmpty)
+                    pw.Text(
+                      'TVA client : ${VatService.formatVat(f.clientVatNumber!)}',
+                      style: pw.TextStyle(fontSize: 8, color: _grey),
+                    ),
+                  if (client?.billingEmail != null)
+                    pw.Text(
+                      client!.billingEmail!,
+                      style: pw.TextStyle(fontSize: 8, color: _grey),
                     ),
                 ],
               ),
@@ -455,10 +486,16 @@ class DocumentService {
               child: pw.Column(
                 children: [
                   _totalRow('Sous-total', _eur.format(f.subtotal)),
-                  _totalRow(
-                    'TVA ${f.taxPercent.toStringAsFixed(0)}%',
-                    _eur.format(f.taxAmount),
-                  ),
+                  if (vat.reverseCharge || vat.intraEuB2b || vat.rate == 0)
+                    _totalRow(
+                      'TVA (0%)',
+                      _eur.format(0),
+                    )
+                  else
+                    _totalRow(
+                      'TVA ${f.taxPercent.toStringAsFixed(0)}%',
+                      _eur.format(f.taxAmount),
+                    ),
                   pw.Container(
                     height: 0.8,
                     color: _gold,
@@ -473,13 +510,62 @@ class DocumentService {
               ),
             ),
           ),
+          if (f.vatMention != null && f.vatMention!.isNotEmpty) ...[
+            pw.SizedBox(height: 12),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(9),
+              decoration: pw.BoxDecoration(
+                color: PdfColor.fromInt(0xFFF6F4EF),
+                borderRadius: pw.BorderRadius.circular(3),
+                border: pw.Border.all(color: _line, width: 0.5),
+              ),
+              child: pw.Text(
+                f.vatMention!,
+                style: pw.TextStyle(fontSize: 8, color: _dark),
+              ),
+            ),
+          ],
+          if (f.clientReference != null && f.clientReference!.isNotEmpty) ...[
+            pw.SizedBox(height: 8),
+            _kv('Référence client', f.clientReference!),
+          ],
+          pw.SizedBox(height: 12),
+          _sectionTitle('Paiement'),
+          pw.Text(
+            'Virement bancaire sur le compte professionnel de ${company.legalName} :',
+            style: pw.TextStyle(fontSize: 9, color: _dark),
+          ),
+          pw.SizedBox(height: 3),
+          pw.Text(
+            'IBAN : ${company.iban}  ·  BIC : ${company.bic}',
+            style: pw.TextStyle(
+              fontSize: 9.5,
+              fontWeight: pw.FontWeight.bold,
+              color: _dark,
+            ),
+          ),
+          if (f.structuredCommunication != null)
+            pw.Text(
+              'Communication structurée : ${f.structuredCommunication}',
+              style: pw.TextStyle(fontSize: 9, color: _dark),
+            ),
+          if (f.type == FinanceDocType.invoice)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 6),
+              child: pw.Text(
+                f.peppolStatus == PeppolStatus.notApplicable
+                    ? 'Facture PDF — non éligible Peppol'
+                    : 'Facture électronique Peppol — statut : ${f.peppolStatus.label}',
+                style: pw.TextStyle(fontSize: 8, color: _grey),
+              ),
+            ),
           if (f.notes != null) ...[
             _sectionTitle('Notes'),
             pw.Text(f.notes!, style: pw.TextStyle(fontSize: 9, color: _dark)),
           ],
-          pw.SizedBox(height: 20),
+          pw.SizedBox(height: 16),
           pw.Text(
-            'Merci de votre confiance. Paiement par virement — IBAN BE00 0000 0000 0000.',
+            'Merci de votre confiance.',
             style: pw.TextStyle(fontSize: 8, color: _grey),
           ),
         ],

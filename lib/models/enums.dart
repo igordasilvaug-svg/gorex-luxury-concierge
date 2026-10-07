@@ -21,6 +21,24 @@ enum ClientCategory {
       );
 }
 
+/// Statut d'envoi d'une facture via le réseau Peppol
+enum PeppolStatus {
+  notApplicable('Non applicable', ''),
+  ready('Prêt à envoyer', 'READY'),
+  sent('Envoyé', 'SENT'),
+  delivered('Distribué', 'DELIVERED'),
+  failed('Échec', 'FAILED');
+
+  final String label;
+  final String code;
+  const PeppolStatus(this.label, this.code);
+
+  static PeppolStatus fromName(String name) => PeppolStatus.values.firstWhere(
+    (e) => e.name == name,
+    orElse: () => PeppolStatus.notApplicable,
+  );
+}
+
 /// Niveaux de confidentialité
 enum ConfidentialityLevel {
   standard('Standard', 1),

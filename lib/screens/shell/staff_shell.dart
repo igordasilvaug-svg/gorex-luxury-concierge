@@ -19,6 +19,7 @@ import '../communication/communication_screen.dart';
 import '../team/team_screen.dart';
 import '../access/staff_access_screen.dart';
 import '../clients/clients_screen.dart';
+import '../settings/company_settings_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import 'app_shell.dart';
 
@@ -87,6 +88,13 @@ class _StaffShellState extends State<StaffShell> {
         Icons.account_balance_outlined,
         Icons.account_balance,
         const FinanceScreen(),
+        permission: 'finance',
+      ),
+      _NavItem(
+        'Paramètres société',
+        Icons.apartment_outlined,
+        Icons.apartment,
+        const CompanySettingsScreen(),
         permission: 'finance',
       ),
       _NavItem(

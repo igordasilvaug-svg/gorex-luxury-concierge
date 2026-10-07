@@ -48,6 +48,18 @@ class FinanceDocument {
   final double amountPaid;
   final String? notes;
 
+  // ─── Facturation électronique ───
+  /// Statut d'envoi via le réseau Peppol
+  final PeppolStatus peppolStatus;
+  /// Référence client / bon de commande
+  final String? clientReference;
+  /// Mention de TVA (autoliquidation, exonération intracommunautaire…)
+  final String? vatMention;
+  /// Snapshot du numéro de TVA du client au moment de l'émission
+  final String? clientVatNumber;
+  /// Communication structurée (OGM/VCS) pour le virement
+  final String? structuredCommunication;
+
   const FinanceDocument({
     required this.id,
     required this.reference,
@@ -63,6 +75,11 @@ class FinanceDocument {
     this.currency = 'EUR',
     this.amountPaid = 0,
     this.notes,
+    this.peppolStatus = PeppolStatus.notApplicable,
+    this.clientReference,
+    this.vatMention,
+    this.clientVatNumber,
+    this.structuredCommunication,
   });
 
   double get subtotal => lines.fold(0.0, (s, l) => s + l.total);
@@ -75,6 +92,11 @@ class FinanceDocument {
     double? amountPaid,
     List<FinanceLine>? lines,
     String? notes,
+    PeppolStatus? peppolStatus,
+    String? clientReference,
+    String? vatMention,
+    String? clientVatNumber,
+    String? structuredCommunication,
   }) => FinanceDocument(
     id: id,
     reference: reference,
@@ -90,6 +112,12 @@ class FinanceDocument {
     currency: currency,
     amountPaid: amountPaid ?? this.amountPaid,
     notes: notes ?? this.notes,
+    peppolStatus: peppolStatus ?? this.peppolStatus,
+    clientReference: clientReference ?? this.clientReference,
+    vatMention: vatMention ?? this.vatMention,
+    clientVatNumber: clientVatNumber ?? this.clientVatNumber,
+    structuredCommunication:
+        structuredCommunication ?? this.structuredCommunication,
   );
 
   Map<String, dynamic> toMap() => {
@@ -107,6 +135,11 @@ class FinanceDocument {
     'currency': currency,
     'amountPaid': amountPaid,
     'notes': notes,
+    'peppolStatus': peppolStatus.name,
+    'clientReference': clientReference,
+    'vatMention': vatMention,
+    'clientVatNumber': clientVatNumber,
+    'structuredCommunication': structuredCommunication,
   };
 
   factory FinanceDocument.fromMap(Map<String, dynamic> m) => FinanceDocument(
@@ -132,6 +165,11 @@ class FinanceDocument {
     currency: m['currency'] as String? ?? 'EUR',
     amountPaid: (m['amountPaid'] as num?)?.toDouble() ?? 0,
     notes: m['notes'] as String?,
+    peppolStatus: PeppolStatus.fromName(m['peppolStatus'] as String? ?? ''),
+    clientReference: m['clientReference'] as String?,
+    vatMention: m['vatMention'] as String?,
+    clientVatNumber: m['clientVatNumber'] as String?,
+    structuredCommunication: m['structuredCommunication'] as String?,
   );
 }
 

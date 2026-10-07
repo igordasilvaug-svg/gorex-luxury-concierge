@@ -31,6 +31,20 @@ class Client {
   final bool active;
   final DateTime createdAt;
 
+  // ─── Identification & facturation ───
+  /// true = client professionnel/indépendant (facturation B2B)
+  final bool isBusiness;
+  /// Numéro d'entreprise BCE belge (ex. 0123.456.789)
+  final String? companyNumber;
+  /// Numéro de TVA (ex. BE0123456789) — Belgique ou étranger
+  final String? vatNumber;
+  /// Adresse de facturation (si différente)
+  final String? billingAddress;
+  /// Adresse e-mail dédiée à la facturation
+  final String? billingEmail;
+  /// Le client accepte la réception des factures via le réseau Peppol
+  final bool peppolEnabled;
+
   const Client({
     required this.id,
     required this.code,
@@ -57,6 +71,12 @@ class Client {
     this.notes,
     this.active = true,
     required this.createdAt,
+    this.isBusiness = false,
+    this.companyNumber,
+    this.vatNumber,
+    this.billingAddress,
+    this.billingEmail,
+    this.peppolEnabled = false,
   });
 
   Client copyWith({
@@ -82,6 +102,12 @@ class Client {
     List<String>? interests,
     String? notes,
     bool? active,
+    bool? isBusiness,
+    String? companyNumber,
+    String? vatNumber,
+    String? billingAddress,
+    String? billingEmail,
+    bool? peppolEnabled,
   }) => Client(
     id: id,
     code: code,
@@ -108,6 +134,12 @@ class Client {
     notes: notes ?? this.notes,
     active: active ?? this.active,
     createdAt: createdAt,
+    isBusiness: isBusiness ?? this.isBusiness,
+    companyNumber: companyNumber ?? this.companyNumber,
+    vatNumber: vatNumber ?? this.vatNumber,
+    billingAddress: billingAddress ?? this.billingAddress,
+    billingEmail: billingEmail ?? this.billingEmail,
+    peppolEnabled: peppolEnabled ?? this.peppolEnabled,
   );
 
   Map<String, dynamic> toMap() => {
@@ -136,6 +168,12 @@ class Client {
     'notes': notes,
     'active': active,
     'createdAt': createdAt.toIso8601String(),
+    'isBusiness': isBusiness,
+    'companyNumber': companyNumber,
+    'vatNumber': vatNumber,
+    'billingAddress': billingAddress,
+    'billingEmail': billingEmail,
+    'peppolEnabled': peppolEnabled,
   };
 
   factory Client.fromMap(Map<String, dynamic> m) => Client(
@@ -166,6 +204,12 @@ class Client {
     notes: m['notes'] as String?,
     active: m['active'] as bool? ?? true,
     createdAt: DateTime.parse(m['createdAt'] as String),
+    isBusiness: m['isBusiness'] as bool? ?? false,
+    companyNumber: m['companyNumber'] as String?,
+    vatNumber: m['vatNumber'] as String?,
+    billingAddress: m['billingAddress'] as String?,
+    billingEmail: m['billingEmail'] as String?,
+    peppolEnabled: m['peppolEnabled'] as bool? ?? false,
   );
 
   static List<String> _list(dynamic v) =>

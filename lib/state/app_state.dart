@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/billing/vat_service.dart';
 import '../data/seed_data.dart';
 import '../data/seed_operations.dart';
 import '../models/app_user.dart';
 import '../models/client.dart';
+import '../models/company_profile.dart';
 import '../models/communication.dart';
 import '../models/crm_agenda.dart';
 import '../models/enums.dart';
@@ -22,6 +24,9 @@ class AppState extends ChangeNotifier {
   static const _storageKey = 'gorex_state_v1';
 
   AppUser? currentUser;
+
+  /// Coordonnées officielles de l'émetteur (Gorex Group) — facturation.
+  CompanyProfile company = const CompanyProfile();
 
   List<AppUser> users = [];
   List<Client> clients = [];
@@ -85,6 +90,11 @@ class AppState extends ChangeNotifier {
   }
 
   void _hydrate(Map<String, dynamic> m) {
+    if (m['company'] != null) {
+      company = CompanyProfile.fromMap(
+        Map<String, dynamic>.from(m['company'] as Map),
+      );
+    }
     users = _mapList(m['users'], AppUser.fromMap);
     clients = _mapList(m['clients'], Client.fromMap);
     tiers = _mapList(m['tiers'], SubscriptionTier.fromMap);
@@ -111,6 +121,7 @@ class AppState extends ChangeNotifier {
     await prefs.setString(
       _storageKey,
       jsonEncode({
+        'company': company.toMap(),
         'users': users.map((e) => e.toMap()).toList(),
         'clients': clients.map((e) => e.toMap()).toList(),
         'tiers': tiers.map((e) => e.toMap()).toList(),
@@ -496,9 +507,19 @@ class AppState extends ChangeNotifier {
       interests: draft.interests,
       notes: draft.notes,
       createdAt: DateTime.now(),
+      isBusiness: draft.isBusiness,
+      companyNumber: draft.companyNumber,
+      vatNumber: draft.vatNumber,
+      billingAddress: draft.billingAddress,
+      billingEmail: draft.billingEmail,
+      peppolEnabled: draft.peppolEnabled,
     );
     clients.insert(0, c);
-    log('Création client', c.code);
+    log(
+      'Création client',
+      c.code,
+      detail: c.isBusiness ? 'Professionnel (facturation B2B)' : null,
+    );
     await _persist();
     notifyListeners();
     return c;
@@ -698,9 +719,14 @@ class AppState extends ChangeNotifier {
   }
 
   Future<FinanceDocument> createFinanceDoc(FinanceDocument draft) async {
+    final reference = _nextFinanceRef(draft.type);
+    // Enrichissement automatique : régime TVA, mention, numéro client, Peppol.
+    final client = clientById(draft.clientId);
+    final vat = VatService.computeVat(client);
+    final peppol = VatService.isPeppolEligible(client) && client!.peppolEnabled;
     final d = FinanceDocument(
       id: 'f_${DateTime.now().microsecondsSinceEpoch}',
-      reference: _nextFinanceRef(draft.type),
+      reference: reference,
       type: draft.type,
       clientId: draft.clientId,
       clientName: draft.clientName,
@@ -708,17 +734,63 @@ class AppState extends ChangeNotifier {
       date: draft.date,
       dueDate: draft.dueDate,
       lines: draft.lines,
-      taxPercent: draft.taxPercent,
+      taxPercent: draft.taxPercent == 21 ? vat.rate : draft.taxPercent,
       status: draft.status,
       currency: draft.currency,
       amountPaid: draft.amountPaid,
       notes: draft.notes,
+      peppolStatus: draft.type == FinanceDocType.invoice && peppol
+          ? PeppolStatus.ready
+          : PeppolStatus.notApplicable,
+      vatMention: vat.mention,
+      clientVatNumber: client?.vatNumber,
+      structuredCommunication: VatService.structuredCommunication(reference),
+      clientReference: draft.clientReference,
     );
     financeDocs.insert(0, d);
-    log('Création document', d.reference, detail: d.type.label);
+    log(
+      'Création document',
+      d.reference,
+      detail: '${d.type.label} · TVA ${vat.rate.toStringAsFixed(0)}%'
+          '${d.peppolStatus == PeppolStatus.ready ? ' · Peppol prêt' : ''}',
+    );
     await _persist();
     notifyListeners();
     return d;
+  }
+
+  /// Marque une facture comme envoyée via le réseau Peppol.
+  Future<void> sendViaPeppol(String docId) async {
+    final i = financeDocs.indexWhere((e) => e.id == docId);
+    if (i < 0) return;
+    final d = financeDocs[i];
+    financeDocs[i] = d.copyWith(
+      peppolStatus: PeppolStatus.sent,
+      status: d.status == InvoiceStatus.draft ? InvoiceStatus.sent : d.status,
+    );
+    log('Envoi Peppol', d.reference, detail: 'Facture électronique transmise');
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Simule la confirmation de distribution Peppol (accusé du destinataire).
+  Future<void> markPeppolDelivered(String docId) async {
+    final i = financeDocs.indexWhere((e) => e.id == docId);
+    if (i < 0) return;
+    financeDocs[i] = financeDocs[i].copyWith(
+      peppolStatus: PeppolStatus.delivered,
+    );
+    log('Peppol distribué', financeDocs[i].reference);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Met à jour les coordonnées officielles de Gorex Group (facturation).
+  Future<void> updateCompany(CompanyProfile profile) async {
+    company = profile;
+    log('Mise à jour coordonnées société', profile.legalName);
+    await _persist();
+    notifyListeners();
   }
 
   Future<void> updateFinanceDoc(FinanceDocument d) async {

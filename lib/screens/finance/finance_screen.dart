@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/billing/vat_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/enums.dart';
@@ -124,7 +125,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
               (d) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: LuxuryCard(
-                  onTap: () => DocumentService.exportFinanceDoc(context, s, d),
+                  onTap: () => _openDoc(context, s, d),
                   child: Row(
                     children: [
                       Container(
@@ -160,6 +161,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
                               '${d.clientName} · ${DateFormat('dd/MM/yyyy', 'fr_BE').format(d.date)}',
                               style: AppTypography.caption,
                             ),
+                            if (d.peppolStatus != PeppolStatus.notApplicable) ...[
+                              const SizedBox(height: 5),
+                              _peppolPill(d.peppolStatus),
+                            ],
                           ],
                         ),
                       ),
@@ -230,6 +235,153 @@ class _FinanceScreenState extends State<FinanceScreen> {
             ),
             const SizedBox(height: 30),
           ],
+        ),
+      ),
+    );
+  }
+
+  Color _peppolColor(PeppolStatus st) {
+    switch (st) {
+      case PeppolStatus.delivered:
+        return AppColors.statusConfirmed;
+      case PeppolStatus.sent:
+        return AppColors.statusProgress;
+      case PeppolStatus.ready:
+        return AppColors.champagne;
+      case PeppolStatus.failed:
+        return AppColors.urgent;
+      case PeppolStatus.notApplicable:
+        return AppColors.grey;
+    }
+  }
+
+  Widget _peppolPill(PeppolStatus st) => StatusPill(
+    label: 'Peppol · ${st.label}',
+    color: _peppolColor(st),
+    icon: Icons.send_outlined,
+  );
+
+  /// Panneau d'actions d'un document financier :
+  /// aperçu PDF, transmission Peppol et confirmation de distribution.
+  void _openDoc(BuildContext context, AppState s, FinanceDocument d) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceElevated,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${d.type.label} · ${d.reference}',
+                style: AppTypography.headline,
+              ),
+              const SizedBox(height: 4),
+              Text(d.clientName, style: AppTypography.caption),
+              const SizedBox(height: 14),
+              LuxuryCard(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  children: [
+                    InfoRow(label: 'Statut', value: d.status.label),
+                    if (d.clientVatNumber != null) ...[
+                      const Divider(height: 1),
+                      InfoRow(
+                        label: 'TVA client',
+                        value: VatService.formatVat(d.clientVatNumber!),
+                      ),
+                    ],
+                    if (d.vatMention != null) ...[
+                      const Divider(height: 1),
+                      InfoRow(label: 'Régime', value: d.vatMention!),
+                    ],
+                    if (d.structuredCommunication != null) ...[
+                      const Divider(height: 1),
+                      InfoRow(
+                        label: 'Communication',
+                        value: d.structuredCommunication!,
+                      ),
+                    ],
+                    const Divider(height: 1),
+                    InfoRow(
+                      label: 'Peppol',
+                      value: d.peppolStatus == PeppolStatus.notApplicable
+                          ? 'Non applicable'
+                          : d.peppolStatus.label,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              GoldButton(
+                label: 'Aperçu / export PDF',
+                icon: Icons.picture_as_pdf_outlined,
+                fullWidth: true,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  DocumentService.exportFinanceDoc(context, s, d);
+                },
+              ),
+              if (d.peppolStatus != PeppolStatus.notApplicable) ...[
+                const SizedBox(height: 10),
+                if (d.peppolStatus == PeppolStatus.ready)
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await s.sendViaPeppol(d.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Facture transmise via le réseau Peppol.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.send_outlined, size: 15),
+                    label: const Text('TRANSMETTRE VIA PEPPOL'),
+                  ),
+                if (d.peppolStatus == PeppolStatus.sent)
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await s.markPeppolDelivered(d.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Accusé Peppol enregistré (distribué).'),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.mark_email_read_outlined, size: 15),
+                    label: const Text('MARQUER COMME DISTRIBUÉ'),
+                  ),
+                if (d.peppolStatus == PeppolStatus.delivered)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.verified_outlined,
+                        size: 15,
+                        color: AppColors.statusConfirmed,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Facture distribuée via Peppol',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.statusConfirmed,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
       ),
     );

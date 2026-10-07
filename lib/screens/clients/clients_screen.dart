@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/billing/vat_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/client.dart';
@@ -9,6 +10,7 @@ import '../../state/app_state.dart';
 import '../../widgets/common.dart';
 import '../access/member_form_screen.dart';
 import '../documents/document_service.dart';
+import 'client_form_screen.dart';
 
 class ClientsScreen extends StatefulWidget {
   const ClientsScreen({super.key});
@@ -63,6 +65,17 @@ class _ClientsScreenState extends State<ClientsScreen> {
                       Icons.search,
                       size: 18,
                       color: AppColors.grey,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GoldButton(
+                  label: 'Nouveau client',
+                  icon: Icons.person_add_alt,
+                  fullWidth: true,
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ClientFormScreen(),
                     ),
                   ),
                 ),
@@ -140,9 +153,30 @@ class _ClientCard extends StatelessWidget {
           ),
           if (client.companyName != null) ...[
             const SizedBox(height: 8),
-            Text(
-              client.companyName!,
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.grey),
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    client.companyName!,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.grey,
+                    ),
+                  ),
+                ),
+                if (client.isBusiness) ...[
+                  const SizedBox(width: 8),
+                  StatusPill(label: 'Pro', color: AppColors.champagne),
+                ],
+                if (client.peppolEnabled) ...[
+                  const SizedBox(width: 6),
+                  StatusPill(
+                    label: 'Peppol',
+                    color: AppColors.statusConfirmed,
+                    icon: Icons.send_outlined,
+                  ),
+                ],
+              ],
             ),
           ],
         ],
@@ -243,6 +277,8 @@ class _ClientCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+              _billingCard(s, client),
               if (client.preferredHotels.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _chipSection('Hôtels préférés', client.preferredHotels),
@@ -280,6 +316,22 @@ class _ClientCard extends StatelessWidget {
                 Text(client.notes!, style: AppTypography.bodyMedium),
               ],
               const SizedBox(height: 20),
+              GoldButton(
+                label: 'Modifier le profil',
+                icon: Icons.edit_outlined,
+                fullWidth: true,
+                onPressed: () async {
+                  final saved = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => ClientFormScreen(existing: client),
+                    ),
+                  );
+                  if (saved == true && context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: () =>
                     DocumentService.exportClientFile(context, s, client),
@@ -325,6 +377,66 @@ class _ClientCard extends StatelessWidget {
       MaterialPageRoute(
         builder: (_) => MemberFormScreen(clientId: client.id),
       ),
+    );
+  }
+
+  Widget _billingCard(AppState s, Client client) {
+    final vat = VatService.computeVat(client);
+    final eligible = VatService.isPeppolEligible(client);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('IDENTIFICATION & FACTURATION', style: AppTypography.label),
+        const SizedBox(height: 8),
+        LuxuryCard(
+          child: Column(
+            children: [
+              InfoRow(
+                label: 'Type',
+                value: client.isBusiness
+                    ? 'Professionnel / Indépendant'
+                    : 'Particulier',
+              ),
+              const Divider(height: 1),
+              InfoRow(
+                label: 'N° entreprise',
+                value: (client.companyNumber?.isNotEmpty ?? false)
+                    ? VatService.normalize(client.companyNumber!)
+                    : '—',
+              ),
+              const Divider(height: 1),
+              InfoRow(
+                label: 'N° TVA',
+                value: (client.vatNumber?.isNotEmpty ?? false)
+                    ? VatService.formatVat(client.vatNumber!)
+                    : '—',
+              ),
+              const Divider(height: 1),
+              InfoRow(label: 'Régime TVA', value: vat.mention),
+              if (client.billingAddress != null) ...[
+                const Divider(height: 1),
+                InfoRow(
+                  label: 'Adresse fact.',
+                  value: client.billingAddress!,
+                ),
+              ],
+              if (client.billingEmail != null) ...[
+                const Divider(height: 1),
+                InfoRow(label: 'E-mail fact.', value: client.billingEmail!),
+              ],
+              const Divider(height: 1),
+              InfoRow(
+                label: 'Peppol',
+                value: eligible
+                    ? (client.peppolEnabled
+                          ? 'Activé · ${VatService.peppolIdFor(client)}'
+                          : 'Éligible (non activé)')
+                    : 'Non éligible',
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
