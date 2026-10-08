@@ -27,8 +27,8 @@ Plateforme de conciergerie d'exception éditée par **Gorex Group** (Belgique). 
 
 | Ressource | URL |
 |---|---|
-| Application web | https://gorex-luxury-concierge.omniscient-magpie-1dc.workers.dev |
-| Politique de confidentialité (RGPD) | https://gorex-luxury-concierge.omniscient-magpie-1dc.workers.dev/privacy.html |
+| Application web | https://gorex-luxury-concierge.delightful-bag-624.workers.dev |
+| Politique de confidentialité (RGPD) | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/privacy.html |
 
 ## Fonctionnalités
 

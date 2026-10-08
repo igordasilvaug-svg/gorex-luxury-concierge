@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../widgets/animations.dart';
 import '../widgets/common.dart';
 import 'legal/privacy_policy_screen.dart';
+import 'legal/user_guide_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -183,23 +184,47 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 14),
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 600),
-                  child: Center(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const PrivacyPolicyScreen(),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const UserGuideScreen(),
+                          ),
+                        ),
+                        child: const Text(
+                          'Guide d\'utilisation',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.grey,
+                            decoration: TextDecoration.underline,
+                            decorationColor: AppColors.greyDark,
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        'Politique de confidentialité',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: AppColors.grey,
-                          decoration: TextDecoration.underline,
-                          decorationColor: AppColors.greyDark,
+                      Container(
+                        width: 1,
+                        height: 12,
+                        color: AppColors.divider,
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const PrivacyPolicyScreen(),
+                          ),
+                        ),
+                        child: const Text(
+                          'Confidentialité',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.grey,
+                            decoration: TextDecoration.underline,
+                            decorationColor: AppColors.greyDark,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ],

@@ -24,6 +24,7 @@ import '../settings/company_settings_screen.dart';
 import '../settings/peppol_settings_screen.dart';
 import '../settings/reminder_settings_screen.dart';
 import '../legal/privacy_policy_screen.dart';
+import '../legal/user_guide_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import 'app_shell.dart';
 
@@ -163,6 +164,12 @@ class _StaffShellState extends State<StaffShell> {
         Icons.workspace_premium,
         const SubscriptionsScreen(),
         permission: 'subscriptions',
+      ),
+      _NavItem(
+        'Guide d\'utilisation',
+        Icons.menu_book_outlined,
+        Icons.menu_book,
+        const UserGuideScreen(),
       ),
       _NavItem(
         'Confidentialité',

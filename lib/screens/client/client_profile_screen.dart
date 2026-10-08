@@ -9,6 +9,7 @@ import '../../state/app_state.dart';
 import '../../widgets/common.dart';
 import '../documents/document_service.dart';
 import '../legal/privacy_policy_screen.dart';
+import '../legal/user_guide_screen.dart';
 
 class ClientProfileScreen extends StatelessWidget {
   const ClientProfileScreen({super.key});
@@ -212,6 +213,17 @@ class ClientProfileScreen extends StatelessWidget {
               label: const Text('CONTACTER GOREX EN URGENCE'),
             ),
             const SizedBox(height: 18),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const UserGuideScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.menu_book_outlined, size: 15),
+                label: const Text('GUIDE D\'UTILISATION'),
+              ),
+            ),
             Center(
               child: TextButton.icon(
                 onPressed: () => Navigator.of(context).push(

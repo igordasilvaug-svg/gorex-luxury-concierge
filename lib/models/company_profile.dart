@@ -43,6 +43,45 @@ class CompanyProfile {
   String get fullAddress =>
       '$addressLine, $postalCode $city, $country';
 
+  /// Liste des champs encore laissés à leur valeur d'exemple (placeholder).
+  /// Sert à alerter la direction tant que les coordonnées réelles de
+  /// Gorex Group n'ont pas été saisies.
+  List<String> get missingFields {
+    final missing = <String>[];
+    if (companyNumber.replaceAll(RegExp(r'[^0-9]'), '').replaceAll(
+          RegExp(r'^0+$'),
+          '',
+        ).isEmpty ||
+        companyNumber == '0000.000.000') {
+      missing.add('Numéro d\'entreprise (BCE)');
+    }
+    final vatDigits = vatNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    if (vatDigits.isEmpty ||
+        vatDigits.split('').toSet().length == 1 ||
+        vatNumber == 'BE0000000000') {
+      missing.add('Numéro de TVA');
+    }
+    if (iban.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').replaceAll('BE', '') ==
+            '000000000000' ||
+        iban == 'BE00 0000 0000 0000') {
+      missing.add('IBAN professionnel');
+    }
+    if (bankName.toLowerCase().contains('configurer') ||
+        bankName.trim().isEmpty) {
+      missing.add('Banque');
+    }
+    if (addressLine.contains('000') || addressLine.trim().isEmpty) {
+      missing.add('Adresse');
+    }
+    if (peppolId == '0208:0000000000') {
+      missing.add('Identifiant Peppol');
+    }
+    return missing;
+  }
+
+  /// Vrai si toutes les coordonnées officielles sont renseignées.
+  bool get isConfigured => missingFields.isEmpty;
+
   CompanyProfile copyWith({
     String? legalName,
     String? brandName,

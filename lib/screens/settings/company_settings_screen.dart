@@ -168,7 +168,9 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                   'le numéro de TVA et le compte bancaire professionnel.',
                   style: AppTypography.caption,
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 16),
+                _completenessBanner(s.company),
+                const SizedBox(height: 6),
 
                 _section('Identité'),
                 _field('Raison sociale', _legalName, hint: 'Gorex Group SA'),
@@ -306,6 +308,52 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Bannière d'alerte tant que les coordonnées réelles de Gorex Group
+  /// n'ont pas été saisies (valeurs d'exemple encore présentes).
+  Widget _completenessBanner(CompanyProfile c) {
+    final missing = c.missingFields;
+    final ok = missing.isEmpty;
+    final color = ok ? AppColors.statusConfirmed : AppColors.statusWaiting;
+    return LuxuryCard(
+      borderColor: color.withValues(alpha: 0.5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            ok ? Icons.verified_outlined : Icons.edit_note,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ok
+                      ? 'Coordonnées officielles complètes'
+                      : 'Coordonnées officielles à compléter',
+                  style: AppTypography.title.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  ok
+                      ? 'Toutes les coordonnées de l\'émetteur sont renseignées. '
+                            'Vos factures et devis sont conformes.'
+                      : 'Les champs suivants utilisent encore une valeur '
+                            'd\'exemple et doivent être remplacés par les '
+                            'coordonnées réelles de Gorex Group :\n'
+                            '${missing.map((m) => '• $m').join('\n')}',
+                  style: AppTypography.caption.copyWith(fontSize: 10.5),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
