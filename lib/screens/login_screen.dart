@@ -5,8 +5,8 @@ import '../core/theme/app_typography.dart';
 import '../state/app_state.dart';
 import '../widgets/animations.dart';
 import '../widgets/common.dart';
-import 'legal/privacy_policy_screen.dart';
 import 'legal/user_guide_screen.dart';
+import 'legal/legal_hub_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -211,11 +211,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextButton(
                         onPressed: () => Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => const PrivacyPolicyScreen(),
+                            builder: (_) => const LegalHubScreen(),
                           ),
                         ),
                         child: const Text(
-                          'Confidentialité',
+                          'Mentions légales',
                           style: TextStyle(
                             fontSize: 11.5,
                             color: AppColors.grey,

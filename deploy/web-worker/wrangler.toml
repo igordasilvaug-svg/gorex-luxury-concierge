@@ -1,9 +1,20 @@
+# Cloudflare Worker — GOREX LUXURY CONCIERGE
+# Sert le build Flutter Web (statique) avec en-têtes de sécurité stricts.
+#
+# IMPORTANT : `run_worker_first = true` garantit que le Worker s'exécute AVANT
+# que Cloudflare ne serve les fichiers statiques (.html inclus), ce qui permet
+# d'appliquer CSP / HSTS / nosniff / Referrer-Policy / Permissions-Policy sur
+# TOUTES les pages, y compris les pages HTML publiques.
+
 name = "gorex-luxury-concierge"
 compatibility_date = "2025-01-01"
 main = "worker.js"
 
 [assets]
-directory = "/home/user/gorex_web_stage"
+# Chemin relatif au build Flutter Web (copier build/web ici avant déploiement,
+# ou ajuster vers votre répertoire de staging).
+directory = "./public"
 binding = "ASSETS"
 html_handling = "none"
 not_found_handling = "single-page-application"
+run_worker_first = true

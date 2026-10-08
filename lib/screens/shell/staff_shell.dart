@@ -25,6 +25,7 @@ import '../settings/peppol_settings_screen.dart';
 import '../settings/reminder_settings_screen.dart';
 import '../legal/privacy_policy_screen.dart';
 import '../legal/user_guide_screen.dart';
+import '../legal/legal_hub_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import 'app_shell.dart';
 
@@ -170,6 +171,12 @@ class _StaffShellState extends State<StaffShell> {
         Icons.menu_book_outlined,
         Icons.menu_book,
         const UserGuideScreen(),
+      ),
+      _NavItem(
+        'Mentions légales',
+        Icons.gavel_outlined,
+        Icons.gavel,
+        const LegalHubScreen(),
       ),
       _NavItem(
         'Confidentialité',

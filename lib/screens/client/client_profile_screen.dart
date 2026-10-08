@@ -10,6 +10,7 @@ import '../../widgets/common.dart';
 import '../documents/document_service.dart';
 import '../legal/privacy_policy_screen.dart';
 import '../legal/user_guide_screen.dart';
+import '../legal/legal_hub_screen.dart';
 
 class ClientProfileScreen extends StatelessWidget {
   const ClientProfileScreen({super.key});
@@ -222,6 +223,17 @@ class ClientProfileScreen extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.menu_book_outlined, size: 15),
                 label: const Text('GUIDE D\'UTILISATION'),
+              ),
+            ),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const LegalHubScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.gavel_outlined, size: 15),
+                label: const Text('INFORMATIONS LÉGALES'),
               ),
             ),
             Center(
