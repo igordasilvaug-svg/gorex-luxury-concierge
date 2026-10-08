@@ -28,7 +28,14 @@ Plateforme de conciergerie d'exception éditée par **Gorex Group** (Belgique). 
 | Ressource | URL |
 |---|---|
 | Application web | https://gorex-luxury-concierge.delightful-bag-624.workers.dev |
+| Informations légales (hub) | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/legal-hub.html |
+| Mentions légales | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/legal.html |
+| CGV | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/terms.html |
+| Politique cookies | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/cookies.html |
 | Politique de confidentialité (RGPD) | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/privacy.html |
+
+> Sécurité : l'ensemble des pages (y compris `.html`) est servi avec des en-têtes stricts
+> (CSP, HSTS, `X-Content-Type-Options: nosniff`, Referrer-Policy, Permissions-Policy).
 
 ## Fonctionnalités
 
