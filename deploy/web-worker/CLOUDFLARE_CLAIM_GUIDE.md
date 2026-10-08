@@ -25,7 +25,13 @@ gratuitement en quelques minutes.
 Le lien de réclamation est de la forme :
 
 ```
-https://dash.cloudflare.com/claim-preview?token=<JETON>
+https://dash.cloudflare.com/claim-preview?claimToken=<JETON>
+```
+
+**Lien du dernier déploiement (valable ~60 min) :**
+
+```
+https://dash.cloudflare.com/claim-preview?claimToken=ABnb7ADy-9q08bezquk51-tup3CJ32SM8cYs1H2sULI
 ```
 
 > 📌 **Le jeton change à chaque déploiement** et **expire** (fenêtre limitée).
@@ -118,7 +124,7 @@ dans :
 
 | État | URL |
 |---|---|
-| Temporaire (avant réclamation) | `https://gorex-luxury-concierge.stripe-suit.workers.dev` |
+| Temporaire (avant réclamation) | `https://gorex-luxury-concierge.instinctive-submarine.workers.dev` |
 | Permanente (après réclamation) | `https://gorex-luxury-concierge.<compte>.workers.dev` |
 | Domaine final | `https://concierge.gorex.be` |
 

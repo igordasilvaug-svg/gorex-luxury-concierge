@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/app_config.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../state/app_state.dart';
@@ -142,20 +143,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 ),
-                const SizedBox(height: 26),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 320),
-                  child: Text(
-                    state.tr('login.demo_accounts'),
-                    textAlign: TextAlign.center,
-                    style: AppTypography.eyebrow,
+                if (AppConfig.showDemoAccounts) ...[
+                  const SizedBox(height: 26),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 320),
+                    child: Text(
+                      state.tr('login.demo_accounts'),
+                      textAlign: TextAlign.center,
+                      style: AppTypography.eyebrow,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 400),
-                  child: _demoGrid(),
-                ),
+                  const SizedBox(height: 14),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 400),
+                    child: _demoGrid(),
+                  ),
+                ],
                 const SizedBox(height: 28),
                 const FadeSlideIn(
                   delay: Duration(milliseconds: 520),

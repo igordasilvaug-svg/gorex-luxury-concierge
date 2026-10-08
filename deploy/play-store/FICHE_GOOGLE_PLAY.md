@@ -20,7 +20,7 @@
 | Tags | Concierge, Lifestyle, Business, Travel, Assistance |
 | Site web | `https://www.gorex.be` |
 | E-mail de contact | `concierge@gorex.com` |
-| Politique de confidentialité | `https://gorex-luxury-concierge.stripe-suit.workers.dev/privacy.html` *(→ `https://concierge.gorex.be/privacy.html` après domaine personnalisé)* |
+| Politique de confidentialité | `https://gorex-luxury-concierge.instinctive-submarine.workers.dev/privacy.html` *(→ `https://concierge.gorex.be/privacy.html` après domaine personnalisé)* |
 
 ### Coordonnées développeur (obligatoires)
 - **Nom du développeur** : Gorex Group
@@ -254,15 +254,20 @@ Gorex Group — Belgium · www.gorex.be
 |---|---|---|---|
 | Icône de l'application | `icon_512.png` | 512 × 512 | ✅ Prêt |
 | Graphique de présentation | `feature_graphic_1024x500.png` | 1024 × 500 | ✅ Prêt |
-| Captures d'écran téléphone | `screenshots/01…06` | 1080 × 1920 | ✅ 6 captures |
+| Captures d'écran téléphone | `screenshots/01…08` | 1080 × 1920 | ✅ 8 captures |
+| Captures supplémentaires | `screenshots/extras/` | 1080 × 1920 | ✅ 4 captures |
 
-**Ordre recommandé des captures :**
+**Ordre recommandé des captures (8) :**
 1. `01_connexion.png` — Accès sécurisé (connexion)
 2. `02_tableau_de_bord.png` — Tableau de bord Direction
 3. `03_services.png` — Catalogue de services
-4. `04_prestataires.png` — Réseau de prestataires premium
-5. `05_clients_vip.png` — Profils clients VIP (confidentiel)
-6. `06_menu_navigation.png` — Navigation complète
+4. `04_reservations.png` — Réservations (marges & prestataires)
+5. `05_itineraires.png` — Itinéraires de voyage
+6. `06_finance.png` — Finance (CA, marges, documents)
+7. `07_agenda.png` — Agenda (rendez-vous, missions)
+8. `08_clients_vip.png` — Profils clients VIP (confidentiel)
+
+**Extras (au choix) :** `communication.png`, `prestataires.png`, `equipe.png`, `menu_navigation.png`
 
 ---
 
@@ -271,8 +276,17 @@ Gorex Group — Belgium · www.gorex.be
 - [ ] **Domaine personnalisé** `concierge.gorex.be` attaché (voir `../web-worker/CUSTOM_DOMAIN.md`).
 - [ ] **Politique de confidentialité publique** accessible (URL ci-dessus).
 - [ ] **Compte Play Console** avec vérification d'identité (compte Organisation recommandé pour Gorex Group).
-- [ ] **AAB signé** : `build/app/outputs/bundle/release/app-release.aab`.
-- [ ] Vérification que l'app ne contient **aucun compte de démo affiché publiquement** en production (les comptes de démonstration doivent être retirés ou désactivés pour la version Play).
+- [ ] **AAB signé** : `build/app/outputs/bundle/release/app-release.aab` *(build « production » ci-dessous)*.
+- [x] **Comptes de démonstration masqués** en build de production ✅
+
+> ✅ **Build de production (store) — comptes de démo désactivés**
+> L'application dispose d'un drapeau de compilation `PRODUCTION` qui **masque les comptes
+> de démonstration** sur l'écran de connexion. Pour générer l'AAB destiné à Google Play :
+>
+> ```bash
+> flutter build appbundle --release --dart-define=PRODUCTION=true
+> ```
+> En l'absence de ce drapeau (build web de démonstration), les comptes restent visibles.
 
 ---
 
