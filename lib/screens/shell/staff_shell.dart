@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 
 import '../../state/app_state.dart';
 import '../../widgets/common.dart';
+import '../../widgets/language_selector.dart';
 import '../dashboard/ceo_dashboard.dart';
 import '../dashboard/concierge_dashboard.dart';
 import '../requests/requests_screen.dart';
@@ -26,6 +27,7 @@ import '../settings/reminder_settings_screen.dart';
 import '../legal/privacy_policy_screen.dart';
 import '../legal/user_guide_screen.dart';
 import '../legal/legal_hub_screen.dart';
+import '../about/about_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import 'app_shell.dart';
 
@@ -42,147 +44,153 @@ class _StaffShellState extends State<StaffShell> {
   List<_NavItem> _items(AppState s) {
     final all = <_NavItem>[
       _NavItem(
-        'Tableau de bord',
+        s.tr('nav.dashboard'),
         Icons.dashboard_outlined,
         Icons.dashboard,
         s.isCeo ? const CeoDashboard() : const ConciergeDashboard(),
       ),
       _NavItem(
-        'Demandes',
+        s.tr('nav.requests'),
         Icons.inbox_outlined,
         Icons.inbox,
         const RequestsScreen(),
         permission: 'staff',
       ),
       _NavItem(
-        'Services',
+        s.tr('nav.services'),
         Icons.room_service_outlined,
         Icons.room_service,
         const ServicesScreen(),
         permission: 'staff',
       ),
       _NavItem(
-        'Itinéraires',
+        s.tr('nav.itineraries'),
         Icons.map_outlined,
         Icons.map,
         const ItinerariesScreen(),
         permission: 'staff',
       ),
       _NavItem(
-        'Réservations',
+        s.tr('nav.bookings'),
         Icons.event_available_outlined,
         Icons.event_available,
         const BookingsScreen(),
         permission: 'staff',
       ),
       _NavItem(
-        'Prestataires',
+        s.tr('nav.providers'),
         Icons.handshake_outlined,
         Icons.handshake,
         const ProvidersScreen(),
         permission: 'staff',
       ),
       _NavItem(
-        'Clients',
+        s.tr('nav.clients'),
         Icons.people_outline,
         Icons.people,
         const ClientsScreen(),
         permission: 'staff',
       ),
       _NavItem(
-        'Finance',
+        s.tr('nav.finance'),
         Icons.account_balance_outlined,
         Icons.account_balance,
         const FinanceScreen(),
         permission: 'finance',
       ),
       _NavItem(
-        'Comptabilité',
+        s.tr('nav.accounting'),
         Icons.receipt_long_outlined,
         Icons.receipt_long,
         const AccountingScreen(),
         permission: 'finance',
       ),
       _NavItem(
-        'Paramètres société',
+        s.tr('nav.company_settings'),
         Icons.apartment_outlined,
         Icons.apartment,
         const CompanySettingsScreen(),
         permission: 'finance',
       ),
       _NavItem(
-        'Access Point Peppol',
+        s.tr('nav.peppol'),
         Icons.cloud_outlined,
         Icons.cloud,
         const PeppolSettingsScreen(),
         permission: 'finance',
       ),
       _NavItem(
-        'Relances automatiques',
+        s.tr('nav.reminders'),
         Icons.notifications_active_outlined,
         Icons.notifications_active,
         const ReminderSettingsScreen(),
         permission: 'finance',
       ),
       _NavItem(
-        'CRM',
+        s.tr('nav.crm'),
         Icons.trending_up_outlined,
         Icons.trending_up,
         const CrmScreen(),
         permission: 'crm',
       ),
       _NavItem(
-        'Agenda',
+        s.tr('nav.agenda'),
         Icons.calendar_month_outlined,
         Icons.calendar_month,
         const AgendaScreen(),
         permission: 'staff',
       ),
       _NavItem(
-        'Communication',
+        s.tr('nav.communication'),
         Icons.forum_outlined,
         Icons.forum,
         const CommunicationScreen(),
         permission: 'staff',
       ),
       _NavItem(
-        'Équipe',
+        s.tr('nav.team'),
         Icons.badge_outlined,
         Icons.badge,
         const TeamScreen(),
         permission: 'team',
       ),
       _NavItem(
-        'Accès personnel',
+        s.tr('nav.access'),
         Icons.admin_panel_settings_outlined,
         Icons.admin_panel_settings,
         const StaffAccessScreen(),
         permission: 'user_access',
       ),
       _NavItem(
-        'Abonnements',
+        s.tr('nav.subscriptions'),
         Icons.workspace_premium_outlined,
         Icons.workspace_premium,
         const SubscriptionsScreen(),
         permission: 'subscriptions',
       ),
       _NavItem(
-        'Guide d\'utilisation',
+        s.tr('nav.guide'),
         Icons.menu_book_outlined,
         Icons.menu_book,
         const UserGuideScreen(),
       ),
       _NavItem(
-        'Mentions légales',
+        s.tr('nav.legal'),
         Icons.gavel_outlined,
         Icons.gavel,
         const LegalHubScreen(),
       ),
       _NavItem(
-        'Confidentialité',
+        s.tr('nav.privacy'),
         Icons.privacy_tip_outlined,
         Icons.privacy_tip,
         const PrivacyPolicyScreen(),
+      ),
+      _NavItem(
+        s.tr('nav.about'),
+        Icons.info_outline,
+        Icons.info,
+        const AboutScreen(),
       ),
     ];
     return all
@@ -267,6 +275,10 @@ class _StaffShellState extends State<StaffShell> {
                 ),
               ),
               const Divider(height: 1),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(12, 10, 12, 0),
+                child: LanguageSelector(),
+              ),
               const Padding(padding: EdgeInsets.all(12), child: UserBlock()),
             ],
           ),
@@ -385,6 +397,10 @@ class _Sidebar extends StatelessWidget {
               ),
             ),
             const Divider(height: 1),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(14, 10, 14, 0),
+              child: LanguageSelector(),
+            ),
             const Padding(padding: EdgeInsets.all(14), child: UserBlock()),
           ],
         ),

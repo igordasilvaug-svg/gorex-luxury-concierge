@@ -7,6 +7,8 @@ import '../widgets/animations.dart';
 import '../widgets/common.dart';
 import 'legal/user_guide_screen.dart';
 import 'legal/legal_hub_screen.dart';
+import 'about/about_screen.dart';
+import '../widgets/language_selector.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (user == null) {
       setState(() {
         _busy = false;
-        _error = 'Identifiants invalides. Veuillez réessayer.';
+        _error = state.tr('login.invalid');
       });
     } else {
       setState(() => _busy = false);
@@ -82,13 +84,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Center(child: GoldDivider(width: 44)),
                       const SizedBox(height: 20),
                       Text(
-                        'ACCÈS SÉCURISÉ',
+                        state.tr('login.secure_access'),
                         textAlign: TextAlign.center,
                         style: AppTypography.eyebrow,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Portail confidentiel réservé aux membres et à l\'équipe.',
+                        state.tr('login.subtitle'),
                         textAlign: TextAlign.center,
                         style: AppTypography.caption,
                       ),
@@ -99,9 +101,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: AppTypography.bodyMedium.copyWith(
                           color: AppColors.white,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: 'ADRESSE E-MAIL',
-                          prefixIcon: Icon(
+                        decoration: InputDecoration(
+                          labelText: state.tr('login.email'),
+                          prefixIcon: const Icon(
                             Icons.alternate_email,
                             size: 18,
                             color: AppColors.champagne,
@@ -116,9 +118,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: AppColors.white,
                         ),
                         onSubmitted: (_) => _submit(state),
-                        decoration: const InputDecoration(
-                          labelText: 'MOT DE PASSE',
-                          prefixIcon: Icon(
+                        decoration: InputDecoration(
+                          labelText: state.tr('login.password'),
+                          prefixIcon: const Icon(
                             Icons.lock_outline,
                             size: 18,
                             color: AppColors.champagne,
@@ -131,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                       const SizedBox(height: 22),
                       GoldButton(
-                        label: _busy ? 'Vérification...' : 'Se connecter',
+                        label: _busy ? state.tr('login.checking') : state.tr('login.signin'),
                         icon: Icons.arrow_forward,
                         fullWidth: true,
                         onPressed: _busy ? null : () => _submit(state),
@@ -141,10 +143,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 ),
                 const SizedBox(height: 26),
-                const FadeSlideIn(
-                  delay: Duration(milliseconds: 320),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 320),
                   child: Text(
-                    'COMPTES DE DÉMONSTRATION',
+                    state.tr('login.demo_accounts'),
                     textAlign: TextAlign.center,
                     style: AppTypography.eyebrow,
                   ),
@@ -184,48 +186,44 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 14),
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 600),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 4,
                     children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
+                      _footLink(
+                        state.tr('login.guide'),
+                        () => Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => const UserGuideScreen(),
                           ),
                         ),
-                        child: const Text(
-                          'Guide d\'utilisation',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: AppColors.grey,
-                            decoration: TextDecoration.underline,
-                            decorationColor: AppColors.greyDark,
+                      ),
+                      _footSep(),
+                      _footLink(
+                        state.tr('login.about'),
+                        () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AboutScreen(),
                           ),
                         ),
                       ),
-                      Container(
-                        width: 1,
-                        height: 12,
-                        color: AppColors.divider,
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
+                      _footSep(),
+                      _footLink(
+                        state.tr('login.legal'),
+                        () => Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => const LegalHubScreen(),
-                          ),
-                        ),
-                        child: const Text(
-                          'Mentions légales',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: AppColors.grey,
-                            decoration: TextDecoration.underline,
-                            decorationColor: AppColors.greyDark,
                           ),
                         ),
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 14),
+                const FadeSlideIn(
+                  delay: Duration(milliseconds: 640),
+                  child: Center(child: LanguageSelector(dense: true)),
                 ),
               ],
             ),
@@ -234,6 +232,27 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+
+  Widget _footLink(String label, VoidCallback onTap) {
+    return TextButton(
+      onPressed: onTap,
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11.5,
+          color: AppColors.grey,
+          decoration: TextDecoration.underline,
+          decorationColor: AppColors.greyDark,
+        ),
+      ),
+    );
+  }
+
+  Widget _footSep() => Container(
+    width: 1,
+    height: 12,
+    color: AppColors.divider,
+  );
 
   Widget _demoGrid() {
     final accounts = [

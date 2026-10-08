@@ -17,34 +17,32 @@ class LegalHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.watch<AppState>().company;
+    final s = context.watch<AppState>();
+    final c = s.company;
     final brand = c.brandName.isNotEmpty ? c.brandName : c.legalName;
 
     final docs = <_LegalDoc>[
       _LegalDoc(
-        'Politique de confidentialité',
-        'Traitement des données personnelles (RGPD), finalités, durées de '
-            'conservation et vos droits.',
+        s.tr('legal.privacy'),
+        s.tr('legal.privacy_sub'),
         Icons.privacy_tip_outlined,
         () => const PrivacyPolicyScreen(),
       ),
       _LegalDoc(
-        'Conditions Générales de Vente',
-        'Prestations, prix et TVA, paiement, annulation, responsabilité et '
-            'règlement des litiges.',
+        s.tr('legal.terms'),
+        s.tr('legal.terms_sub'),
         Icons.description_outlined,
         () => const TermsOfSaleScreen(),
       ),
       _LegalDoc(
-        'Mentions légales',
-        'Éditeur, hébergeur, propriété intellectuelle, responsabilité et '
-            'juridiction compétente.',
+        s.tr('legal.notice'),
+        s.tr('legal.notice_sub'),
         Icons.gavel_outlined,
         () => const LegalNoticeScreen(),
       ),
       _LegalDoc(
-        'Politique cookies',
-        'Cookies et stockage local utilisés. Aucun traceur publicitaire tiers.',
+        s.tr('legal.cookies'),
+        s.tr('legal.cookies_sub'),
         Icons.cookie_outlined,
         () => const CookiePolicyScreen(),
       ),
@@ -61,9 +59,9 @@ class LegalHubScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('INFORMATIONS LÉGALES', style: AppTypography.eyebrow),
+                  Text(s.tr('legal.hub_eyebrow'), style: AppTypography.eyebrow),
                   const SizedBox(height: 10),
-                  Text('Transparence et conformité', style: AppTypography.displayMedium),
+                  Text(s.tr('legal.hub_title'), style: AppTypography.displayMedium),
                   const SizedBox(height: 6),
                   Text('Version 1.0 · Dernière mise à jour : 2025', style: AppTypography.caption),
                   const SizedBox(height: 10),

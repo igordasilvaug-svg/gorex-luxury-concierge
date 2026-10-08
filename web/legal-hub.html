@@ -17,12 +17,17 @@
       font-size: 15px; line-height: 1.7; -webkit-font-smoothing: antialiased;
       min-height: 100vh; display: flex; flex-direction: column; }
     .wrap { max-width: 820px; margin: 0 auto; padding: 56px 24px 80px; width: 100%; }
-    .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 44px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 44px; }
+    .brand { display: flex; align-items: center; gap: 14px; }
     .mark { width: 40px; height: 40px; border: 1px solid var(--champagne);
       display: flex; align-items: center; justify-content: center;
       color: var(--champagne); font-size: 20px; font-weight: 600; }
     .brand-text .name { color: var(--white); font-size: 20px; font-weight: 600; letter-spacing: 5px; }
     .brand-text .sub { color: var(--grey); font-size: 11px; letter-spacing: 3px; margin-top: 3px; }
+    .lang { display: flex; border: 0.6px solid var(--divider); border-radius: 3px; overflow: hidden; }
+    .lang button { background: transparent; border: 0; color: var(--grey); cursor: pointer;
+      padding: 7px 12px; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; font-family: inherit; }
+    .lang button.active { background: linear-gradient(135deg,#D8BC85,#C6A15B,#A98643); color: #0A0A0B; }
     .eyebrow { color: var(--champagne); font-size: 11px; font-weight: 500;
       letter-spacing: 4px; text-transform: uppercase; }
     h1 { color: var(--white); font-size: 30px; font-weight: 500; margin: 14px 0 8px; }
@@ -55,56 +60,63 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="brand">
-      <div class="mark">G</div>
-      <div class="brand-text">
-        <div class="name">GOREX</div>
-        <div class="sub">LUXURY CONCIERGE</div>
+    <div class="topbar">
+      <div class="brand">
+        <div class="mark">G</div>
+        <div class="brand-text">
+          <div class="name">GOREX</div>
+          <div class="sub">LUXURY CONCIERGE</div>
+        </div>
+      </div>
+      <div class="lang" role="group" aria-label="Language">
+        <button data-lang="fr" class="active">FR</button>
+        <button data-lang="nl">NL</button>
+        <button data-lang="en">EN</button>
       </div>
     </div>
 
-    <div class="eyebrow">Informations légales</div>
-    <h1>Transparence et conformité</h1>
-    <div class="meta">Version 1.0 · Dernière mise à jour : 2025</div>
+    <div class="eyebrow" data-i18n="eyebrow">Informations légales</div>
+    <h1 data-i18n="title">Transparence et conformité</h1>
+    <div class="meta" data-i18n="meta">Version 1.0 · Dernière mise à jour : 2025</div>
     <div class="gold-divider"></div>
 
-    <p class="intro">
+    <p class="intro" data-i18n="intro">
       Retrouvez ici l'ensemble des documents juridiques encadrant l'utilisation de
-      GOREX LUXURY CONCIERGE et nos prestations. La discrétion et la conformité
-      sont au cœur de nos engagements.
+      GOREX LUXURY CONCIERGE et nos prestations.
     </p>
 
     <div class="grid">
       <a class="card" href="privacy.html">
         <div class="ic">&#9878;</div>
-        <div class="t">Politique de confidentialité</div>
-        <div class="d">Traitement des données personnelles (RGPD), finalités, durées de conservation et vos droits.</div>
-        <div class="arrow">Consulter →</div>
+        <div class="t" data-i18n="c1t">Politique de confidentialité</div>
+        <div class="d" data-i18n="c1d">Traitement des données personnelles (RGPD), finalités, durées de conservation et vos droits.</div>
+        <div class="arrow" data-i18n="open">Consulter →</div>
       </a>
       <a class="card" href="terms.html">
         <div class="ic">&#9998;</div>
-        <div class="t">Conditions Générales de Vente</div>
-        <div class="d">Prestations, prix et TVA, paiement, annulation, responsabilité et litiges.</div>
-        <div class="arrow">Consulter →</div>
+        <div class="t" data-i18n="c2t">Conditions Générales de Vente</div>
+        <div class="d" data-i18n="c2d">Prestations, prix et TVA, paiement, annulation, responsabilité et litiges.</div>
+        <div class="arrow" data-i18n="open">Consulter →</div>
       </a>
       <a class="card" href="legal.html">
         <div class="ic">&#9873;</div>
-        <div class="t">Mentions légales</div>
-        <div class="d">Éditeur, hébergeur, propriété intellectuelle, responsabilité et juridiction.</div>
-        <div class="arrow">Consulter →</div>
+        <div class="t" data-i18n="c3t">Mentions légales</div>
+        <div class="d" data-i18n="c3d">Éditeur, hébergeur, propriété intellectuelle, responsabilité et juridiction.</div>
+        <div class="arrow" data-i18n="open">Consulter →</div>
       </a>
       <a class="card" href="cookies.html">
         <div class="ic">&#9673;</div>
-        <div class="t">Politique cookies</div>
-        <div class="d">Cookies et stockage local utilisés. Aucun traceur publicitaire tiers.</div>
-        <div class="arrow">Consulter →</div>
+        <div class="t" data-i18n="c4t">Politique cookies</div>
+        <div class="d" data-i18n="c4d">Cookies et stockage local utilisés. Aucun traceur publicitaire tiers.</div>
+        <div class="arrow" data-i18n="open">Consulter →</div>
       </a>
     </div>
 
     <p style="margin-top: 30px;">
-      Pour toute question juridique, écrivez à
+      <span data-i18n="questions">Pour toute question juridique, écrivez à</span>
       <a class="plain" href="mailto:concierge@gorex.com">concierge@gorex.com</a>.
-      Accéder à <a class="plain" href="./">l'application</a>.
+      <a class="plain" href="about.html" data-i18n="about_link">À propos</a> ·
+      <a class="plain" href="./" data-i18n="app_link">l'application</a>.
     </p>
 
     <footer>
@@ -112,6 +124,74 @@
       <div class="copy">Gorex Group — Belgique · © 2025 GOREX LUXURY CONCIERGE</div>
     </footer>
   </div>
+
+  <script>
+    var I18N = {
+      fr: {
+        eyebrow: "Informations légales", title: "Transparence et conformité",
+        meta: "Version 1.0 · Dernière mise à jour : 2025",
+        intro: "Retrouvez ici l'ensemble des documents juridiques encadrant l'utilisation de GOREX LUXURY CONCIERGE et nos prestations. La discrétion et la conformité sont au cœur de nos engagements.",
+        c1t: "Politique de confidentialité",
+        c1d: "Traitement des données personnelles (RGPD), finalités, durées de conservation et vos droits.",
+        c2t: "Conditions Générales de Vente",
+        c2d: "Prestations, prix et TVA, paiement, annulation, responsabilité et litiges.",
+        c3t: "Mentions légales",
+        c3d: "Éditeur, hébergeur, propriété intellectuelle, responsabilité et juridiction.",
+        c4t: "Politique cookies",
+        c4d: "Cookies et stockage local utilisés. Aucun traceur publicitaire tiers.",
+        open: "Consulter →", questions: "Pour toute question juridique, écrivez à",
+        about_link: "À propos", app_link: "l'application"
+      },
+      nl: {
+        eyebrow: "Juridische informatie", title: "Transparantie en conformiteit",
+        meta: "Versie 1.0 · Laatst bijgewerkt: 2025",
+        intro: "Hier vindt u alle juridische documenten die het gebruik van GOREX LUXURY CONCIERGE en onze diensten regelen. Discretie en conformiteit staan centraal.",
+        c1t: "Privacybeleid",
+        c1d: "Verwerking van persoonsgegevens (AVG), doeleinden, bewaartermijnen en uw rechten.",
+        c2t: "Algemene Verkoopvoorwaarden",
+        c2d: "Diensten, prijzen en btw, betaling, annulering, aansprakelijkheid en geschillen.",
+        c3t: "Juridische informatie",
+        c3d: "Uitgever, hosting, intellectuele eigendom, aansprakelijkheid en bevoegde rechtbank.",
+        c4t: "Cookiebeleid",
+        c4d: "Gebruikte cookies en lokale opslag. Geen tracking door derden.",
+        open: "Bekijken →", questions: "Voor juridische vragen, schrijf naar",
+        about_link: "Over ons", app_link: "de applicatie"
+      },
+      en: {
+        eyebrow: "Legal information", title: "Transparency and compliance",
+        meta: "Version 1.0 · Last updated: 2025",
+        intro: "Here you will find all the legal documents governing the use of GOREX LUXURY CONCIERGE and our services. Discretion and compliance are at the heart of our commitments.",
+        c1t: "Privacy policy",
+        c1d: "Processing of personal data (GDPR), purposes, retention periods and your rights.",
+        c2t: "General Terms of Sale",
+        c2d: "Services, prices and VAT, payment, cancellation, liability and disputes.",
+        c3t: "Legal notice",
+        c3d: "Publisher, hosting, intellectual property, liability and jurisdiction.",
+        c4t: "Cookie policy",
+        c4d: "Cookies and local storage used. No third-party advertising trackers.",
+        open: "View →", questions: "For any legal question, write to",
+        about_link: "About", app_link: "the application"
+      }
+    };
+    function setLang(code) {
+      var d = I18N[code] || I18N.fr;
+      document.documentElement.lang = code;
+      document.querySelectorAll('[data-i18n]').forEach(function (el) {
+        var k = el.getAttribute('data-i18n');
+        if (d[k] !== undefined) el.textContent = d[k];
+      });
+      document.querySelectorAll('.lang button').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-lang') === code);
+      });
+      try { localStorage.setItem('gorex_web_lang', code); } catch (e) {}
+    }
+    document.querySelectorAll('.lang button').forEach(function (b) {
+      b.addEventListener('click', function () { setLang(b.getAttribute('data-lang')); });
+    });
+    var saved = 'fr';
+    try { saved = localStorage.getItem('gorex_web_lang') || 'fr'; } catch (e) {}
+    if (I18N[saved]) setLang(saved);
+  </script>
   <script src="cookie-consent.js" defer></script>
 </body>
 </html>

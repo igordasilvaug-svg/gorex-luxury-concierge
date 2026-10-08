@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/i18n/app_localizations.dart';
 import '../core/billing/peppol_service.dart';
 import '../core/billing/peppol_ubl_generator.dart';
 import '../core/billing/reconciliation_service.dart';
@@ -39,6 +40,10 @@ class AppState extends ChangeNotifier {
 
   /// Configuration du moteur de relance automatique des impayés.
   ReminderConfig reminderConfig = const ReminderConfig();
+
+  /// Langue active de l'interface (code ISO 639-1 : fr, nl, en).
+  /// Persistée pour conserver le choix de l'utilisateur entre les sessions.
+  String language = 'fr';
 
   List<AppUser> users = [];
   List<Client> clients = [];
@@ -120,6 +125,8 @@ class AppState extends ChangeNotifier {
         Map<String, dynamic>.from(m['reminderConfig'] as Map),
       );
     }
+    final lang = m['language'] as String?;
+    if (lang != null && lang.isNotEmpty) language = lang;
     users = _mapList(m['users'], AppUser.fromMap);
     clients = _mapList(m['clients'], Client.fromMap);
     tiers = _mapList(m['tiers'], SubscriptionTier.fromMap);
@@ -150,6 +157,7 @@ class AppState extends ChangeNotifier {
         'company': company.toMap(),
         'peppol': peppol.toMap(),
         'reminderConfig': reminderConfig.toMap(),
+        'language': language,
         'users': users.map((e) => e.toMap()).toList(),
         'clients': clients.map((e) => e.toMap()).toList(),
         'tiers': tiers.map((e) => e.toMap()).toList(),
@@ -214,6 +222,19 @@ class AppState extends ChangeNotifier {
     currentUser = null;
     notifyListeners();
   }
+
+  // ─────────────────────────── LANGUE ───────────────────────────
+  /// Change la langue de l'interface et la persiste.
+  Future<void> setLanguage(String code) async {
+    if (code == language) return;
+    language = code;
+    log('Changement de langue', code.toUpperCase());
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Traduit une clé selon la langue active (délègue à L10n).
+  String tr(String key) => L10n.tr(language, key);
 
   bool get isStaff => currentUser?.role.isStaff ?? false;
   bool get isCeo => currentUser?.role == UserRole.ceo;

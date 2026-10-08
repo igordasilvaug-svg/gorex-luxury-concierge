@@ -11,6 +11,8 @@ import '../documents/document_service.dart';
 import '../legal/privacy_policy_screen.dart';
 import '../legal/user_guide_screen.dart';
 import '../legal/legal_hub_screen.dart';
+import '../about/about_screen.dart';
+import '../../widgets/language_selector.dart';
 
 class ClientProfileScreen extends StatelessWidget {
   const ClientProfileScreen({super.key});
@@ -151,6 +153,14 @@ class ClientProfileScreen extends StatelessWidget {
               ),
             const SizedBox(height: 20),
 
+            SectionHeader(title: 'Langue de l\'application'),
+            const SizedBox(height: 12),
+            LuxuryCard(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: const LanguageTileList(),
+            ),
+            const SizedBox(height: 20),
+
             SectionHeader(title: 'Mes préférences'),
             const SizedBox(height: 12),
             LuxuryCard(
@@ -245,6 +255,17 @@ class ClientProfileScreen extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.privacy_tip_outlined, size: 15),
                 label: const Text('POLITIQUE DE CONFIDENTIALITÉ'),
+              ),
+            ),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AboutScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.info_outline, size: 15),
+                label: const Text('À PROPOS'),
               ),
             ),
             Center(

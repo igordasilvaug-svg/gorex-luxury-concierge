@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>À propos — GOREX LUXURY CONCIERGE</title>
+  <meta name="description" content="GOREX LUXURY CONCIERGE — maison de conciergerie d'exception de Gorex Group (Belgique). Conciergerie de luxe, assistance exécutive, voyage, art de vivre et sécurité.">
+  <style>
+    :root {
+      --black: #0A0A0B; --black-soft: #111114; --surface: #16161A;
+      --champagne: #C6A15B; --champagne-dark: #A98643;
+      --white: #FFFFFF; --off-white: #F6F4EF; --grey: #8A8A90;
+      --grey-light: #B5B5BA; --divider: #2A2A2F;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--black); color: var(--grey-light);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 15px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 48px 24px 80px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 40px; }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .mark { width: 44px; height: 44px; border: 1px solid var(--champagne);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--champagne); font-size: 22px; font-weight: 600; }
+    .brand-text .name { color: var(--white); font-size: 20px; font-weight: 600; letter-spacing: 5px; }
+    .brand-text .sub { color: var(--grey); font-size: 11px; letter-spacing: 3px; margin-top: 3px; }
+    .lang { display: flex; border: 0.6px solid var(--divider); border-radius: 3px; overflow: hidden; }
+    .lang button { background: transparent; border: 0; color: var(--grey); cursor: pointer;
+      padding: 7px 12px; font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+      font-family: inherit; }
+    .lang button.active { background: linear-gradient(135deg,#D8BC85,#C6A15B,#A98643); color: #0A0A0B; }
+    .eyebrow { color: var(--champagne); font-size: 11px; font-weight: 500;
+      letter-spacing: 4px; text-transform: uppercase; }
+    h1 { color: var(--white); font-size: 34px; font-weight: 500; margin: 14px 0 8px; }
+    .meta { color: var(--grey); font-size: 13px; }
+    .gold-divider { width: 60px; height: 1.4px; margin: 22px 0 34px;
+      background: linear-gradient(135deg, #D8BC85, #C6A15B, #A98643); }
+    .intro { color: var(--off-white); font-size: 17px; margin-bottom: 20px; }
+    h2 { color: var(--white); font-size: 17px; font-weight: 600; margin: 34px 0 14px; }
+    p { margin-bottom: 12px; }
+    .pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .pillar { background: var(--surface); border: 0.6px solid var(--divider);
+      border-radius: 4px; padding: 16px; display: flex; align-items: center; gap: 12px; }
+    .pillar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--champagne); flex: 0 0 auto; }
+    .pillar span { color: var(--off-white); font-size: 14px; }
+    .values { display: grid; gap: 12px; }
+    .value { background: var(--surface); border: 0.6px solid var(--divider);
+      border-radius: 4px; padding: 18px; }
+    .value h3 { color: var(--champagne); font-size: 13px; font-weight: 600;
+      letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+    .value p { color: var(--grey-light); font-size: 14px; margin: 0; }
+    .box { background: var(--surface); border: 0.6px solid var(--divider);
+      border-radius: 4px; padding: 18px; margin: 12px 0; }
+    .box strong { color: var(--off-white); }
+    a { color: var(--champagne); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .nav { display: flex; gap: 18px; flex-wrap: wrap; margin: 34px 0 0; }
+    .nav a { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+    footer { margin-top: 50px; padding-top: 22px; border-top: 0.6px solid var(--divider); text-align: center; }
+    footer .sig { color: #4A4A50; font-size: 10px; font-weight: 500; letter-spacing: 4px; }
+    footer .copy { color: #4A4A50; font-size: 12px; margin-top: 8px; }
+    @media (max-width: 600px) { h1 { font-size: 26px; } .wrap { padding: 32px 18px 60px; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="mark">G</div>
+        <div class="brand-text">
+          <div class="name">GOREX</div>
+          <div class="sub">LUXURY CONCIERGE</div>
+        </div>
+      </div>
+      <div class="lang" role="group" aria-label="Language">
+        <button data-lang="fr" class="active">FR</button>
+        <button data-lang="nl">NL</button>
+        <button data-lang="en">EN</button>
+      </div>
+    </div>
+
+    <div class="eyebrow" data-i18n="eyebrow">À propos</div>
+    <h1 data-i18n="title">L'excellence discrète</h1>
+    <div class="meta" data-i18n="version">Version 1.0 · Gorex Group — Belgique</div>
+    <div class="gold-divider"></div>
+
+    <p class="intro" data-i18n="intro">
+      GOREX LUXURY CONCIERGE est la signature de Gorex Group, maison belge
+      dédiée à la conciergerie d'exception et à l'assistance exécutive.
+    </p>
+
+    <h2 data-i18n="pillars_title">Nos cinq piliers</h2>
+    <div class="pillars">
+      <div class="pillar"><span class="dot"></span><span data-i18n="p1">Conciergerie de luxe</span></div>
+      <div class="pillar"><span class="dot"></span><span data-i18n="p2">Assistance exécutive</span></div>
+      <div class="pillar"><span class="dot"></span><span data-i18n="p3">Voyage</span></div>
+      <div class="pillar"><span class="dot"></span><span data-i18n="p4">Art de vivre</span></div>
+      <div class="pillar"><span class="dot"></span><span data-i18n="p5">Sécurité</span></div>
+    </div>
+
+    <h2 data-i18n="values_title">Nos engagements</h2>
+    <div class="values">
+      <div class="value">
+        <h3 data-i18n="v1t">Discrétion</h3>
+        <p data-i18n="v1b">La confidentialité est absolue. Chaque demande est traitée avec la plus stricte réserve.</p>
+      </div>
+      <div class="value">
+        <h3 data-i18n="v2t">Accès</h3>
+        <p data-i18n="v2b">Un réseau privilégié d'adresses, de partenaires et de privilèges normalement inaccessibles.</p>
+      </div>
+      <div class="value">
+        <h3 data-i18n="v3t">Excellence</h3>
+        <p data-i18n="v3b">Un service sur mesure, réactif et irréprochable, du premier contact à l'exécution.</p>
+      </div>
+    </div>
+
+    <h2 data-i18n="contact_title">Nous contacter</h2>
+    <div class="box">
+      <strong>Gorex Group SA</strong><br>
+      <span data-i18n="addr">Avenue Louise 000, 1050 Bruxelles, Belgique</span><br>
+      <span data-i18n="email_label">E-mail :</span> <a href="mailto:concierge@gorex.com">concierge@gorex.com</a><br>
+      <span data-i18n="phone_label">Téléphone :</span> +32 2 555 01 00
+    </div>
+
+    <div class="nav">
+      <a href="./" data-i18n="nav_app">Application</a>
+      <a href="legal-hub.html" data-i18n="nav_legal">Informations légales</a>
+      <a href="privacy.html" data-i18n="nav_privacy">Confidentialité</a>
+    </div>
+
+    <footer>
+      <div class="sig">DISCRETION. ACCESS. EXCELLENCE.</div>
+      <div class="copy">Gorex Group — Belgique · © 2025 GOREX LUXURY CONCIERGE</div>
+    </footer>
+  </div>
+
+  <script>
+    var I18N = {
+      fr: {
+        eyebrow: "À propos", title: "L'excellence discrète",
+        version: "Version 1.0 · Gorex Group — Belgique",
+        intro: "GOREX LUXURY CONCIERGE est la signature de Gorex Group, maison belge dédiée à la conciergerie d'exception et à l'assistance exécutive. Nous accompagnons une clientèle privée et des dirigeants exigeants en Belgique et à l'international.",
+        pillars_title: "Nos cinq piliers", p1: "Conciergerie de luxe", p2: "Assistance exécutive",
+        p3: "Voyage", p4: "Art de vivre", p5: "Sécurité",
+        values_title: "Nos engagements",
+        v1t: "Discrétion", v1b: "La confidentialité est absolue. Chaque demande est traitée avec la plus stricte réserve.",
+        v2t: "Accès", v2b: "Un réseau privilégié d'adresses, de partenaires et de privilèges normalement inaccessibles.",
+        v3t: "Excellence", v3b: "Un service sur mesure, réactif et irréprochable, du premier contact à l'exécution.",
+        contact_title: "Nous contacter", addr: "Avenue Louise 000, 1050 Bruxelles, Belgique",
+        email_label: "E-mail :", phone_label: "Téléphone :",
+        nav_app: "Application", nav_legal: "Informations légales", nav_privacy: "Confidentialité"
+      },
+      nl: {
+        eyebrow: "Over ons", title: "Discrete excellentie",
+        version: "Versie 1.0 · Gorex Group — België",
+        intro: "GOREX LUXURY CONCIERGE is de signatuur van Gorex Group, een Belgisch huis gewijd aan uitzonderlijke conciërge en executive assistance. Wij begeleiden een privécliënteel en veeleisende leiders in België en internationaal.",
+        pillars_title: "Onze vijf pijlers", p1: "Luxe conciërge", p2: "Executive assistance",
+        p3: "Reizen", p4: "Levensstijl", p5: "Beveiliging",
+        values_title: "Onze engagementen",
+        v1t: "Discretie", v1b: "Vertrouwelijkheid is absoluut. Elke aanvraag wordt met de grootste terughoudendheid behandeld.",
+        v2t: "Toegang", v2b: "Een bevoorrecht netwerk van adressen, partners en privileges die normaal ontoegankelijk zijn.",
+        v3t: "Excellentie", v3b: "Een dienst op maat, responsief en onberispelijk, van het eerste contact tot de uitvoering.",
+        contact_title: "Contacteer ons", addr: "Louizalaan 000, 1050 Brussel, België",
+        email_label: "E-mail:", phone_label: "Telefoon:",
+        nav_app: "Applicatie", nav_legal: "Juridische informatie", nav_privacy: "Privacy"
+      },
+      en: {
+        eyebrow: "About", title: "Discreet excellence",
+        version: "Version 1.0 · Gorex Group — Belgium",
+        intro: "GOREX LUXURY CONCIERGE is the signature of Gorex Group, a Belgian house devoted to exceptional concierge and executive assistance. We serve a private clientele and demanding executives in Belgium and internationally.",
+        pillars_title: "Our five pillars", p1: "Luxury concierge", p2: "Executive assistance",
+        p3: "Travel", p4: "Lifestyle", p5: "Security",
+        values_title: "Our commitments",
+        v1t: "Discretion", v1b: "Confidentiality is absolute. Every request is handled with the strictest reserve.",
+        v2t: "Access", v2b: "A privileged network of addresses, partners and privileges normally out of reach.",
+        v3t: "Excellence", v3b: "A tailor-made, responsive and flawless service, from first contact to delivery.",
+        contact_title: "Contact us", addr: "Avenue Louise 000, 1050 Brussels, Belgium",
+        email_label: "Email:", phone_label: "Phone:",
+        nav_app: "Application", nav_legal: "Legal information", nav_privacy: "Privacy"
+      }
+    };
+    function setLang(code) {
+      var d = I18N[code] || I18N.fr;
+      document.documentElement.lang = code;
+      document.querySelectorAll('[data-i18n]').forEach(function (el) {
+        var k = el.getAttribute('data-i18n');
+        if (d[k] !== undefined) el.textContent = d[k];
+      });
+      document.querySelectorAll('.lang button').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-lang') === code);
+      });
+      try { localStorage.setItem('gorex_web_lang', code); } catch (e) {}
+    }
+    document.querySelectorAll('.lang button').forEach(function (b) {
+      b.addEventListener('click', function () { setLang(b.getAttribute('data-lang')); });
+    });
+    var saved = 'fr';
+    try { saved = localStorage.getItem('gorex_web_lang') || 'fr'; } catch (e) {}
+    if (I18N[saved]) setLang(saved);
+  </script>
+  <script src="cookie-consent.js" defer></script>
+</body>
+</html>

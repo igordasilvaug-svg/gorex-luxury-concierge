@@ -26,18 +26,28 @@ class GorexApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => AppState()..init(),
-      child: MaterialApp(
-        title: 'GOREX LUXURY CONCIERGE',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark,
-        locale: const Locale('fr', 'BE'),
-        supportedLocales: const [Locale('fr', 'BE'), Locale('fr'), Locale('en')],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        home: const _Root(),
+      child: Consumer<AppState>(
+        builder: (context, state, _) {
+          return MaterialApp(
+            title: 'GOREX LUXURY CONCIERGE',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.dark,
+            locale: _localeFor(state.language),
+            supportedLocales: const [
+              Locale('fr', 'BE'),
+              Locale('fr'),
+              Locale('nl', 'BE'),
+              Locale('nl'),
+              Locale('en'),
+            ],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: const _Root(),
+          );
+        },
       ),
     );
   }
@@ -88,5 +98,18 @@ class _RootState extends State<_Root> {
       return const ForcePasswordChangeScreen();
     }
     return const AppShell();
+  }
+}
+
+/// Convertit un code de langue (fr/nl/en) en Locale adaptée (BE pour fr & nl).
+Locale _localeFor(String code) {
+  switch (code) {
+    case 'nl':
+      return const Locale('nl', 'BE');
+    case 'en':
+      return const Locale('en');
+    case 'fr':
+    default:
+      return const Locale('fr', 'BE');
   }
 }
