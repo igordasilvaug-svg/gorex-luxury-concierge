@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GOREX LUXURY CONCIERGE — Téléchargement Android</title>
+<meta name="description" content="Téléchargez l'application officielle GOREX LUXURY CONCIERGE pour Android.">
+<link rel="icon" href="favicon.png">
+<style>
+  :root{
+    --black:#0A0A0B; --black-soft:#111114; --surface:#16161A;
+    --champagne:#C6A15B; --champagne-light:#D8BC85; --champagne-dark:#A98643;
+    --grey:#8A8A90; --grey-light:#B5B5BA; --divider:#2A2A2F;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(circle at 50% -10%, #1a1712 0%, var(--black) 55%);
+    color:#fff; min-height:100vh;
+    font-family:'Georgia','Times New Roman',serif;
+    -webkit-font-smoothing:antialiased;
+    display:flex; flex-direction:column; align-items:center;
+    padding:48px 20px 64px;
+  }
+  .wrap{width:100%; max-width:520px; text-align:center}
+  .logo{width:190px; height:auto; margin:0 auto 6px; display:block;
+    filter:drop-shadow(0 0 26px rgba(198,161,91,.18))}
+  .tag{font-size:11px; letter-spacing:4px; color:var(--champagne-dark);
+    text-transform:uppercase; margin-top:14px}
+  .eyebrow{font-size:10px; letter-spacing:5px; color:var(--grey);
+    text-transform:uppercase; margin-top:34px}
+  h1{font-size:20px; letter-spacing:2px; font-weight:600; margin-top:10px}
+  .sub{font-size:13px; color:var(--grey-light); margin-top:8px; line-height:1.6}
+  .card{
+    background:linear-gradient(160deg,#16161A 0%,#111114 100%);
+    border:1px solid var(--divider); border-radius:8px;
+    padding:22px; margin-top:26px; text-align:left;
+  }
+  .dl{
+    display:flex; align-items:center; gap:14px; width:100%;
+    padding:14px 16px; border:1px solid var(--divider); border-radius:6px;
+    text-decoration:none; color:#fff; transition:.18s; margin-top:12px;
+    background:rgba(255,255,255,.01); cursor:pointer;
+    font-family:Arial,sans-serif;
+  }
+  .dl:first-of-type{margin-top:0}
+  .dl:hover{border-color:var(--champagne); background:rgba(198,161,91,.06)}
+  .dl.busy{opacity:.85; pointer-events:none}
+  .dl .ico{width:34px;height:34px;flex:0 0 34px;border:1px solid var(--champagne);
+    border-radius:6px;display:flex;align-items:center;justify-content:center;
+    color:var(--champagne);font-size:16px}
+  .dl .meta{flex:1;min-width:0;text-align:left}
+  .dl .name{font-size:13px;font-weight:600;letter-spacing:.4px}
+  .dl .note{font-size:11px;color:var(--grey);margin-top:2px}
+  .dl .size{font-size:11px;color:var(--champagne);white-space:nowrap}
+  .rec{display:inline-block;font-size:9px;letter-spacing:1px;
+    color:var(--black);background:var(--champagne);border-radius:3px;padding:2px 6px;margin-left:8px;vertical-align:middle}
+  .prog{height:3px;background:var(--divider);border-radius:2px;margin-top:8px;overflow:hidden;display:none}
+  .prog.on{display:block}
+  .prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--champagne-dark),var(--champagne-light));transition:width .2s}
+  .status{font-family:Arial,sans-serif;font-size:11px;color:var(--grey);margin-top:6px;text-align:left;display:none}
+  .status.on{display:block}
+  .gold{height:1px;background:linear-gradient(90deg,transparent,var(--champagne),transparent);
+    margin:26px 0;border:0}
+  .steps{font-family:Arial,sans-serif;font-size:12px;color:var(--grey-light);line-height:1.8;text-align:left}
+  .steps b{color:#fff}
+  .web{display:inline-block;margin-top:8px;font-family:Arial,sans-serif;font-size:12px;
+    letter-spacing:1px;color:var(--champagne);text-decoration:none;border-bottom:1px solid var(--champagne-dark);padding-bottom:2px}
+  .foot{font-size:10px;letter-spacing:3px;color:var(--grey);margin-top:40px;text-transform:uppercase}
+  .links{margin-top:14px;font-family:Arial,sans-serif;font-size:11px;color:var(--grey)}
+  .links a{color:var(--grey-light);text-decoration:none;margin:0 8px}
+  .links a:hover{color:var(--champagne)}
+  .err{color:#d98b7a;font-family:Arial,sans-serif;font-size:11px;margin-top:8px;text-align:left;display:none}
+  .err.on{display:block}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="logo" src="assets/assets/brand/gorex_logo.png" alt="GOREX LUXURY CONCIERGE">
+    <div class="tag">Your requests. Our priority.</div>
+
+    <div class="eyebrow">Application Android</div>
+    <h1>GOREX LUXURY CONCIERGE</h1>
+    <p class="sub">Téléchargez l'application officielle. Choisissez la version correspondant à votre appareil — dans le doute, prenez la version recommandée.</p>
+
+    <div class="card" id="card">
+      <div class="dl" data-abi="arm64-v8a">
+        <span class="ico">&#9660;</span>
+        <span class="meta">
+          <span class="name">ARM 64 bits (v8a)<span class="rec">RECOMMANDÉ</span></span>
+          <span class="note">Téléphones &amp; tablettes récents (2018+)</span>
+        </span>
+        <span class="size" data-size></span>
+      </div>
+      <div class="prog" data-prog><i></i></div>
+      <div class="status" data-status></div>
+
+      <div class="dl" data-abi="armeabi-v7a">
+        <span class="ico">&#9660;</span>
+        <span class="meta">
+          <span class="name">ARM 32 bits (v7a)</span>
+          <span class="note">Appareils plus anciens</span>
+        </span>
+        <span class="size" data-size></span>
+      </div>
+      <div class="prog" data-prog><i></i></div>
+      <div class="status" data-status></div>
+
+      <div class="dl" data-abi="x86_64">
+        <span class="ico">&#9660;</span>
+        <span class="meta">
+          <span class="name">x86_64</span>
+          <span class="note">Émulateurs &amp; appareils Intel</span>
+        </span>
+        <span class="size" data-size></span>
+      </div>
+      <div class="prog" data-prog><i></i></div>
+      <div class="status" data-status></div>
+
+      <div class="err" data-err></div>
+    </div>
+
+    <hr class="gold">
+
+    <div class="steps">
+      <b>Installation :</b><br>
+      1. Touchez la version recommandée : le fichier se prépare puis se télécharge.<br>
+      2. Ouvrez l'APK téléchargé, autorisez l'installation depuis cette source si demandé.<br>
+      3. Lancez l'application GOREX LUXURY CONCIERGE.<br>
+      <br>
+      <b>Prérequis :</b> Android 7.0 (API 24) ou supérieur.
+    </div>
+
+    <hr class="gold">
+
+    <div class="steps" style="text-align:center">
+      Vous préférez tester sans installer ?<br>
+      <a class="web" href="./">Ouvrir la version web &rarr;</a>
+    </div>
+
+    <div class="foot">Discretion. Access. Excellence.</div>
+    <div class="links">
+      <a href="about.html">À propos</a> ·
+      <a href="legal-hub.html">Mentions légales</a> ·
+      <a href="privacy.html">Confidentialité</a>
+    </div>
+  </div>
+
+<script src="download.js"></script>
+</body>
+</html>

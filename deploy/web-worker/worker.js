@@ -2,7 +2,7 @@
 // Sert le build Flutter Web (dossier d'assets) avec :
 //  - routage SPA (fallback index.html)
 //  - en-têtes de sécurité HTTP renforcés (CSP, HSTS, anti-sniff, referrer, permissions)
-//  - conservation de la page statique privacy.html
+//  - page de téléchargement /download + APK Android publics (/download/*.apk)
 //
 // Note CSP : Flutter Web (CanvasKit / Skwasm) charge le moteur de rendu depuis
 // https://www.gstatic.com. Les directives autorisent donc gstatic en script-src
@@ -51,6 +51,9 @@ export default {
 
     if (path === '/' || path === '') path = '/index.html';
 
+    // Raccourci : /download -> page de téléchargement
+    if (path === '/download' || path === '/download/') path = '/download.html';
+
     // Service worker Flutter : toujours revalidé
     if (path === '/flutter_service_worker.js') {
       const res = await env.ASSETS.fetch(new URL('/flutter_service_worker.js', url.origin));
@@ -59,6 +62,22 @@ export default {
       h.set('Service-Worker-Allowed', '/');
       for (const [k, v] of Object.entries(SECURITY_HEADERS)) h.set(k, v);
       return new Response(res.body, { status: res.status, headers: h });
+    }
+
+    // APK Android : type MIME correct + téléchargement forcé
+    if (path.startsWith('/download/') && path.endsWith('.apk')) {
+      const apkRes = await env.ASSETS.fetch(new URL(path, url.origin));
+      if (apkRes.status === 200) {
+        const h = new Headers();
+        h.set('Content-Type', 'application/vnd.android.package-archive');
+        const filename = path.substring(path.lastIndexOf('/') + 1);
+        h.set('Content-Disposition', `attachment; filename="${filename}"`);
+        h.set('Cache-Control', 'public, max-age=86400');
+        h.set('X-Content-Type-Options', 'nosniff');
+        h.set('Accept-Ranges', 'bytes');
+        return new Response(apkRes.body, { status: 200, headers: h });
+      }
+      return new Response('APK not found', { status: 404 });
     }
 
     let assetRes = await env.ASSETS.fetch(new URL(path, url.origin));

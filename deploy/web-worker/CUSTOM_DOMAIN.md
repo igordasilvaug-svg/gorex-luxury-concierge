@@ -81,3 +81,35 @@ Tant qu'aucun domaine personnalisé n'est attaché, l'application reste accessib
 l'URL `*.workers.dev` générée par Cloudflare. Pour **pérenniser** cette URL (au lieu de
 la version temporaire), utilisez le **lien de réclamation (claim)** fourni par
 `wrangler deploy --temporary` : il transfère le projet dans votre propre compte Cloudflare.
+
+**URL actuelle du Worker** : `https://gorex-luxury-concierge.stripe-suit.workers.dev`
+
+---
+
+## Page de téléchargement Android (publique)
+
+L'application expose une page de téléchargement publique : **`/download`**
+(ex. `https://concierge.gorex.be/download`).
+
+- Trois variantes d'APK signés sont proposées (arm64-v8a *recommandé*, armeabi-v7a, x86_64).
+- Comme un APK dépasse la limite Cloudflare de 5 Mo par fichier, chaque APK est **découpé
+  en morceaux < 5 Mo** (`/download/parts/*.partNN`) et **réassemblé automatiquement dans le
+  navigateur** par `download.js`, avec **vérification de l'empreinte SHA-256** avant
+  enregistrement du fichier `.apk`.
+- Le manifeste (`/download/manifest.json`) décrit tailles, découpages et empreintes.
+
+### Mise à jour des APK (nouvelle version)
+
+```bash
+# 1. Reconstruire les APK séparés par ABI
+cd /home/user/flutter_app
+flutter build apk --release --split-per-abi
+
+# 2. Régénérer les morceaux + le manifeste dans le dossier d'assets du Worker
+#    (voir scripts de build internes), puis redéployer :
+cd /home/user/gorex_web_worker && npx wrangler deploy
+```
+
+> **Alternative sans découpage** : héberger les APK sur un stockage objet
+> (R2, S3, GitHub Releases…) et pointer les liens de la page `/download` vers ces URL
+> — utile pour des fichiers de plus de 5 Mo ou une distribution via un CDN dédié.
