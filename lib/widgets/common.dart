@@ -23,63 +23,23 @@ class ConfidentialityBadge extends StatelessWidget {
   }
 }
 
-/// Logo / marque GOREX
+/// Logo / marque GOREX — logo officiel GOREX LUXURY CONCIERGE (tel quel)
 class GorexBrand extends StatelessWidget {
   final bool compact;
   const GorexBrand({super.key, this.compact = false});
 
+  static const String _logoAsset = 'assets/brand/gorex_logo.png';
+
   @override
   Widget build(BuildContext context) {
-    if (compact) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _mark(22),
-          const SizedBox(width: 10),
-          Text('GOREX', style: AppTypography.brandTitleSmall),
-        ],
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            _mark(30),
-            const SizedBox(width: 12),
-            const Text('GOREX', style: AppTypography.brandTitle),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Padding(
-          padding: const EdgeInsets.only(left: 42),
-          child: Text(
-            'LUXURY CONCIERGE',
-            style: AppTypography.eyebrow.copyWith(color: AppColors.grey),
-          ),
-        ),
-      ],
+    final double h = compact ? 34 : 96;
+    return Image.asset(
+      _logoAsset,
+      height: h,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
     );
   }
-
-  Widget _mark(double size) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      border: Border.all(color: AppColors.champagne, width: 1),
-    ),
-    alignment: Alignment.center,
-    child: Text(
-      'G',
-      style: TextStyle(
-        color: AppColors.champagne,
-        fontSize: size * 0.52,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0,
-      ),
-    ),
-  );
 }
 
 /// Étiquette de section (eyebrow)

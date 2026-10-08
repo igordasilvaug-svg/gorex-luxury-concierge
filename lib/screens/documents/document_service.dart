@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -25,35 +26,57 @@ class DocumentService {
     decimalDigits: 2,
   );
 
-  static pw.Widget _header(String docType, String reference) {
+  /// Cache du logo officiel pour l'entête des documents PDF.
+  static pw.MemoryImage? _logo;
+
+  static Future<pw.MemoryImage?> _loadLogo() async {
+    if (_logo != null) return _logo;
+    try {
+      final data = await rootBundle.load('assets/brand/gorex_logo.png');
+      _logo = pw.MemoryImage(data.buffer.asUint8List());
+      return _logo;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static pw.Widget _header(String docType, String reference, {pw.MemoryImage? logo}) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'GOREX',
-                  style: pw.TextStyle(
-                    fontSize: 22,
-                    letterSpacing: 6,
-                    fontWeight: pw.FontWeight.bold,
+            // Logo officiel GOREX LUXURY CONCIERGE (tel quel)
+            if (logo != null)
+              pw.Container(
+                height: 52,
+                child: pw.Image(logo, height: 52, fit: pw.BoxFit.contain),
+              )
+            else
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'GOREX',
+                    style: pw.TextStyle(
+                      fontSize: 22,
+                      letterSpacing: 6,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
                   ),
-                ),
-                pw.SizedBox(height: 2),
-                pw.Text(
-                  'LUXURY CONCIERGE',
-                  style: pw.TextStyle(
-                    fontSize: 8,
-                    letterSpacing: 3,
-                    color: _grey,
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    'LUXURY CONCIERGE',
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      letterSpacing: 3,
+                      color: _grey,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.end,
               children: [
@@ -157,6 +180,7 @@ class DocumentService {
   ) async {
     final client = s.clientById(r.clientId);
     final tier = s.tierById(client?.subscriptionTierId);
+    final logo = await _loadLogo();
     final doc = pw.Document();
     doc.addPage(
       pw.MultiPage(
@@ -164,7 +188,7 @@ class DocumentService {
         margin: const pw.EdgeInsets.all(38),
         footer: _footer,
         build: (ctx) => [
-          _header('Récapitulatif de demande', r.reference),
+          _header('Récapitulatif de demande', r.reference, logo: logo),
           pw.Text(
             r.title,
             style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
@@ -230,6 +254,7 @@ class DocumentService {
     Itinerary it,
   ) async {
     final client = s.clientById(it.clientId);
+    final logo = await _loadLogo();
     final doc = pw.Document();
     doc.addPage(
       pw.MultiPage(
@@ -237,7 +262,7 @@ class DocumentService {
         margin: const pw.EdgeInsets.all(38),
         footer: _footer,
         build: (ctx) => [
-          _header('Itinéraire premium', it.reference),
+          _header('Itinéraire premium', it.reference, logo: logo),
           pw.Text(
             it.title,
             style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
@@ -333,6 +358,7 @@ class DocumentService {
     final client = s.clientById(f.clientId);
     final company = s.company;
     final vat = VatService.computeVat(client);
+    final logo = await _loadLogo();
     final doc = pw.Document();
     final title = f.type == FinanceDocType.quote ? 'Devis' : 'Facture';
     doc.addPage(
@@ -341,7 +367,7 @@ class DocumentService {
         margin: const pw.EdgeInsets.all(38),
         footer: _footer,
         build: (ctx) => [
-          _header(title, f.reference),
+          _header(title, f.reference, logo: logo),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -608,6 +634,7 @@ class DocumentService {
   ) async {
     final tier = s.tierById(client.subscriptionTierId);
     final concierge = s.userById(client.assignedConciergeId);
+    final logo = await _loadLogo();
     final doc = pw.Document();
     doc.addPage(
       pw.MultiPage(
@@ -615,7 +642,7 @@ class DocumentService {
         margin: const pw.EdgeInsets.all(38),
         footer: _footer,
         build: (ctx) => [
-          _header('Fiche client confidentielle', client.code),
+          _header('Fiche client confidentielle', client.code, logo: logo),
           pw.Text(
             client.fullName,
             style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
