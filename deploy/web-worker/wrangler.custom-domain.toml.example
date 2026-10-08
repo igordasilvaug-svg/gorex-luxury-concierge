@@ -1,0 +1,26 @@
+# Exemple — Worker avec DOMAINE PERSONNALISÉ
+# Copier ce fichier vers wrangler.toml (et adapter le domaine) pour servir
+# GOREX LUXURY CONCIERGE sur un domaine géré par Cloudflare.
+#
+# ⚠️ Le domaine doit être dans une zone Cloudflare de votre compte.
+#    Remplacez "concierge.gorex.be" et "gorex.be" par vos valeurs réelles.
+
+name = "gorex-luxury-concierge"
+compatibility_date = "2025-01-01"
+main = "worker.js"
+
+# Route(s) du domaine personnalisé (zone du même compte Cloudflare)
+routes = [
+  { pattern = "concierge.gorex.be/*", zone_name = "gorex.be" }
+]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+html_handling = "none"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+# Alternative (recommandée pour un sous-domaine) : utiliser "Custom Domain"
+# via le tableau de bord → Settings → Domains & Routes → Add → Custom domain.
+# Dans ce cas, ne PAS définir de routes ici.
