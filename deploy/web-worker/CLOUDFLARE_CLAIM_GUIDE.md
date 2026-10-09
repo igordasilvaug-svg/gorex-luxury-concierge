@@ -60,6 +60,12 @@ https://dash.cloudflare.com/claim-preview?claimToken=lYkaQV1dswlfWTT_vrPR-VCowil
 
 ## ÉTAPE 4 — Attacher le domaine personnalisé `concierge.gorex.be`
 
+> ⚠️ **PRÉREQUIS VÉRIFIÉ (09/10/2026)** : le domaine **`gorex.be` n'est PAS encore
+> enregistré** (réponse DNS Belgium : *disponible*). Cloudflare affiche donc
+> *« Aucune zone ne correspond à concierge.gorex.be »*.
+> **Il faut d'abord enregistrer `gorex.be`** puis l'ajouter à Cloudflare.
+> 👉 Voir le guide dédié : [`DOMAINES_GOREX.md`](DOMAINES_GOREX.md).
+
 > Prérequis : la zone DNS `gorex.be` doit être gérée par Cloudflare
 > (nameservers Cloudflare actifs). Si `gorex.be` est géré ailleurs, vous pouvez d'abord
 > ajouter le domaine à Cloudflare (gratuit) et changer les nameservers chez votre registrar.
