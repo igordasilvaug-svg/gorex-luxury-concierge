@@ -1,11 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gorex_concierge/core/firebase/firebase_bootstrap.dart';
 import 'package:gorex_concierge/core/firebase/firestore_service.dart';
 import 'package:gorex_concierge/core/firebase/firebase_options.dart';
+import 'package:gorex_concierge/state/app_state.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
 
   group('DefaultFirebaseOptions', () {
     test('expose une configuration non vide (Android & Web)', () {
@@ -68,6 +73,23 @@ void main() {
         throwsA(isA<CloudException>()),
       );
     });
+
+    test('watchState émet un flux vide sans Firebase', () async {
+      final events = await FirestoreService.watchState().toList();
+      expect(events, isEmpty);
+    });
+
+    test('watchCollectionCount émet un flux vide sans Firebase', () async {
+      final events = await FirestoreService.watchCollectionCount(
+        'clients',
+      ).toList();
+      expect(events, isEmpty);
+    });
+
+    test('watchCollection émet un flux vide sans Firebase', () async {
+      final events = await FirestoreService.watchCollection('clients').toList();
+      expect(events, isEmpty);
+    });
   });
 
   group('FirebaseBootstrap', () {
@@ -75,6 +97,42 @@ void main() {
       // En environnement de test, l'init doit échouer proprement.
       await FirebaseBootstrap.init();
       expect(FirebaseBootstrap.available, isA<bool>());
+    });
+  });
+
+  group('AppState — synchronisation temps réel (défensif)', () {
+    test('startLiveSync retourne false sans Firebase', () {
+      final s = AppState();
+      expect(s.liveSyncEnabled, isFalse);
+      final ok = s.startLiveSync();
+      expect(ok, isFalse); // Firebase indisponible en test
+      expect(s.liveSyncEnabled, isFalse);
+    });
+
+    test('stopLiveSync est sûr même sans abonnement', () async {
+      final s = AppState();
+      await s.stopLiveSync();
+      expect(s.liveSyncEnabled, isFalse);
+    });
+
+    test('importMap closeSession=false conserve la session', () async {
+      final s = AppState();
+      await s.init();
+      final user = s.users.firstWhere((u) => u.role.isStaff);
+      s.currentUser = user;
+      final snap = s.exportState();
+      await s.importMap(snap, closeSession: false);
+      expect(s.currentUser, isNotNull);
+      expect(s.currentUser!.id, user.id);
+    });
+
+    test('importMap closeSession=true clôt la session', () async {
+      final s = AppState();
+      await s.init();
+      s.currentUser = s.users.first;
+      final snap = s.exportState();
+      await s.importMap(snap);
+      expect(s.currentUser, isNull);
     });
   });
 }

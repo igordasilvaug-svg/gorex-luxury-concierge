@@ -203,6 +203,21 @@ class _BackupScreenState extends State<BackupScreen> {
     );
   }
 
+  void _toggleLive(bool enabled) {
+    final s = context.read<AppState>();
+    if (enabled) {
+      final ok = s.startLiveSync();
+      _snack(
+        ok
+            ? 'Synchronisation temps réel activée.'
+            : 'Cloud indisponible sur cet appareil.',
+      );
+    } else {
+      s.stopLiveSync();
+      _snack('Synchronisation temps réel désactivée.');
+    }
+  }
+
   Future<void> _pushCloud() async {
     final state = context.read<AppState>();
     setState(() => _busy = true);
@@ -445,6 +460,27 @@ class _BackupScreenState extends State<BackupScreen> {
                             '${_fmt(s.lastCloudSync!)}',
                             style: AppTypography.caption.copyWith(
                               color: AppColors.champagne,
+                            ),
+                          ),
+                        ],
+                        if (s.cloudAvailable) ...[
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            value: s.liveSyncEnabled,
+                            onChanged: (v) => _toggleLive(v),
+                            title: Text(
+                              'Synchronisation temps réel',
+                              style: AppTypography.bodyMedium,
+                            ),
+                            subtitle: Text(
+                              s.liveSyncEnabled
+                                  ? 'Les modifications distantes sont '
+                                        'appliquées automatiquement.'
+                                  : 'Activer pour recevoir les mises à jour '
+                                        'en direct.',
+                              style: AppTypography.caption,
                             ),
                           ),
                         ],

@@ -4,6 +4,8 @@
 // échouent proprement (exceptions typées / valeurs neutres) sans jamais faire
 // planter l'application. L'application reste pleinement fonctionnelle en local.
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
@@ -136,5 +138,66 @@ class FirestoreService {
     } catch (e) {
       throw CloudException('Lecture « $name » impossible : $e');
     }
+  }
+
+  // ─────────────────────────── TEMPS RÉEL (STREAMS) ───────────────────────────
+  /// Flux temps réel de l'état applicatif cloud (document unique).
+  ///
+  /// Émet à chaque modification détectée côté serveur. Chaque émission contient
+  /// la charge utile complète et la date de synchronisation. Si Firebase est
+  /// indisponible, un flux vide est retourné (aucune erreur).
+  static Stream<({Map<String, dynamic> payload, DateTime syncedAt})>
+  watchState() {
+    if (!FirebaseBootstrap.available) {
+      return const Stream.empty();
+    }
+    return _db
+        .collection(_stateCollection)
+        .doc(_stateDoc)
+        .snapshots()
+        .where((snap) => snap.exists && snap.data() != null)
+        .map((snap) {
+          final data = snap.data()!;
+          final payload = data['payload'];
+          final at = DateTime.tryParse('${data['syncedAt']}') ?? DateTime.now();
+          return (
+            payload: payload is Map
+                ? Map<String, dynamic>.from(payload)
+                : <String, dynamic>{},
+            syncedAt: at,
+          );
+        });
+  }
+
+  /// Flux temps réel du nombre de documents d'une collection.
+  ///
+  /// Utile pour un tableau de bord « live » (compteurs qui se mettent à jour).
+  static Stream<int> watchCollectionCount(String name) {
+    if (!FirebaseBootstrap.available) {
+      return const Stream.empty();
+    }
+    return _db
+        .collection(name)
+        .snapshots()
+        .map((snap) => snap.docs.length);
+  }
+
+  /// Flux temps réel des documents d'une collection (lecture seule).
+  static Stream<List<Map<String, dynamic>>> watchCollection(
+    String name, {
+    int limit = 50,
+  }) {
+    if (!FirebaseBootstrap.available) {
+      return const Stream.empty();
+    }
+    return _db
+        .collection(name)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+              .toList(),
+        );
   }
 }

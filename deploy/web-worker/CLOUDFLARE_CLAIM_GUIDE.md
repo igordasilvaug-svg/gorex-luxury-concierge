@@ -31,11 +31,11 @@ https://dash.cloudflare.com/claim-preview?claimToken=<JETON>
 **Lien du dernier déploiement (valable ~60 min) :**
 
 ```
-https://dash.cloudflare.com/claim-preview?claimToken=tZYuKnsMx7qW8LH4kZl27o3ouVA4YwL4om5yqIfmSzU
+https://dash.cloudflare.com/claim-preview?claimToken=dKamJhDtLqRjHiZ8nmNSP3AcCR9rte16ebT4ZdFURgI
 ```
 
 > ⚠️ **URL temporaire du dernier déploiement** (peut expirer) :
-> `https://gorex-luxury-concierge.calico-wormhole.workers.dev`
+> `https://gorex-luxury-concierge.smoggy-shock.workers.dev`
 
 > 📌 **Le jeton change à chaque déploiement** et **expire** (fenêtre limitée).
 > Le jeton du dernier déploiement vous est fourni dans la conversation.
@@ -127,7 +127,7 @@ dans :
 
 | État | URL |
 |---|---|
-| Temporaire (avant réclamation) | `https://gorex-luxury-concierge.calico-wormhole.workers.dev` |
+| Temporaire (avant réclamation) | `https://gorex-luxury-concierge.smoggy-shock.workers.dev` |
 | Permanente (après réclamation) | `https://gorex-luxury-concierge.<compte>.workers.dev` |
 | Domaine final | `https://concierge.gorex.be` |
 

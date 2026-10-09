@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -245,9 +246,19 @@ class AppState extends ChangeNotifier {
   }
 
   /// Variante acceptant directement une carte d'état (tests / appel interne).
-  Future<void> importMap(Map<String, dynamic> data) => _applyImport(data);
+  ///
+  /// [closeSession] = false conserve la session courante (utilisé par la
+  /// synchronisation temps réel, pour ne pas déconnecter l'utilisateur à chaque
+  /// mise à jour distante).
+  Future<void> importMap(
+    Map<String, dynamic> data, {
+    bool closeSession = true,
+  }) => _applyImport(data, closeSession: closeSession);
 
-  Future<void> _applyImport(Map<String, dynamic> data) async {
+  Future<void> _applyImport(
+    Map<String, dynamic> data, {
+    bool closeSession = true,
+  }) async {
     // Validation stricte AVANT toute mutation d'état : la sauvegarde doit
     // contenir des utilisateurs et des clients non vides.
     final usersRaw = data['users'];
@@ -270,7 +281,13 @@ class AppState extends ChangeNotifier {
       // absents de la sauvegarde.
       _clearData();
       _hydrate(data);
-      currentUser = null; // session close → reconnexion requise
+      if (closeSession) {
+        currentUser = null; // session close → reconnexion requise
+      } else if (previousUser != null) {
+        // Conserver la session : ré-aligner l'objet sur les nouvelles données.
+        final idx = users.indexWhere((u) => u.id == previousUser.id);
+        currentUser = idx >= 0 ? users[idx] : null;
+      }
       log(
         'Restauration sauvegarde',
         'Données locales',
@@ -349,6 +366,62 @@ class AppState extends ChangeNotifier {
   /// Nombre de documents par collection du backend GOREX (diagnostic).
   Future<Map<String, int>> cloudCollectionCounts() =>
       FirestoreService.collectionCounts();
+
+  // ── Synchronisation TEMPS RÉEL ──
+  StreamSubscription<({Map<String, dynamic> payload, DateTime syncedAt})>?
+  _cloudSub;
+  bool _liveSync = false;
+  DateTime? lastRemoteUpdate;
+
+  /// Vrai si l'abonnement temps réel Firestore est actif.
+  bool get liveSyncEnabled => _liveSync;
+
+  /// Démarre l'écoute temps réel du document cloud.
+  ///
+  /// À chaque mise à jour distante, l'état local est réaligné (la session
+  /// courante est conservée). Les écritures déclenchées localement par cette
+  /// synchronisation sont ignorées grâce à [_applyingRemote] (anti-boucle).
+  bool startLiveSync() {
+    if (!FirestoreService.available) return false;
+    if (_liveSync) return true;
+    _liveSync = true;
+    _cloudSub = FirestoreService.watchState().listen((event) async {
+      if (_applyingRemote) return;
+      if (event.payload.isEmpty) return;
+      _applyingRemote = true;
+      try {
+        final before = lastRemoteUpdate;
+        if (before != null && !event.syncedAt.isAfter(before)) return;
+        await importMap(event.payload, closeSession: false);
+        lastRemoteUpdate = event.syncedAt;
+      } catch (e) {
+        if (kDebugMode) debugPrint('[Cloud] apply remote failed: $e');
+      } finally {
+        _applyingRemote = false;
+      }
+    }, onError: (e) {
+      if (kDebugMode) debugPrint('[Cloud] live stream error: $e');
+    });
+    notifyListeners();
+    return true;
+  }
+
+  /// Arrête l'écoute temps réel.
+  Future<void> stopLiveSync() async {
+    await _cloudSub?.cancel();
+    _cloudSub = null;
+    _liveSync = false;
+    notifyListeners();
+  }
+
+  /// Anti-boucle : vrai pendant l'application d'une mise à jour distante.
+  bool _applyingRemote = false;
+
+  @override
+  void dispose() {
+    _cloudSub?.cancel();
+    super.dispose();
+  }
 
   // ─────────────────────────── AUTH ───────────────────────────
   AppUser? authenticate(String email, String password) {

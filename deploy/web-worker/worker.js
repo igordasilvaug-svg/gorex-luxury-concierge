@@ -22,15 +22,19 @@ const SECURITY_HEADERS = {
   // Protection XSS navigateurs anciens
   'X-XSS-Protection': '1; mode=block',
   // Content Security Policy
+  // Note Firebase/Firestore : le SDK Web ouvre des connexions HTTPS vers
+  // firestore.googleapis.com et un canal WebSocket (long-polling) vers
+  // *.googleapis.com / *.firebaseio.com → autorisés en connect-src.
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval' https://www.gstatic.com",
-    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'wasm-unsafe-eval' https://www.gstatic.com https://apis.google.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob:",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "connect-src 'self' https://www.gstatic.com https://fonts.gstatic.com",
+    "connect-src 'self' https://www.gstatic.com https://fonts.gstatic.com https://firestore.googleapis.com https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net",
     "worker-src 'self' blob:",
     "child-src 'self' blob:",
+    "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com",
     "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",

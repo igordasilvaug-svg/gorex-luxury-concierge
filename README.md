@@ -9,7 +9,7 @@
 ![Flutter](https://img.shields.io/badge/Flutter-3.35.4-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.9.2-0175C2?logo=dart&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Web-3DDC84?logo=android&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-166%20passed-success)
+![Tests](https://img.shields.io/badge/tests-173%20passed-success)
 ![License](https://img.shields.io/badge/license-Proprietary-C6A15B)
 
 </div>
@@ -27,8 +27,8 @@ Plateforme de conciergerie d'exception éditée par **Gorex Group** (Belgique). 
 
 | Ressource | URL |
 |---|---|
-| Application web | https://gorex-luxury-concierge.calico-wormhole.workers.dev |
-| Téléchargement Android (APK) | https://gorex-luxury-concierge.calico-wormhole.workers.dev/download |
+| Application web | https://gorex-luxury-concierge.smoggy-shock.workers.dev |
+| Téléchargement Android (APK) | https://gorex-luxury-concierge.smoggy-shock.workers.dev/download |
 | Informations légales (hub) | .../legal-hub.html |
 | Mentions légales | .../legal.html |
 | CGV | .../terms.html |
@@ -119,7 +119,7 @@ flutter build appbundle --release --dart-define=PRODUCTION=true   # Play Store
 
 ```bash
 flutter analyze     # → No issues found
-flutter test        # → 166/166 tests
+flutter test        # → 173/173 tests
 ```
 
 ## Publication
@@ -175,6 +175,8 @@ automatiquement en mode local sans jamais planter.
 - 🔥 **11 collections** créées (clients, requests, providers, bookings, itineraries,
   finance_docs, expenses, conversations, appointments, users, audit_log) — 10 documents chacune
 - ☁️ Synchronisation via **Sauvegarde → Synchronisation Cloud** (envoi / récupération)
+- ⚡ **Synchronisation temps réel** : écoute des modifications distantes (streams Firestore),
+  anti-boucle, session conservée — activable par un interrupteur
 - 🔒 Règles de sécurité Firestore déployées (durcir avant production)
 
 Ressources :
@@ -188,7 +190,8 @@ Ressources :
 
 ## Déploiement web
 
-Voir [`deploy/web-worker/README.md`](deploy/web-worker/README.md) (Cloudflare Workers + Assets).
+Voir le **guide complet** [`deploy/web-worker/GUIDE_HERBERGEMENT_CLOUDFLARE.md`](deploy/web-worker/GUIDE_HERBERGEMENT_CLOUDFLARE.md)
+(Cloudflare Workers + Assets : réclamation, domaine `concierge.gorex.be`, mises à jour, distribution APK).
 
 ---
 
