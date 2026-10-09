@@ -9,7 +9,7 @@
 ![Flutter](https://img.shields.io/badge/Flutter-3.35.4-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.9.2-0175C2?logo=dart&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Web-3DDC84?logo=android&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-112%20passed-success)
+![Tests](https://img.shields.io/badge/tests-136%20passed-success)
 ![License](https://img.shields.io/badge/license-Proprietary-C6A15B)
 
 </div>
@@ -27,12 +27,17 @@ Plateforme de conciergerie d'exception éditée par **Gorex Group** (Belgique). 
 
 | Ressource | URL |
 |---|---|
-| Application web | https://gorex-luxury-concierge.delightful-bag-624.workers.dev |
-| Informations légales (hub) | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/legal-hub.html |
-| Mentions légales | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/legal.html |
-| CGV | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/terms.html |
-| Politique cookies | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/cookies.html |
-| Politique de confidentialité (RGPD) | https://gorex-luxury-concierge.delightful-bag-624.workers.dev/privacy.html |
+| Application web | https://gorex-luxury-concierge.instinctive-submarine.workers.dev |
+| Téléchargement Android (APK) | https://gorex-luxury-concierge.instinctive-submarine.workers.dev/download |
+| Informations légales (hub) | .../legal-hub.html |
+| Mentions légales | .../legal.html |
+| CGV | .../terms.html |
+| Politique cookies | .../cookies.html |
+| Politique de confidentialité (RGPD) | .../privacy.html |
+
+> **Domaine cible** : `concierge.gorex.be` (à attacher après réclamation du Worker).
+> L'URL `*.workers.dev` est **temporaire** tant que le Worker n'est pas réclamé — voir la
+> [section Publication](#publication) ci-dessous.
 
 > Sécurité : l'ensemble des pages (y compris `.html`) est servi avec des en-têtes stricts
 > (CSP, HSTS, `X-Content-Type-Options: nosniff`, Referrer-Policy, Permissions-Policy).
@@ -90,17 +95,62 @@ lib/
 ```bash
 flutter pub get
 flutter run                      # dev
-flutter build web --release      # web
-flutter build apk --release      # Android (signé)
-flutter build appbundle --release
+flutter build web --release      # web (mode démo : comptes visibles)
+flutter build appbundle --release --dart-define=PRODUCTION=true   # Play Store
 ```
+
+> **Flag `PRODUCTION`** : `--dart-define=PRODUCTION=true` masque les comptes de
+> démonstration sur l'écran de connexion (voir `lib/core/app_config.dart`).
 
 ## Qualité
 
 ```bash
 flutter analyze     # → No issues found
-flutter test        # → 112/112 tests
+flutter test        # → 136/136 tests
 ```
+
+## Publication
+
+### 1. Build release (tout-en-un)
+
+```bash
+./build_release.sh                 # analyse + tests + AAB + APK + web + staging + découpage
+./build_release.sh --skip-tests    # sans la suite de tests
+./build_release.sh --deploy        # + déploiement Cloudflare (wrangler --temporary)
+```
+
+Le script produit :
+
+| Artefact | Emplacement |
+|---|---|
+| **AAB** (Play Store, démo masquée) | `build/app/outputs/bundle/release/app-release.aab` |
+| **APK** par ABI | `build/app/outputs/flutter-apk/app-{arm64-v8a,armeabi-v7a,x86_64}-release.apk` |
+| **Staging Worker** (web + `/download`) | `/home/user/gorex_web_stage` |
+
+### 2. Fiche Google Play
+
+Tout le dossier de publication (descriptions **FR / NL / EN**, classification, sécurité des
+Données, captures 1080×1920, icône 512, bannière 1024×500) se trouve dans
+[`deploy/play-store/`](deploy/play-store/) :
+
+- 📄 [`FICHE_GOOGLE_PLAY.md`](deploy/play-store/FICHE_GOOGLE_PLAY.md) — fiche complète
+- 🖼️ `icon_512.png`, `feature_graphic_1024x500.png`, `screenshots/01…08` + `screenshots/extras/`
+- 🎨 `screenshots/marketing/` — visuels avec cadres et accroches
+
+### 3. Réclamation Cloudflare & domaine personnalisé
+
+L'URL `*.workers.dev` est **temporaire**. Pour la rendre permanente et attacher
+`concierge.gorex.be`, suivre :
+
+- 📄 [`deploy/web-worker/CLOUDFLARE_CLAIM_GUIDE.md`](deploy/web-worker/CLOUDFLARE_CLAIM_GUIDE.md) — réclamation pas-à-pas
+- 📄 [`deploy/web-worker/CUSTOM_DOMAIN.md`](deploy/web-worker/CUSTOM_DOMAIN.md) — domaine personnalisé
+
+### 4. Téléchargement Android public
+
+La page **`/download`** distribue les APK signés. Comme un APK dépasse la limite Cloudflare
+de **5 Mo/fichier**, chaque APK est **découpé en morceaux < 4 Mo** (`download/parts/*.partNN`)
+et **réassemblé dans le navigateur** (`web/download.js`) avec **vérification SHA-256** avant
+enregistrement du `.apk`.
 
 ## Déploiement web
 

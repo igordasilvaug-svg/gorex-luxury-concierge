@@ -256,6 +256,7 @@ Gorex Group — Belgium · www.gorex.be
 | Graphique de présentation | `feature_graphic_1024x500.png` | 1024 × 500 | ✅ Prêt |
 | Captures d'écran téléphone | `screenshots/01…08` | 1080 × 1920 | ✅ 8 captures |
 | Captures supplémentaires | `screenshots/extras/` | 1080 × 1920 | ✅ 4 captures |
+| Captures « marketing » (cadres + accroches) | `screenshots/marketing/01…08` | 1080 × 1920 | ✅ 8 captures |
 
 **Ordre recommandé des captures (8) :**
 1. `01_connexion.png` — Accès sécurisé (connexion)
@@ -268,6 +269,8 @@ Gorex Group — Belgium · www.gorex.be
 8. `08_clients_vip.png` — Profils clients VIP (confidentiel)
 
 **Extras (au choix) :** `communication.png`, `prestataires.png`, `equipe.png`, `menu_navigation.png`
+
+**Captures « marketing » (style fiche Play) :** `screenshots/marketing/01…08` — version encadrée des 8 captures principales, avec fond noir/doré, accroche (eyebrow + titre sérif) et signature *GOREX LUXURY CONCIERGE · Discretion. Access. Excellence.* Idéales pour la première impression et la conversion sur la fiche Play.
 
 ---
 
