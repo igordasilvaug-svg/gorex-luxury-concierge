@@ -20,7 +20,7 @@
 | Tags | Concierge, Lifestyle, Business, Travel, Assistance |
 | Site web | `https://www.gorex.be` |
 | E-mail de contact | `concierge@gorex.com` |
-| Politique de confidentialité | `https://gorex-luxury-concierge.instinctive-submarine.workers.dev/privacy.html` *(→ `https://concierge.gorex.be/privacy.html` après domaine personnalisé)* |
+| Politique de confidentialité | `https://gorex-luxury-concierge.internal-promotion.workers.dev/privacy.html` *(→ `https://concierge.gorex.be/privacy.html` après domaine personnalisé)* |
 
 ### Coordonnées développeur (obligatoires)
 - **Nom du développeur** : Gorex Group
