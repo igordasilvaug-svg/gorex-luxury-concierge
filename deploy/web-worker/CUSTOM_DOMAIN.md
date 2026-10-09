@@ -82,7 +82,7 @@ l'URL `*.workers.dev` générée par Cloudflare. Pour **pérenniser** cette URL 
 la version temporaire), utilisez le **lien de réclamation (claim)** fourni par
 `wrangler deploy --temporary` : il transfère le projet dans votre propre compte Cloudflare.
 
-**URL actuelle du Worker** : `https://gorex-luxury-concierge.internal-promotion.workers.dev`
+**URL actuelle du Worker** : `https://gorex-luxury-concierge.calico-wormhole.workers.dev`
 
 ---
 
