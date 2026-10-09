@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/firebase/firestore_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../state/app_state.dart';
@@ -202,6 +203,77 @@ class _BackupScreenState extends State<BackupScreen> {
     );
   }
 
+  Future<void> _pushCloud() async {
+    final state = context.read<AppState>();
+    setState(() => _busy = true);
+    try {
+      final at = await state.pushToCloud();
+      _snack('État synchronisé vers le cloud — ${_fmt(at)}.');
+    } on CloudException catch (e) {
+      _snack(e.message);
+    } catch (e) {
+      _snack('Synchronisation impossible : $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _pullCloud() async {
+    final state = context.read<AppState>();
+    final ok = await _confirm(
+      title: 'Récupérer depuis le cloud ?',
+      message:
+          'Les données locales seront remplacées par la dernière version '
+          'sauvegardée dans le cloud. La session sera close par sécurité.',
+      action: 'Récupérer',
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      final at = await state.pullFromCloud();
+      if (!mounted) return;
+      if (at == null) {
+        _snack('Aucune sauvegarde cloud disponible.');
+      } else {
+        _snack('Données cloud restaurées — ${_fmt(at)}.');
+      }
+    } on CloudException catch (e) {
+      _snack(e.message);
+    } catch (e) {
+      _snack('Récupération impossible : $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _cloudPill(bool available) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: (available ? AppColors.success : AppColors.grey).withValues(
+        alpha: 0.14,
+      ),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(
+        color: (available ? AppColors.success : AppColors.grey).withValues(
+          alpha: 0.5,
+        ),
+        width: 0.8,
+      ),
+    ),
+    child: Text(
+      available ? 'CONNECTÉ' : 'LOCAL',
+      style: AppTypography.eyebrow.copyWith(
+        fontSize: 9,
+        color: available ? AppColors.success : AppColors.grey,
+      ),
+    ),
+  );
+
+  String _fmt(DateTime d) {
+    String p2(int n) => n.toString().padLeft(2, '0');
+    return '${p2(d.day)}/${p2(d.month)}/${d.year} ${p2(d.hour)}:${p2(d.minute)}';
+  }
+
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -331,6 +403,70 @@ class _BackupScreenState extends State<BackupScreen> {
                           icon: Icons.content_paste,
                           outlined: true,
                           onPressed: _busy ? null : _importDialog,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Cloud (Firestore) ──
+                  LuxuryCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.cloud_outlined,
+                              size: 18,
+                              color: AppColors.champagne,
+                            ),
+                            const SizedBox(width: 10),
+                            Text('Synchronisation Cloud', style: AppTypography.title),
+                            const Spacer(),
+                            _cloudPill(s.cloudAvailable),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          s.cloudAvailable
+                              ? 'Le backend Firestore GOREX est connecté. '
+                                    'Vous pouvez envoyer ou récupérer l\'état '
+                                    'complet depuis le cloud sécurisé.'
+                              : 'Backend Cloud non initialisé sur cet appareil. '
+                                    'L\'application fonctionne en mode local '
+                                    '(aucune donnée n\'est transmise).',
+                          style: AppTypography.caption,
+                        ),
+                        if (s.lastCloudSync != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Dernière synchro : '
+                            '${_fmt(s.lastCloudSync!)}',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.champagne,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            GoldButton(
+                              label: 'Envoyer vers le cloud',
+                              icon: Icons.cloud_upload_outlined,
+                              onPressed:
+                                  (_busy || !s.cloudAvailable) ? null : _pushCloud,
+                            ),
+                            GoldButton(
+                              label: 'Récupérer du cloud',
+                              icon: Icons.cloud_download_outlined,
+                              outlined: true,
+                              onPressed:
+                                  (_busy || !s.cloudAvailable) ? null : _pullCloud,
+                            ),
+                          ],
                         ),
                       ],
                     ),

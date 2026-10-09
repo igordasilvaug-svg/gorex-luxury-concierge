@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "724339415341",
+    "project_id": "gorex-concierge",
+    "storage_bucket": "gorex-concierge.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:724339415341:android:180257674c8df9434f1ba4",
+        "android_client_info": {
+          "package_name": "com.gorexconcierge.luxury"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDoFazGB2cxqOxsObUMQAL9ZU3WEaVIovE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -24,6 +24,11 @@ dependencies:
   # Networking (API-ready)
   http: 1.5.0
 
+  # Firebase (cloud backend — Firestore)
+  # ⚠️ Versions verrouillées, compatibles Flutter 3.35.4
+  firebase_core: 3.6.0
+  cloud_firestore: 5.4.3
+
   # Documents & export
   pdf: ^3.11.1
   printing: ^5.13.4

@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/firebase/firebase_bootstrap.dart';
 import 'widgets/animations.dart';
 import 'state/app_state.dart';
 import 'screens/login_screen.dart';
@@ -16,6 +17,8 @@ Future<void> main() async {
   // Initialize French (Belgium) locale data so DateFormat('...', 'fr_BE')
   // works on every platform (web, Android, tests).
   await initializeDateFormatting('fr_BE', null);
+  // Amorçage Firebase défensif : bascule en mode local si indisponible.
+  await FirebaseBootstrap.init();
   runApp(const GorexApp());
 }
 

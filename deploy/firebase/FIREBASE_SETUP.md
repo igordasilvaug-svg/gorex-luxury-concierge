@@ -4,19 +4,52 @@
 > Firestore** (base de données cloud), avec synchronisation temps réel et
 > comptes multi-appareils.
 >
-> **Statut actuel** : l'application fonctionne **100 % en local**
-> (`shared_preferences`). Le backend n'est **pas** encore activé car
-> l'environnement de développement ne contient **aucune clé Firebase**.
-> Ce guide décrit exactement ce qu'il faut fournir pour l'activer.
+> **✅ STATUT : BACKEND ACTIVÉ** — Le projet Firebase **`gorex-concierge`** est
+> connecté. 11 collections ont été créées avec 10 enregistrements chacune, les
+> règles de sécurité sont déployées, et l'application synchronise désormais son
+> état complet (envoi / récupération) vers Firestore.
+>
+> L'application reste **pleinement fonctionnelle en mode local** si le cloud est
+> indisponible (initialisation défensive) : aucune donnée n'est perdue.
 
 ---
 
-## 1. Pourquoi l'activation n'est pas automatique
+## ✅ État de l'activation (résumé)
+
+| Élément | État |
+|---|---|
+| Projet Firebase | `gorex-concierge` (n° 724339415341) |
+| Collections Firestore | **11** × 10 documents |
+| Règles de sécurité | Déployées (développement — accès ouvert) |
+| Dépendances Flutter | `firebase_core 3.6.0`, `cloud_firestore 5.4.3` |
+| Android | `google-services.json` synchronisé · plugin Google Services |
+| Web | `firebase_options.dart` (app « GOREX Concierge Web ») |
+| Synchronisation | Écran **Sauvegarde → Synchronisation Cloud** |
+
+> ⚠️ **Avant mise en production** : durcissez les règles Firestore
+> (`deploy/firebase/set_firestore_security_rules.py` → bloc `PROD_RULES`) et
+> activez l'authentification Firebase.
+
+### Commandes de maintenance
+
+```bash
+# (Re)créer les collections + données
+python3 deploy/firebase/create_backend_services.py            # écriture
+python3 deploy/firebase/create_backend_services.py --dry-run  # simulation
+
+# (Re)déployer les règles de sécurité
+python3 deploy/firebase/set_firestore_security_rules.py
+python3 deploy/firebase/set_firestore_security_rules.py --show  # afficher
+```
+
+---
+
+## 1. Fichiers de configuration requis
 
 Pour connecter une application Flutter à Firebase, **deux fichiers de
 configuration** sont obligatoires et **propres à votre projet Firebase**.
-Ils ne peuvent pas être générés à votre place : ils proviennent de la console
-Firebase et contiennent des identifiants liés à votre compte.
+Ils proviennent de la console Firebase et contiennent des identifiants liés à
+votre compte. *(Ces deux fichiers ont déjà été fournis et installés.)*
 
 | Fichier | Rôle | Où le récupérer |
 |---|---|---|

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/i18n/app_localizations.dart';
+import '../core/firebase/firestore_service.dart';
 import '../core/billing/peppol_service.dart';
 import '../core/billing/peppol_ubl_generator.dart';
 import '../core/billing/reconciliation_service.dart';
@@ -315,6 +316,39 @@ class AppState extends ChangeNotifier {
     await prefs.remove(_storageKey);
     notifyListeners();
   }
+
+  // ─────────────────────── SYNCHRONISATION CLOUD (Firestore) ───────────────────────
+  /// Vrai si le backend Cloud (Firestore) est initialisé et exploitable.
+  bool get cloudAvailable => FirestoreService.available;
+
+  /// Date de la dernière synchronisation cloud réussie (session courante).
+  DateTime? lastCloudSync;
+
+  /// Pousse l'intégralité de l'état local vers Firestore.
+  /// Retourne la date d'écriture. Lève [CloudException] en cas d'échec.
+  Future<DateTime> pushToCloud() async {
+    final at = await FirestoreService.pushState(exportState());
+    lastCloudSync = at;
+    log('Synchronisation cloud', 'Envoi', detail: 'État complet transmis');
+    await _persist();
+    notifyListeners();
+    return at;
+  }
+
+  /// Récupère l'état précédemment poussé depuis Firestore et l'applique.
+  /// Retourne la date de synchronisation, ou null si aucune donnée cloud.
+  Future<DateTime?> pullFromCloud() async {
+    final remote = await FirestoreService.pullState();
+    if (remote == null) return null;
+    await _applyImport(remote.payload);
+    lastCloudSync = remote.syncedAt;
+    notifyListeners();
+    return remote.syncedAt;
+  }
+
+  /// Nombre de documents par collection du backend GOREX (diagnostic).
+  Future<Map<String, int>> cloudCollectionCounts() =>
+      FirestoreService.collectionCounts();
 
   // ─────────────────────────── AUTH ───────────────────────────
   AppUser? authenticate(String email, String password) {

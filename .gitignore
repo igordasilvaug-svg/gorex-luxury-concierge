@@ -4,3 +4,10 @@ android/.gradle/
 android/build/
 android/app/build/
 *.log
+
+# ── Firebase secrets (ne JAMAIS committer la clé Admin SDK) ──
+firebase-admin-sdk.json
+*adminsdk*.json
+*admin-sdk*.json
+serviceAccountKey.json
+deploy/firebase/web_config.json

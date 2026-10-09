@@ -9,7 +9,7 @@
 ![Flutter](https://img.shields.io/badge/Flutter-3.35.4-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.9.2-0175C2?logo=dart&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Web-3DDC84?logo=android&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-157%20passed-success)
+![Tests](https://img.shields.io/badge/tests-166%20passed-success)
 ![License](https://img.shields.io/badge/license-Proprietary-C6A15B)
 
 </div>
@@ -119,7 +119,7 @@ flutter build appbundle --release --dart-define=PRODUCTION=true   # Play Store
 
 ```bash
 flutter analyze     # → No issues found
-flutter test        # → 157/157 tests
+flutter test        # → 166/166 tests
 ```
 
 ## Publication
@@ -165,14 +165,26 @@ de **5 Mo/fichier**, chaque APK est **découpé en morceaux < 4 Mo** (`download/
 et **réassemblé dans le navigateur** (`web/download.js`) avec **vérification SHA-256** avant
 enregistrement du `.apk`.
 
-### 5. Backend Firebase (optionnel)
+### 5. Backend Firebase — ✅ activé
 
-L'application fonctionne **100 % en local** par défaut. Pour activer un backend cloud
-Firestore (synchronisation multi-appareils), il suffit de fournir **deux clés Firebase**.
-Tout est préparé :
+L'application fonctionne **100 % en local** par défaut **et** synchronise
+désormais son état complet vers **Cloud Firestore** (projet `gorex-concierge`).
+L'initialisation est **défensive** : si le cloud est indisponible, l'app bascule
+automatiquement en mode local sans jamais planter.
 
-- 📄 [`deploy/firebase/FIREBASE_SETUP.md`](deploy/firebase/FIREBASE_SETUP.md) — guide d'activation
-- 🐍 [`deploy/firebase/create_backend_services.py`](deploy/firebase/create_backend_services.py) — script d'initialisation (11 collections × 10 documents, prêt à l'emploi)
+- 🔥 **11 collections** créées (clients, requests, providers, bookings, itineraries,
+  finance_docs, expenses, conversations, appointments, users, audit_log) — 10 documents chacune
+- ☁️ Synchronisation via **Sauvegarde → Synchronisation Cloud** (envoi / récupération)
+- 🔒 Règles de sécurité Firestore déployées (durcir avant production)
+
+Ressources :
+
+- 📄 [`deploy/firebase/FIREBASE_SETUP.md`](deploy/firebase/FIREBASE_SETUP.md) — guide complet
+- 🐍 [`deploy/firebase/create_backend_services.py`](deploy/firebase/create_backend_services.py) — (ré)initialisation des collections
+- 🛡️ [`deploy/firebase/set_firestore_security_rules.py`](deploy/firebase/set_firestore_security_rules.py) — déploiement des règles
+
+> ⚠️ La clé **Admin SDK** (`firebase-admin-sdk.json`) n'est **jamais** versionnée
+> (voir `.gitignore`). Seuls les identifiants publics Web/Android sont inclus.
 
 ## Déploiement web
 

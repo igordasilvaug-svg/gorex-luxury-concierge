@@ -283,9 +283,9 @@ def main():
     db = firestore.client()
     print("✅ firebase_admin initialisé")
 
-    # Détection de la base
+    # Détection de la base (nom de sonde valide, non réservé)
     try:
-        db.collection("__probe__").limit(1).get()
+        db.collection("gorex_probe").limit(1).get()
         print("✅ Base Firestore accessible")
     except Exception as e:  # noqa: BLE001
         print(f"\n❌ Firestore inaccessible : {e}")
