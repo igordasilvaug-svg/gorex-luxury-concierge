@@ -22,6 +22,7 @@ import '../team/team_screen.dart';
 import '../access/staff_access_screen.dart';
 import '../audit/audit_log_screen.dart';
 import '../backup/backup_screen.dart';
+import '../security/security_dashboard_screen.dart';
 import '../clients/clients_screen.dart';
 import '../settings/company_settings_screen.dart';
 import '../settings/peppol_settings_screen.dart';
@@ -176,6 +177,13 @@ class _StaffShellState extends State<StaffShell> {
         Icons.history,
         const AuditLogScreen(),
         permission: 'user_access',
+      ),
+      _NavItem(
+        s.tr('nav.security'),
+        Icons.shield_outlined,
+        Icons.shield,
+        const SecurityDashboardScreen(),
+        permission: 'security',
       ),
       _NavItem(
         s.tr('nav.backup'),

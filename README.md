@@ -9,7 +9,7 @@
 ![Flutter](https://img.shields.io/badge/Flutter-3.35.4-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.9.2-0175C2?logo=dart&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Web-3DDC84?logo=android&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-148%20passed-success)
+![Tests](https://img.shields.io/badge/tests-157%20passed-success)
 ![License](https://img.shields.io/badge/license-Proprietary-C6A15B)
 
 </div>
@@ -68,7 +68,11 @@ Plateforme de conciergerie d'exception éditée par **Gorex Group** (Belgique). 
 ### Sécurité & données
 - **Journal d'audit** : traçabilité horodatée des actions sensibles (connexions,
   mots de passe, escalades sécurité, opérations Peppol, rapprochements…) avec
-  recherche, filtre par rôle et export CSV (presse-papiers). Borné à 300 entrées.
+  recherche, filtre par rôle et **export CSV + PDF** (rapport confidentiel).
+  Borné à 300 entrées.
+- **Tableau de bord sécurité** : activité sur 14 jours (histogramme), répartition
+  par catégorie d'actions, indicateurs clés et liste des événements sensibles
+  (échecs, suppressions, escalades).
 - **Sauvegarde & restauration** : export JSON complet des données (clients,
   demandes, finances, agenda, journal d'audit…) et restauration transactionnelle
   (rollback automatique en cas de sauvegarde invalide). 100 % local, aucune
@@ -115,7 +119,7 @@ flutter build appbundle --release --dart-define=PRODUCTION=true   # Play Store
 
 ```bash
 flutter analyze     # → No issues found
-flutter test        # → 148/148 tests
+flutter test        # → 157/157 tests
 ```
 
 ## Publication
@@ -160,6 +164,15 @@ La page **`/download`** distribue les APK signés. Comme un APK dépasse la limi
 de **5 Mo/fichier**, chaque APK est **découpé en morceaux < 4 Mo** (`download/parts/*.partNN`)
 et **réassemblé dans le navigateur** (`web/download.js`) avec **vérification SHA-256** avant
 enregistrement du `.apk`.
+
+### 5. Backend Firebase (optionnel)
+
+L'application fonctionne **100 % en local** par défaut. Pour activer un backend cloud
+Firestore (synchronisation multi-appareils), il suffit de fournir **deux clés Firebase**.
+Tout est préparé :
+
+- 📄 [`deploy/firebase/FIREBASE_SETUP.md`](deploy/firebase/FIREBASE_SETUP.md) — guide d'activation
+- 🐍 [`deploy/firebase/create_backend_services.py`](deploy/firebase/create_backend_services.py) — script d'initialisation (11 collections × 10 documents, prêt à l'emploi)
 
 ## Déploiement web
 

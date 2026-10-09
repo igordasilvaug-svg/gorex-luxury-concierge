@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/audit/audit_export_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/crm_agenda.dart';
@@ -24,11 +25,34 @@ class AuditLogScreen extends StatefulWidget {
 class _AuditLogScreenState extends State<AuditLogScreen> {
   final TextEditingController _search = TextEditingController();
   String _roleFilter = '';
+  bool _exporting = false;
 
   @override
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  Future<void> _exportPdf(List<AuditEntry> entries) async {
+    setState(() => _exporting = true);
+    try {
+      final s = context.read<AppState>();
+      await AuditExportService.exportPdf(
+        entries,
+        companyName: s.company.brandName.isNotEmpty
+            ? s.company.brandName
+            : s.company.legalName,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Export PDF indisponible sur cet appareil.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
   }
 
   @override
@@ -64,11 +88,29 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
       appBar: AppBar(
         title: const Text('Journal d\'audit'),
         actions: [
-          IconButton(
-            tooltip: 'Exporter (CSV)',
-            icon: const Icon(Icons.download_outlined),
-            onPressed: all.isEmpty ? null : () => _exportCsv(all),
-          ),
+          if (_exporting)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else ...[
+            IconButton(
+              tooltip: 'Exporter (CSV)',
+              icon: const Icon(Icons.table_view_outlined),
+              onPressed: all.isEmpty ? null : () => _exportCsv(all),
+            ),
+            IconButton(
+              tooltip: 'Exporter (PDF)',
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              onPressed: all.isEmpty ? null : () => _exportPdf(all),
+            ),
+          ],
         ],
       ),
       body: SafeArea(
