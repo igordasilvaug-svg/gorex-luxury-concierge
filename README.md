@@ -27,8 +27,8 @@ Plateforme de conciergerie d'exception éditée par **Gorex Group** (Belgique). 
 
 | Ressource | URL |
 |---|---|
-| Application web | https://gorex-luxury-concierge.smoggy-shock.workers.dev |
-| Téléchargement Android (APK) | https://gorex-luxury-concierge.smoggy-shock.workers.dev/download |
+| Application web | https://gorex-luxury-concierge.determined-pint.workers.dev |
+| Téléchargement Android (APK) | https://gorex-luxury-concierge.determined-pint.workers.dev/download |
 | Informations légales (hub) | .../legal-hub.html |
 | Mentions légales | .../legal.html |
 | CGV | .../terms.html |

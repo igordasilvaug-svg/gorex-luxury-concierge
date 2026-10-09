@@ -15,9 +15,9 @@
 | Élément | Valeur |
 |---|---|
 | Worker | `gorex-luxury-concierge` |
-| URL temporaire | `https://gorex-luxury-concierge.smoggy-shock.workers.dev` |
+| URL temporaire | `https://gorex-luxury-concierge.determined-pint.workers.dev` |
 | Statut | ✅ en ligne (toutes les pages 200, en-têtes de sécurité actifs) |
-| Lien de réclamation | `https://dash.cloudflare.com/claim-preview?claimToken=dKamJhDtLqRjHiZ8nmNSP3AcCR9rte16ebT4ZdFURgI` |
+| Lien de réclamation | `https://dash.cloudflare.com/claim-preview?claimToken=lYkaQV1dswlfWTT_vrPR-VCowilcXsPcV6cvrU-iU5U` |
 | Validité du lien | **~60 minutes** (régénérable — voir §4) |
 
 > ⚠️ Tant que le Worker n'est **pas réclamé**, l'URL `*.workers.dev` est
@@ -31,7 +31,7 @@
 Ouvrez dans votre navigateur :
 
 ```
-https://dash.cloudflare.com/claim-preview?claimToken=dKamJhDtLqRjHiZ8nmNSP3AcCR9rte16ebT4ZdFURgI
+https://dash.cloudflare.com/claim-preview?claimToken=lYkaQV1dswlfWTT_vrPR-VCowilcXsPcV6cvrU-iU5U
 ```
 
 ### Étape 2 — Créer / connecter un compte Cloudflare
@@ -215,7 +215,7 @@ vers ces URL.
 
 | État | URL |
 |---|---|
-| Temporaire (avant réclamation) | `https://gorex-luxury-concierge.smoggy-shock.workers.dev` |
+| Temporaire (avant réclamation) | `https://gorex-luxury-concierge.determined-pint.workers.dev` |
 | Permanente (après réclamation) | `https://gorex-luxury-concierge.<compte>.workers.dev` |
 | Domaine final | `https://concierge.gorex.be` |
 

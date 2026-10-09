@@ -1,8 +1,8 @@
 # GOREX LUXURY CONCIERGE — Déploiement Web (Cloudflare Workers + Assets)
 
 ## URL publique
-- Application : https://gorex-luxury-concierge.smoggy-shock.workers.dev
-- Confidentialité : https://gorex-luxury-concierge.smoggy-shock.workers.dev/privacy.html
+- Application : https://gorex-luxury-concierge.determined-pint.workers.dev
+- Confidentialité : https://gorex-luxury-concierge.determined-pint.workers.dev/privacy.html
 
 > ⚠️ L'URL `*.workers.dev` dépend du compte Cloudflare utilisé. En mode
 > « temporary » (`--temporary`), un nouveau compte preview est créé à chaque
