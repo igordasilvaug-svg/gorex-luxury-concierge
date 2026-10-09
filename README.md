@@ -9,7 +9,7 @@
 ![Flutter](https://img.shields.io/badge/Flutter-3.35.4-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.9.2-0175C2?logo=dart&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Web-3DDC84?logo=android&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-136%20passed-success)
+![Tests](https://img.shields.io/badge/tests-148%20passed-success)
 ![License](https://img.shields.io/badge/license-Proprietary-C6A15B)
 
 </div>
@@ -65,6 +65,15 @@ Plateforme de conciergerie d'exception éditée par **Gorex Group** (Belgique). 
 - Politique de confidentialité **RGPD** (écran in-app + page web publique)
 - Charte de confidentialité intégrée à l'identité visuelle
 
+### Sécurité & données
+- **Journal d'audit** : traçabilité horodatée des actions sensibles (connexions,
+  mots de passe, escalades sécurité, opérations Peppol, rapprochements…) avec
+  recherche, filtre par rôle et export CSV (presse-papiers). Borné à 300 entrées.
+- **Sauvegarde & restauration** : export JSON complet des données (clients,
+  demandes, finances, agenda, journal d'audit…) et restauration transactionnelle
+  (rollback automatique en cas de sauvegarde invalide). 100 % local, aucune
+  donnée transmise à un tiers.
+
 ## Stack technique
 
 | Domaine | Technologie |
@@ -106,7 +115,7 @@ flutter build appbundle --release --dart-define=PRODUCTION=true   # Play Store
 
 ```bash
 flutter analyze     # → No issues found
-flutter test        # → 136/136 tests
+flutter test        # → 148/148 tests
 ```
 
 ## Publication

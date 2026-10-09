@@ -85,6 +85,7 @@ Une seule application, toutes vos exigences traitées avec discrétion et excell
 • Tableau de bord direction, CRM clients VIP.
 • Gestion des prestataires, réservations et finances.
 • Contrôle d'accès par rôle et journal d'audit.
+• Sauvegarde et restauration des données en un geste.
 
 Discrétion absolue. Accès privilégié. Excellence sans compromis.
 
@@ -146,6 +147,7 @@ Het vertrouwelijke portaal van GOREX GROUP, de Belgische luxe-concierge voor een
 • Directiedashboard, VIP-klanten-CRM.
 • Beheer van leveranciers, boekingen en financiën.
 • Rolvermogen en auditspoor.
+• Back-up en herstel van gegevens in één beweging.
 
 Absolute discretie. Bevoorrechte toegang. Excellentie zonder compromis.
 
@@ -207,6 +209,7 @@ One app, every request handled with discretion and excellence.
 • Executive dashboard, VIP client CRM.
 • Management of providers, bookings and finances.
 • Role-based access control and audit trail.
+• One-tap data backup and restore.
 
 Absolute discretion. Privileged access. Excellence without compromise.
 
@@ -255,7 +258,7 @@ Gorex Group — Belgium · www.gorex.be
 | Icône de l'application | `icon_512.png` | 512 × 512 | ✅ Prêt |
 | Graphique de présentation | `feature_graphic_1024x500.png` | 1024 × 500 | ✅ Prêt |
 | Captures d'écran téléphone | `screenshots/01…08` | 1080 × 1920 | ✅ 8 captures |
-| Captures supplémentaires | `screenshots/extras/` | 1080 × 1920 | ✅ 4 captures |
+| Captures supplémentaires | `screenshots/extras/` | 1080 × 1920 | ✅ 6 captures |
 | Captures « marketing » (cadres + accroches) | `screenshots/marketing/01…08` | 1080 × 1920 | ✅ 8 captures |
 
 **Ordre recommandé des captures (8) :**
@@ -268,7 +271,7 @@ Gorex Group — Belgium · www.gorex.be
 7. `07_agenda.png` — Agenda (rendez-vous, missions)
 8. `08_clients_vip.png` — Profils clients VIP (confidentiel)
 
-**Extras (au choix) :** `communication.png`, `prestataires.png`, `equipe.png`, `menu_navigation.png`
+**Extras (au choix) :** `communication.png`, `prestataires.png`, `equipe.png`, `menu_navigation.png`, `audit_log.png`, `backup.png`
 
 **Captures « marketing » (style fiche Play) :** `screenshots/marketing/01…08` — version encadrée des 8 captures principales, avec fond noir/doré, accroche (eyebrow + titre sérif) et signature *GOREX LUXURY CONCIERGE · Discretion. Access. Excellence.* Idéales pour la première impression et la conversion sur la fiche Play.
 

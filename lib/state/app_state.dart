@@ -53,6 +53,7 @@ class AppState extends ChangeNotifier {
   List<Itinerary> itineraries = [];
   List<FinanceDocument> financeDocs = [];
   List<Expense> expenses = [];
+
   /// Relevé bancaire importé (transactions à rapprocher des factures).
   List<BankTransaction> bankTransactions = [];
   List<Conversation> conversations = [];
@@ -179,6 +180,139 @@ class AppState extends ChangeNotifier {
   Future<void> resetDemo() async {
     _seed();
     currentUser = null;
+    notifyListeners();
+  }
+
+  // ─────────────────────── SAUVEGARDE / RESTAURATION ───────────────────────
+  /// Sérialise l'intégralité des données persistées (hors session courante).
+  Map<String, dynamic> exportState() => {
+    'schema': 1,
+    'app': 'GOREX LUXURY CONCIERGE',
+    'exportedAt': DateTime.now().toIso8601String(),
+    'company': company.toMap(),
+    'peppol': peppol.toMap(),
+    'reminderConfig': reminderConfig.toMap(),
+    'language': language,
+    'users': users.map((e) => e.toMap()).toList(),
+    'clients': clients.map((e) => e.toMap()).toList(),
+    'tiers': tiers.map((e) => e.toMap()).toList(),
+    'requests': requests.map((e) => e.toMap()).toList(),
+    'providers': providers.map((e) => e.toMap()).toList(),
+    'bookings': bookings.map((e) => e.toMap()).toList(),
+    'itineraries': itineraries.map((e) => e.toMap()).toList(),
+    'financeDocs': financeDocs.map((e) => e.toMap()).toList(),
+    'expenses': expenses.map((e) => e.toMap()).toList(),
+    'bankTransactions': bankTransactions.map((e) => e.toMap()).toList(),
+    'conversations': conversations.map((e) => e.toMap()).toList(),
+    'appointments': appointments.map((e) => e.toMap()).toList(),
+    'prospects': prospects.map((e) => e.toMap()).toList(),
+    'auditLog': auditLog.map((e) => e.toMap()).toList(),
+  };
+
+  /// Sérialise l'état sous forme de chaîne JSON lisible (sauvegarde fichier).
+  String exportJson() =>
+      const JsonEncoder.withIndent('  ').convert(exportState());
+
+  /// Indicateurs résumés des données actuelles (affichage sauvegarde).
+  Map<String, int> get dataCounts => {
+    'clients': clients.length,
+    'requests': requests.length,
+    'providers': providers.length,
+    'bookings': bookings.length,
+    'itineraries': itineraries.length,
+    'financeDocs': financeDocs.length,
+    'expenses': expenses.length,
+    'users': users.length,
+    'auditLog': auditLog.length,
+  };
+
+  /// Restaure les données à partir d'une sauvegarde JSON.
+  ///
+  /// [rawJson] peut être la chaîne JSON complète ou directement la carte
+  /// d'état. La session courante est clôturée pour éviter toute incohérence
+  /// d'identifiants après remplacement des données. La méthode conserve une
+  /// copie des données précédentes et restaure l'état antérieur en cas
+  /// d'erreur de lecture (transaction tout-ou-rien).
+  Future<void> importJson(String rawJson) async {
+    Map<String, dynamic> parsed;
+    try {
+      parsed = jsonDecode(rawJson) as Map<String, dynamic>;
+    } catch (_) {
+      throw const FormatException('JSON invalide.');
+    }
+    await _applyImport(parsed);
+  }
+
+  /// Variante acceptant directement une carte d'état (tests / appel interne).
+  Future<void> importMap(Map<String, dynamic> data) => _applyImport(data);
+
+  Future<void> _applyImport(Map<String, dynamic> data) async {
+    // Validation stricte AVANT toute mutation d'état : la sauvegarde doit
+    // contenir des utilisateurs et des clients non vides.
+    final usersRaw = data['users'];
+    final clientsRaw = data['clients'];
+    if (usersRaw is! List ||
+        clientsRaw is! List ||
+        usersRaw.isEmpty ||
+        clientsRaw.isEmpty) {
+      throw const FormatException(
+        'Sauvegarde invalide ou vide : utilisateurs/clients manquants.',
+      );
+    }
+
+    // Copie de sécurité de l'état courant.
+    final snapshot = exportState();
+    final previousUser = currentUser;
+
+    try {
+      // Repartir d'une base vierge pour ne pas conserver d'éléments résiduels
+      // absents de la sauvegarde.
+      _clearData();
+      _hydrate(data);
+      currentUser = null; // session close → reconnexion requise
+      log(
+        'Restauration sauvegarde',
+        'Données locales',
+        detail:
+            '${dataCounts['clients']} clients · ${dataCounts['requests']} demandes',
+      );
+      await _persist();
+      notifyListeners();
+    } catch (e) {
+      // Rollback : on restaure l'état antérieur et la session.
+      _clearData();
+      _hydrate(snapshot);
+      currentUser = previousUser;
+      await _persist();
+      notifyListeners();
+      throw FormatException('Restauration échouée : $e');
+    }
+  }
+
+  /// Vide tous les jeux de données (utilisé avant import / restauration).
+  void _clearData() {
+    users = [];
+    clients = [];
+    requests = [];
+    providers = [];
+    bookings = [];
+    itineraries = [];
+    financeDocs = [];
+    expenses = [];
+    bankTransactions = [];
+    conversations = [];
+    appointments = [];
+    prospects = [];
+    tiers = [];
+    auditLog = [];
+  }
+
+  /// Efface toutes les données locales et réinitialise l'application.
+  Future<void> wipeAll() async {
+    _clearData();
+    currentUser = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storageKey);
     notifyListeners();
   }
 
@@ -585,9 +719,7 @@ class AppState extends ChangeNotifier {
 
   bool emailExists(String email, {String? exceptId}) {
     final e = email.trim().toLowerCase();
-    return users.any(
-      (u) => u.email.toLowerCase() == e && u.id != exceptId,
-    );
+    return users.any((u) => u.email.toLowerCase() == e && u.id != exceptId);
   }
 
   /// Crée un accès (personnel ou client VIP)
@@ -614,11 +746,7 @@ class AppState extends ChangeNotifier {
       mustChangePassword: true,
     );
     users.insert(0, u);
-    log(
-      'Création accès',
-      u.email,
-      detail: '${u.fullName} · ${u.role.label}',
-    );
+    log('Création accès', u.email, detail: '${u.fullName} · ${u.role.label}');
     await _persist();
     notifyListeners();
     return u;
@@ -801,7 +929,8 @@ class AppState extends ChangeNotifier {
     log(
       'Création document',
       d.reference,
-      detail: '${d.type.label} · TVA ${vat.rate.toStringAsFixed(0)}%'
+      detail:
+          '${d.type.label} · TVA ${vat.rate.toStringAsFixed(0)}%'
           '${d.peppolStatus == PeppolStatus.ready ? ' · Peppol prêt' : ''}',
     );
     await _persist();
@@ -934,7 +1063,11 @@ class AppState extends ChangeNotifier {
       peppolStatus: status,
       peppolLastUpdate: DateTime.now(),
     );
-    log('Webhook Peppol', financeDocs[i].reference, detail: '→ ${status.label}');
+    log(
+      'Webhook Peppol',
+      financeDocs[i].reference,
+      detail: '→ ${status.label}',
+    );
     await _persist();
     notifyListeners();
     return true;
@@ -1024,10 +1157,7 @@ class AppState extends ChangeNotifier {
     final ti = bankTransactions.indexWhere((t) => t.id == transactionId);
     if (ti < 0) return;
     final t = bankTransactions[ti];
-    bankTransactions[ti] = t.copyWith(
-      matched: true,
-      matchedDocumentId: docId,
-    );
+    bankTransactions[ti] = t.copyWith(matched: true, matchedDocumentId: docId);
     await markInvoicePaid(
       docId,
       amount: t.amount,
@@ -1059,7 +1189,9 @@ class AppState extends ChangeNotifier {
   /// factures impayées via communication structurée / référence / montant.
   /// Retourne le nombre de rapprochements effectués.
   Future<int> autoReconcile({double threshold = 0.5}) async {
-    final open = bankTransactions.where((t) => !t.matched && t.amount > 0).toList();
+    final open = bankTransactions
+        .where((t) => !t.matched && t.amount > 0)
+        .toList();
     if (open.isEmpty) return 0;
     final matches = ReconciliationService.autoMatch(
       open,
@@ -1160,10 +1292,7 @@ class AppState extends ChangeNotifier {
   /// Met à jour la configuration du moteur de relance automatique.
   Future<void> updateReminderConfig(ReminderConfig config) async {
     reminderConfig = config;
-    log(
-      'Configuration relances',
-      config.enabled ? 'Activée' : 'Désactivée',
-    );
+    log('Configuration relances', config.enabled ? 'Activée' : 'Désactivée');
     await _persist();
     notifyListeners();
   }
@@ -1210,11 +1339,12 @@ class AppState extends ChangeNotifier {
       unmatchedTransactions.fold(0.0, (s, t) => s + t.amount);
 
   /// Journaux de vente de l'exercice (factures) — pour export comptable.
-  List<FinanceDocument> salesJournal({int? year}) => financeDocs
-      .where((d) => d.type == FinanceDocType.invoice)
-      .where((d) => year == null || d.date.year == year)
-      .toList()
-    ..sort((a, b) => a.date.compareTo(b.date));
+  List<FinanceDocument> salesJournal({int? year}) =>
+      financeDocs
+          .where((d) => d.type == FinanceDocType.invoice)
+          .where((d) => year == null || d.date.year == year)
+          .toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
 
   Future<void> updateFinanceDoc(FinanceDocument d) async {
     final i = financeDocs.indexWhere((e) => e.id == d.id);
