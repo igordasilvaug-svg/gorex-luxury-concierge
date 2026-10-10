@@ -18,9 +18,9 @@
 | Gratuit / Payant | Gratuit (accès sur invitation / abonnement concierge) |
 | Catégorie | **Business** (alternative : Lifestyle) |
 | Tags | Concierge, Lifestyle, Business, Travel, Assistance |
-| Site web | `https://www.gorex.be` |
+| Site web | `https://gorex-luxury-concierge.eu` |
 | E-mail de contact | `concierge@gorex.com` |
-| Politique de confidentialité | `https://gorex-luxury-concierge.determined-pint.workers.dev/privacy.html` *(→ `https://concierge.gorex.be/privacy.html` après domaine personnalisé)* |
+| Politique de confidentialité | `https://gorex-luxury-concierge.eu/privacy.html` |
 
 ### Coordonnées développeur (obligatoires)
 - **Nom du développeur** : Gorex Group

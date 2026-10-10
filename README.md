@@ -27,18 +27,18 @@ Plateforme de conciergerie d'exception éditée par **Gorex Group** (Belgique). 
 
 | Ressource | URL |
 |---|---|
-| Application web | https://gorex-luxury-concierge.smoggy-shock.workers.dev |
-| Téléchargement Android (APK) | https://gorex-luxury-concierge.smoggy-shock.workers.dev/download |
+| Application web | https://gorex-luxury-concierge.eu |
+| Téléchargement Android (APK) | https://gorex-luxury-concierge.eu/download |
 | Informations légales (hub) | .../legal-hub.html |
 | Mentions légales | .../legal.html |
 | CGV | .../terms.html |
 | Politique cookies | .../cookies.html |
 | Politique de confidentialité (RGPD) | .../privacy.html |
 
-> **Domaine final** : `gorex-luxury-concierge.eu` (zone Cloudflare **active**).
-> Le compte Cloudflare a été **réclamé** (compte *Smoggy Shock*) : l'URL `*.workers.dev`
-> est désormais **permanente**. Il reste à **attacher le domaine au Worker** — voir
-> [`deploy/web-worker/BRANCHER_DOMAINE_WORKER.md`](deploy/web-worker/BRANCHER_DOMAINE_WORKER.md).
+> ✅ **Domaine final en ligne** : `https://gorex-luxury-concierge.eu` (HTTP 200, HTTPS actif).
+> Le domaine est branché au Worker `gorex-luxury-concierge` (zone Cloudflare active,
+> compte *Smoggy Shock*) via un enregistrement DNS `A` (Proxied) + une Route Worker.
+> L'URL technique `*.workers.dev` reste disponible en parallèle.
 
 > Sécurité : l'ensemble des pages (y compris `.html`) est servi avec des en-têtes stricts
 > (CSP, HSTS, `X-Content-Type-Options: nosniff`, Referrer-Policy, Permissions-Policy).
@@ -179,7 +179,7 @@ automatiquement en mode local sans jamais planter.
 - ☁️ Synchronisation via **Sauvegarde → Synchronisation Cloud** (envoi / récupération)
 - ⚡ **Synchronisation temps réel** : écoute des modifications distantes (streams Firestore),
   anti-boucle, session conservée — activable par un interrupteur
-- 🔒 Règles de s��� [`deploy/firebase/create_backend_services.py`](deploy/firebase/create_backend_services.py) — (ré)initialisation des collections
+- 🔒 Règles de s��� [`deploy/firebase/create_backend_services.py`](deploy/firebase/create_backend_services.py) — (ré)initialisation des collections
 - 🛡️ [`deploy/firebase/set_firestore_security_rules.py`](deploy/firebase/set_firestore_security_rules.py) — déploiement des règles
 
 > ⚠️ La clé **Admin SDK** (`firebase-admin-sdk.json`) n'est **jamais** versionnée
