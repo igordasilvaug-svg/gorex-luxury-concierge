@@ -148,7 +148,7 @@ d'entrée, chaque mutation passe déjà par une méthode dédiée).
 1. **Fournir les 2 clés** → j'active le backend et crée le schéma + données.
 2. **Réclamer le Worker Cloudflare** (voir `../web-worker/CLOUDFLARE_CLAIM_GUIDE.md`)
    → rend l'URL web **permanente** (actuellement temporaire).
-3. **Attacher `concierge.gorex.be`** → domaine final.
+3. **Attacher `gorex-luxury-concierge.eu`** → domaine final.
 
 ---
 

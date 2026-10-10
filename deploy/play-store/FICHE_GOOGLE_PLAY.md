@@ -279,7 +279,7 @@ Gorex Group — Belgium · www.gorex.be
 
 ## 6. Prérequis avant soumission
 
-- [ ] **Domaine personnalisé** `concierge.gorex.be` attaché (voir `../web-worker/CUSTOM_DOMAIN.md`).
+- [x] **Domaine personnalisé** `gorex-luxury-concierge.eu` **EN LIGNE** (HTTP 200) (voir `../web-worker/CUSTOM_DOMAIN.md`).
 - [ ] **Politique de confidentialité publique** accessible (URL ci-dessus).
 - [ ] **Compte Play Console** avec vérification d'identité (compte Organisation recommandé pour Gorex Group).
 - [ ] **AAB signé** : `build/app/outputs/bundle/release/app-release.aab` *(build « production » ci-dessous)*.
