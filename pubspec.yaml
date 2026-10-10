@@ -28,6 +28,7 @@ dependencies:
   # ⚠️ Versions verrouillées, compatibles Flutter 3.35.4
   firebase_core: 3.6.0
   cloud_firestore: 5.4.3
+  firebase_auth: 5.3.1
 
   # Documents & export
   pdf: ^3.11.1

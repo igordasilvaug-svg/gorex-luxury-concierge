@@ -7,6 +7,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
+import 'firebase_auth_service.dart';
 import 'firebase_options.dart';
 
 class FirebaseBootstrap {
@@ -37,6 +38,9 @@ class FirebaseBootstrap {
         );
       }
       _available = true;
+      // Session Firebase (anonyme) pour accéder à Firestore sous règles de
+      // production. Défensif : si indisponible, l'app reste en mode local.
+      await FirebaseAuthService.ensureSignedIn();
       if (kDebugMode) {
         debugPrint('[Firebase] initialisé — projet gorex-concierge');
       }
