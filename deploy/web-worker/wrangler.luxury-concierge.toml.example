@@ -1,0 +1,41 @@
+# GOREX LUXURY CONCIERGE — Worker avec DOMAINE PERSONNALISÉ
+# Domaine : gorex-luxury-concierge.eu  (ou .com)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# PRÉREQUIS (à faire AVANT de déployer avec ce fichier) :
+#   1. Acheter le domaine gorex-luxury-concierge.eu chez un registrar
+#   2. L'ajouter comme site dans Cloudflare (plan Free) → zone « Active »
+#   3. (Optionnel) idem pour le .com
+#
+# UTILISATION :
+#   cp wrangler.luxury-concierge.toml.example wrangler.toml
+#   npx wrangler@4 deploy
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# ⚠️ Deux méthodes pour rattacher le domaine (choisir UNE seule) :
+#
+#   MÉTHODE A (recommandée, sous-domaine/domaine racine) — « Custom Domain »
+#     → NE PAS définir de `routes` ici.
+#     → Passer par le tableau de bord : Worker → Domaines → Ajouter un domaine
+#       personnalisé → gorex-luxury-concierge.eu
+#     → Ou en CLI : npx wrangler domains add gorex-luxury-concierge.eu \
+#                       --service gorex-luxury-concierge
+#
+#   MÉTHODE B — « Route » (zone du même compte) : décommenter le bloc `routes`.
+
+name = "gorex-luxury-concierge"
+compatibility_date = "2025-01-01"
+main = "worker.js"
+
+# ── MÉTHODE B : Route(s) du domaine personnalisé (décommenter si utilisée) ──
+# routes = [
+#   { pattern = "gorex-luxury-concierge.eu/*", zone_name = "gorex-luxury-concierge.eu" },
+#   { pattern = "www.gorex-luxury-concierge.eu/*", zone_name = "gorex-luxury-concierge.eu" }
+# ]
+
+[assets]
+directory = "/home/user/gorex_web_stage"
+binding = "ASSETS"
+html_handling = "none"
+not_found_handling = "single-page-application"
+run_worker_first = true

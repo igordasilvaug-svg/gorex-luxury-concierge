@@ -190,8 +190,10 @@ Ressources :
 
 ## Déploiement web
 
-Voir le **guide complet** [`deploy/web-worker/GUIDE_HERBERGEMENT_CLOUDFLARE.md`](deploy/web-worker/GUIDE_HERBERGEMENT_CLOUDFLARE.md)
-(Cloudflare Workers + Assets : réclamation, domaine `concierge.gorex.be`, mises à jour, distribution APK).
+- 🌐 **Domaine personnalisé** : [`deploy/web-worker/GUIDE_DOMAINE_LUXURY_CONCIERGE.md`](deploy/web-worker/GUIDE_DOMAINE_LUXURY_CONCIERGE.md)
+  → héberger sur **`gorex-luxury-concierge.eu`** / **`.com`** (disponibles ✅)
+- ☁️ **Hébergement Cloudflare** : [`deploy/web-worker/GUIDE_HERBERGEMENT_CLOUDFLARE.md`](deploy/web-worker/GUIDE_HERBERGEMENT_CLOUDFLARE.md)
+  (réclamation, mises à jour, distribution APK)
 
 ---
 

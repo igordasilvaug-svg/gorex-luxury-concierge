@@ -1,4 +1,13 @@
-# 🌐 Domaines gorex.be / gorex.com — État & marche à suivre
+# 🌐 Domaines — État & marche à suivre
+
+> ✅ **DÉCISION (09/10/2026)** : le domaine retenu est
+> **`gorex-luxury-concierge.eu`** (et/ou `.com`) — **les deux sont disponibles**.
+> 👉 **Marche à suivre complète** :
+> [`GUIDE_DOMAINE_LUXURY_CONCIERGE.md`](GUIDE_DOMAINE_LUXURY_CONCIERGE.md).
+
+---
+
+# 🌐 (Annexe) Domaines gorex.be / gorex.com — Diagnostic initial
 
 > **Contexte** : pour attacher `concierge.gorex.be` au Worker Cloudflare
 > `gorex-luxury-concierge`, le domaine **`gorex.be` doit d'abord exister** et
