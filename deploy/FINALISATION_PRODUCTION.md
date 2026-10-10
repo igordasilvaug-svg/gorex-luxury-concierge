@@ -39,15 +39,17 @@ curl -sI https://www.gorex-luxury-concierge.eu/ | grep -iE "http/|location"
 
 | Fichier | Taille | Signé |
 |---|---|---|
-| `build/app/outputs/bundle/release/app-release.aab` | 49 Mo | ✅ |
-| `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` | 23 Mo | ✅ |
-| `build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk` | 21 Mo | ✅ |
-| `build/app/outputs/flutter-apk/app-x86_64-release.apk` | 24 Mo | ✅ |
+| `build/app/outputs/bundle/release/app-release.aab` | 48,0 Mo | ✅ |
+| `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` | 22,2 Mo | ✅ |
+| `build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk` | 20,4 Mo | ✅ |
+| `build/app/outputs/flutter-apk/app-x86_64-release.apk` | 23,3 Mo | ✅ |
 
 - **Version** : `1.0.0+1`
 - **Package** : `com.gorexconcierge.luxury`
-- **Keystore** : `android/release-key.jks` (alias `release`)
+- **Keystore** : `android/release-key.jks` (alias `release`, DN `CN=Flutter App, O=GenSpark`)
 - **Build** : `--dart-define=PRODUCTION=true` (comptes de démonstration masqués)
+- **Page `/download`** : morceaux APK régénérés (arm64 6, armeabi 6, x86_64 7) + `manifest.json`
+  (SHA-256 recalculés). Tous les morceaux < 5 Mo (limite Cloudflare).
 
 ### Publier sur Google Play
 1. **Play Console** → votre application → **Production** → **Créer une release**
@@ -104,6 +106,40 @@ cd /home/user/flutter_app && ./build_release.sh --skip-tests
 Les règles actuelles (**développement, accès ouvert**) restent en place et
 fonctionnelles. Le site étant public, il est **recommandé** d'activer l'auth
 anonyme + les règles PROD dès que possible.
+
+---
+
+## D. Déployer la nouvelle version du site (Cloudflare)
+
+Le build web (avec `firebase_auth`) et la page `/download` (nouveaux APK) sont
+prêts dans le staging `/home/user/gorex_web_stage`, mais **le déploiement nécessite
+une authentification Cloudflare** (jeton API ou `wrangler login`).
+
+### Méthode 1 — Jeton API (recommandé)
+1. Créez un jeton : voir **`deploy/web-worker/CREER_JETON_API_CLOUDFLARE.md`**
+   (permissions : *Account → Workers Scripts → Edit*).
+2. Déployez :
+   ```bash
+   cd /home/user/gorex_web_worker
+   CLOUDFLARE_API_TOKEN="<votre_jeton>" npx wrangler@4 deploy
+   ```
+
+### Méthode 2 — `wrangler login`
+```bash
+cd /home/user/gorex_web_worker
+npx wrangler@4 login        # ouvre le navigateur
+npx wrangler@4 deploy
+```
+
+### Vérification
+```bash
+curl -sI https://gorex-luxury-concierge.eu/download | grep -iE "http/"
+curl -s  https://gorex-luxury-concierge.eu/download/manifest.json | head
+```
+
+> ℹ️ Le staging est déjà synchronisé (`build/web` → `gorex_web_stage`), les `.wasm`
+> CanvasKit retirés (servis via le CDN gstatic) et les APK découpés. Il ne reste
+> que la commande `wrangler deploy`.
 
 ---
 
