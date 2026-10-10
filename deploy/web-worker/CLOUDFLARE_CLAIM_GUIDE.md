@@ -1,22 +1,21 @@
 # Réclamation Cloudflare & mise en ligne permanente — GOREX LUXURY CONCIERGE
 
-> Objectif : transformer l'URL **temporaire** du Worker en URL **permanente** rattachée à
-> votre propre compte Cloudflare, puis **attacher le domaine personnalisé** `concierge.gorex.be`.
+> ✅ **RÉCLAMATION EFFECTUÉE.** Le Worker a été réclamé dans le compte Cloudflare
+> **« Smoggy Shock »** ; l'URL `*.workers.dev` est désormais **permanente**.
+> L'étape restante — **attacher le domaine `gorex-luxury-concierge.eu`** — est décrite
+> dans **`BRANCHER_DOMAINE_WORKER.md`**.
 
 ---
 
 ## Pourquoi réclamer ?
 
-Le déploiement a été fait en mode **temporaire** (`wrangler deploy --temporary`). L'URL
-`*.workers.dev` fonctionne **immédiatement** mais reste **temporaire** (elle peut expirer).
+Le déploiement initial a été fait en mode **temporaire** (`wrangler deploy --temporary`).
+L'URL `*.workers.dev` fonctionne **immédiatement** mais reste **temporaire** (elle peut expirer).
 La **réclamation (claim)** transfère le Worker dans **votre compte Cloudflare**, ce qui :
 
 - ✅ rend l'URL **permanente** ;
-- ✅ permet d'**attacher un domaine personnalisé** (`concierge.gorex.be`) ;
+- ✅ permet d'**attacher un domaine personnalisé** (`gorex-luxury-concierge.eu`) ;
 - ✅ donne accès au tableau de bord Cloudflare (statistiques, logs, cache, règles).
-
-**Vous n'avez PAS besoin de compte préalable** : la réclamation vous permet d'en créer un
-gratuitement en quelques minutes.
 
 ---
 
@@ -28,18 +27,8 @@ Le lien de réclamation est de la forme :
 https://dash.cloudflare.com/claim-preview?claimToken=<JETON>
 ```
 
-**Lien du dernier déploiement (valable ~60 min) :**
-
-```
-https://dash.cloudflare.com/claim-preview?claimToken=lYkaQV1dswlfWTT_vrPR-VCowilcXsPcV6cvrU-iU5U
-```
-
-> ⚠️ **URL temporaire du dernier déploiement** (peut expirer) :
-> `https://gorex-luxury-concierge.determined-pint.workers.dev`
-
-> 📌 **Le jeton change à chaque déploiement** et **expire** (fenêtre limitée).
-> Le jeton du dernier déploiement vous est fourni dans la conversation.
-> Si le lien a expiré, il suffit de **redéployer** pour en générer un nouveau (voir Étape 5).
+> ⚠️ **Le jeton expire après ~60 minutes** et **change à chaque déploiement**.
+> Si le lien a expiré, **redéployez** pour en générer un nouveau (voir Étape 5).
 
 1. Ouvrez le lien dans votre navigateur.
 2. Vous verrez un aperçu du Worker `gorex-luxury-concierge`.
@@ -55,35 +44,31 @@ https://dash.cloudflare.com/claim-preview?claimToken=lYkaQV1dswlfWTT_vrPR-VCowil
 ## ÉTAPE 3 — Vérifier la nouvelle URL permanente
 
 6. Dans le tableau de bord : **Workers & Pages** → `gorex-luxury-concierge`.
-7. L'URL `https://gorex-luxury-concierge.<votre-sous-domaine>.workers.dev` est maintenant
+7. L'URL `https://gorex-luxury-concierge.<compte>.workers.dev` est maintenant
    **permanente**. Testez-la : la page de connexion GOREX doit s'afficher.
+   ➡️ Compte actuel : `https://gorex-luxury-concierge.smoggy-shock.workers.dev`
 
-## ÉTAPE 4 — Attacher le domaine personnalisé `concierge.gorex.be`
+## ÉTAPE 4 — Attacher le domaine personnalisé `gorex-luxury-concierge.eu`
 
-> ⚠️ **PRÉREQUIS VÉRIFIÉ (09/10/2026)** : le domaine **`gorex.be` n'est PAS encore
-> enregistré** (réponse DNS Belgium : *disponible*). Cloudflare affiche donc
-> *« Aucune zone ne correspond à concierge.gorex.be »*.
-> **Il faut d'abord enregistrer `gorex.be`** puis l'ajouter à Cloudflare.
-> 👉 Voir le guide dédié : [`DOMAINES_GOREX.md`](DOMAINES_GOREX.md).
-
-> Prérequis : la zone DNS `gorex.be` doit être gérée par Cloudflare
-> (nameservers Cloudflare actifs). Si `gorex.be` est géré ailleurs, vous pouvez d'abord
-> ajouter le domaine à Cloudflare (gratuit) et changer les nameservers chez votre registrar.
+> **Prérequis** : la zone DNS `gorex-luxury-concierge.eu` doit être gérée par Cloudflare
+> (serveurs de noms `nucum` / `tanner` actifs) — ✅ c'est le cas.
+>
+> 📘 **Procédure détaillée (clic par clic) : voir [`BRANCHER_DOMAINE_WORKER.md`](BRANCHER_DOMAINE_WORKER.md).**
 
 **Méthode tableau de bord (recommandée) :**
 
 8. **Workers & Pages** → `gorex-luxury-concierge` → onglet **Settings**.
 9. **Domains & Routes** → **Add** → **Custom domain**.
-10. Saisir : `concierge.gorex.be` → **Add domain**.
+10. Saisir : `gorex-luxury-concierge.eu` → **Add domain**.
 11. Cloudflare crée le **CNAME** et le **certificat TLS** automatiquement.
     Attendre l'état **Active** (≈ 1 minute).
-12. (Optionnel) Ajouter `app.gorex.be` et `www.gorex.be` de la même façon.
+12. (Optionnel) Ajouter `www.gorex-luxury-concierge.eu` de la même façon.
 
 **Vérification DNS :**
 
-| Type  | Nom (host)  | Cible                                            | Proxy |
-|-------|-------------|--------------------------------------------------|-------|
-| CNAME | `concierge` | `gorex-luxury-concierge.<compte>.workers.dev`   | 🟠 Proxied |
+| Type  | Nom (host)   | Cible                                              | Proxy |
+|-------|--------------|----------------------------------------------------|-------|
+| CNAME | `@` (racine) | `gorex-luxury-concierge.smoggy-shock.workers.dev`  | 🟠 Proxied |
 
 > ⚠️ Le proxy **doit rester orange (Proxied)** : indispensable pour les en-têtes de
 > sécurité, le cache et le TLS géré par Cloudflare.
@@ -106,11 +91,11 @@ Le déploiement actuel est **idempotent** : le contenu du site ne change pas.
 
 ```bash
 # En-têtes de sécurité présents
-curl -sI https://concierge.gorex.be/ | grep -iE "strict-transport|content-security"
+curl -sI https://gorex-luxury-concierge.eu/ | grep -iE "strict-transport|content-security"
 
 # Pages principales (toutes doivent répondre 200)
 for p in "" download privacy.html legal.html terms.html cookies.html legal-hub.html about.html; do
-  curl -s -o /dev/null -w "$p -> %{http_code}\n" "https://concierge.gorex.be/$p"
+  curl -s -o /dev/null -w "$p -> %{http_code}\n" "https://gorex-luxury-concierge.eu/$p"
 done
 ```
 
@@ -120,7 +105,7 @@ done
 
 ## ÉTAPE 7 — Mettre à jour les URL de référence
 
-Après activation du domaine, remplacer l'URL `*.workers.dev` par `https://concierge.gorex.be`
+Après activation du domaine, remplacer l'URL `*.workers.dev` par `https://gorex-luxury-concierge.eu`
 dans :
 
 - la **fiche Google Play** (politique de confidentialité, site web) — voir `../play-store/FICHE_GOOGLE_PLAY.md` ;
@@ -133,9 +118,8 @@ dans :
 
 | État | URL |
 |---|---|
-| Temporaire (avant réclamation) | `https://gorex-luxury-concierge.determined-pint.workers.dev` |
-| Permanente (après réclamation) | `https://gorex-luxury-concierge.<compte>.workers.dev` |
-| Domaine final | `https://concierge.gorex.be` |
+| Permanente (compte réclamé) | `https://gorex-luxury-concierge.smoggy-shock.workers.dev` |
+| Domaine final | `https://gorex-luxury-concierge.eu` |
 
 ---
 

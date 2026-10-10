@@ -1,10 +1,12 @@
 # Domaine personnalisé — GOREX LUXURY CONCIERGE
 
-Ce guide décrit comment attacher un domaine personnalisé (par ex. `concierge.gorex.be`)
+Ce guide décrit comment attacher le domaine personnalisé **`gorex-luxury-concierge.eu`**
 au Worker Cloudflare `gorex-luxury-concierge` qui sert l'application Flutter Web.
 
 > **Prérequis** : posséder un compte Cloudflare et un nom de domaine dont la zone DNS
-> est gérée par Cloudflare (nameservers Cloudflare actifs).
+> est gérée par Cloudflare (serveurs de noms `nucum` / `tanner` actifs).
+>
+> ➡️ Procédure détaillée et à jour : voir **`BRANCHER_DOMAINE_WORKER.md`**.
 
 ---
 
@@ -13,10 +15,10 @@ au Worker Cloudflare `gorex-luxury-concierge` qui sert l'application Flutter Web
 1. Se connecter à https://dash.cloudflare.com
 2. **Workers & Pages** → sélectionner le projet `gorex-luxury-concierge`
 3. Onglet **Settings** → **Domains & Routes** → **Add** → **Custom domain**
-4. Saisir le domaine, par ex. `concierge.gorex.be`
+4. Saisir le domaine : `gorex-luxury-concierge.eu`
 5. Cloudflare crée automatiquement l'enregistrement DNS (CNAME) et provisionne le
    certificat TLS. Attendre l'état **Active** (généralement < 1 minute).
-6. (Optionnel) Ajouter aussi `www` ou `app.gorex.be`.
+6. (Optionnel) Ajouter aussi `www.gorex-luxury-concierge.eu`.
 
 ## Option B — Route personnalisée (zone du même compte)
 
@@ -25,14 +27,14 @@ Si le domaine est sur le même compte Cloudflare, on peut utiliser une **route**
 ```toml
 # wrangler.toml
 routes = [
-  { pattern = "concierge.gorex.be/*", zone_name = "gorex.be" }
+  { pattern = "gorex-luxury-concierge.eu/*", zone_name = "gorex-luxury-concierge.eu" }
 ]
 ```
 
 Puis redéployer :
 
 ```bash
-cd deploy/web-worker
+cd /home/user/gorex_web_worker
 npx wrangler deploy
 ```
 
@@ -42,7 +44,7 @@ npx wrangler deploy
 
 ```bash
 # Attacher le domaine au Worker (après authentification wrangler)
-npx wrangler domains add concierge.gorex.be \
+npx wrangler domains add gorex-luxury-concierge.eu \
   --service gorex-luxury-concierge
 ```
 
@@ -50,10 +52,10 @@ npx wrangler domains add concierge.gorex.be \
 
 ## Enregistrements DNS requis
 
-| Type  | Nom (host)          | Contenu / Cible                                   | Proxy |
-|-------|---------------------|---------------------------------------------------|-------|
-| CNAME | `concierge`         | `gorex-luxury-concierge.<compte>.workers.dev`     | 🟠 Proxied |
-| CNAME | `app` (optionnel)   | idem                                              | 🟠 Proxied |
+| Type  | Nom (host)      | Contenu / Cible                                    | Proxy |
+|-------|-----------------|----------------------------------------------------|-------|
+| CNAME | `@` (racine)    | `gorex-luxury-concierge.smoggy-shock.workers.dev`  | 🟠 Proxied |
+| CNAME | `www` (option)  | idem                                               | 🟠 Proxied |
 
 > Avec un domaine personnalisé, l'option **Proxied (orange)** est **obligatoire** :
 > elle est nécessaire pour l'application des en-têtes de sécurité, du cache et du TLS
@@ -65,11 +67,11 @@ npx wrangler domains add concierge.gorex.be \
 
 ```bash
 # La page doit répondre 200 avec les en-têtes de sécurité
-curl -sI https://concierge.gorex.be/ | grep -iE "strict-transport|content-security"
+curl -sI https://gorex-luxury-concierge.eu/ | grep -iE "strict-transport|content-security"
 
 # Toutes les pages légales doivent répondre 200
 for p in "" privacy.html legal.html terms.html cookies.html legal-hub.html; do
-  curl -s -o /dev/null -w "$p -> %{http_code}\n" "https://concierge.gorex.be/$p"
+  curl -s -o /dev/null -w "$p -> %{http_code}\n" "https://gorex-luxury-concierge.eu/$p"
 done
 ```
 
@@ -77,19 +79,17 @@ done
 
 ## Rappel — URL permanente du Worker
 
-Tant qu'aucun domaine personnalisé n'est attaché, l'application reste accessible via
-l'URL `*.workers.dev` générée par Cloudflare. Pour **pérenniser** cette URL (au lieu de
-la version temporaire), utilisez le **lien de réclamation (claim)** fourni par
-`wrangler deploy --temporary` : il transfère le projet dans votre propre compte Cloudflare.
+Le compte Cloudflare a été **réclamé** (compte *Smoggy Shock*) : l'URL `*.workers.dev`
+est désormais **permanente** et reste accessible en parallèle du domaine final.
 
-**URL actuelle du Worker** : `https://gorex-luxury-concierge.determined-pint.workers.dev`
+**URL actuelle du Worker** : `https://gorex-luxury-concierge.smoggy-shock.workers.dev`
 
 ---
 
 ## Page de téléchargement Android (publique)
 
 L'application expose une page de téléchargement publique : **`/download`**
-(ex. `https://concierge.gorex.be/download`).
+(ex. `https://gorex-luxury-concierge.eu/download`).
 
 - Trois variantes d'APK signés sont proposées (arm64-v8a *recommandé*, armeabi-v7a, x86_64).
 - Comme un APK dépasse la limite Cloudflare de 5 Mo par fichier, chaque APK est **découpé
@@ -105,8 +105,8 @@ L'application expose une page de téléchargement publique : **`/download`**
 cd /home/user/flutter_app
 flutter build apk --release --split-per-abi
 
-# 2. Régénérer les morceaux + le manifeste dans le dossier d'assets du Worker
-#    (voir scripts de build internes), puis redéployer :
+# 2. Régénérer les morceaux + le manifeste dans le dossier d'assets du Worker,
+#    puis redéployer :
 cd /home/user/gorex_web_worker && npx wrangler deploy
 ```
 

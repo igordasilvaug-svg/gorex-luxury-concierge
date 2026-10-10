@@ -1,19 +1,19 @@
 # GOREX LUXURY CONCIERGE — Déploiement Web (Cloudflare Workers + Assets)
 
 ## URL publique
-- Application : https://gorex-luxury-concierge.determined-pint.workers.dev
-- Confidentialité : https://gorex-luxury-concierge.determined-pint.workers.dev/privacy.html
+- Application (technique) : https://gorex-luxury-concierge.smoggy-shock.workers.dev
+- Domaine final (à attacher) : https://gorex-luxury-concierge.eu
+- Confidentialité : https://gorex-luxury-concierge.smoggy-shock.workers.dev/privacy.html
 
-> ⚠️ L'URL `*.workers.dev` dépend du compte Cloudflare utilisé. En mode
-> « temporary » (`--temporary`), un nouveau compte preview est créé à chaque
-> déploiement et l'URL change. Pour une URL **stable et permanente**, réclamez
-> le compte (claim token) ou attachez un domaine personnalisé (voir plus bas).
+> ✅ Le compte Cloudflare a été **réclamé** (compte *Smoggy Shock*) : l'URL
+> `*.workers.dev` est désormais **permanente**.
+> ➡️ Pour brancher le domaine final, suivez **`BRANCHER_DOMAINE_WORKER.md`**.
 
 ## En-têtes de sécurité appliqués (worker.js)
 | En-tête | Valeur |
 |---|---|
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` |
-| `Content-Security-Policy` | `default-src 'self'` + `gstatic` (CanvasKit) + `wasm-unsafe-eval` |
+| `Content-Security-Policy` | `default-src 'self'` + `gstatic` (CanvasKit) + Firestore + `wasm-unsafe-eval` |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | caméra/micro/géoloc/paiement… désactivés |
@@ -23,12 +23,15 @@
 CSP détaillée :
 ```
 default-src 'self';
-script-src 'self' 'wasm-unsafe-eval' https://www.gstatic.com;
-style-src 'self' 'unsafe-inline';
+script-src 'self' 'wasm-unsafe-eval' https://www.gstatic.com https://apis.google.com;
+style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
 img-src 'self' data: blob:;
-font-src 'self' data:;
-connect-src 'self' https://www.gstatic.com;
+font-src 'self' data: https://fonts.gstatic.com;
+connect-src 'self' https://www.gstatic.com https://fonts.gstatic.com
+            https://firestore.googleapis.com https://*.googleapis.com
+            https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net;
 worker-src 'self' blob:;
+frame-src 'self' https://*.firebaseapp.com https://accounts.google.com;
 frame-ancestors 'self';
 base-uri 'self';
 form-action 'self';
@@ -49,8 +52,8 @@ rm -f /home/user/gorex_web_stage/canvaskit/*.wasm \
       /home/user/gorex_web_stage/canvaskit/chromium/*.wasm \
       /home/user/gorex_web_stage/canvaskit/chromium/*.symbols
 
-# 3) Déployer
-cd /home/user/gorex_web_worker && npx wrangler deploy --temporary
+# 3) Déployer (sur le compte réclamé : npx wrangler deploy ; en preview : --temporary)
+cd /home/user/gorex_web_worker && npx wrangler deploy
 ```
 
 ## Notes techniques
@@ -60,27 +63,23 @@ cd /home/user/gorex_web_worker && npx wrangler deploy --temporary
   préservent `privacy.html` et le routage SPA.
 - Cache : `index.html` jamais mis en cache ; assets versionnés 1 an (`immutable`).
 
-## 🔒 Domaine personnalisé (URL permanente)
+## 🔒 Domaine personnalisé — `gorex-luxury-concierge.eu`
 
-### Option 1 — Réclamer le compte preview (gratuit)
-1. Au moment du `wrangler deploy --temporary`, un **claim URL** s'affiche
-   (valable 60 min) : `https://dash.cloudflare.com/claim-preview?claimToken=…`
-2. Ouvrez-le, créez/connectez un compte Cloudflare gratuit.
-3. Le Worker est alors conservé et l'URL `*.workers.dev` devient permanente.
+➡️ **Procédure complète et à jour : voir `BRANCHER_DOMAINE_WORKER.md`.**
 
-### Option 2 — Domaine personnalisé (ex. `app.gorex.be`)
-1. Possédez un domaine (ex. chez votre registrar) et un compte Cloudflare.
-2. `wrangler login` (ou `CLOUDFLARE_API_TOKEN`).
-3. Dans `wrangler.toml`, ajoutez :
-   ```toml
-   [[routes]]
-   pattern = "app.gorex.be"
-   custom_domain = true
-   ```
-4. `npx wrangler deploy` → Cloudflare crée l'enregistrement DNS + le certificat
-   TLS automatiquement.
+Résumé (tableau de bord) :
+1. https://dash.cloudflare.com → **Workers & Pages** → projet `gorex-luxury-concierge`
+2. **Settings → Domains & Routes → Add → Custom domain**
+3. Saisir `gorex-luxury-concierge.eu` → **Add domain**
+4. Attendre le statut **Active** (< 1 min) → l'enregistrement DNS et le certificat TLS sont créés automatiquement.
 
-### Option 3 — Cloudflare Pages (alternative)
+### Alternative CLI (nécessite un jeton API avec droits Workers)
+```bash
+cd /home/user/gorex_web_worker
+npx wrangler deploy   # avec [[routes]] custom_domain dans wrangler.toml
+```
+
+### Option — Cloudflare Pages (alternative)
 ```bash
 npx wrangler pages deploy /home/user/gorex_web_stage --project-name gorex-concierge
 ```

@@ -2,7 +2,7 @@
 
 > **But** : mettre en ligne l'application web GOREX LUXURY CONCIERGE sur
 > **Cloudflare Workers + Assets**, obtenir une **URL permanente**, puis la
-> rattacher au domaine **`concierge.gorex.be`**.
+> rattacher au domaine **`gorex-luxury-concierge.eu`**.
 >
 > Deux méthodes sont proposées :
 > - **Méthode A — Réclamation (claim)** : la plus simple, sans outil à installer.
@@ -10,51 +10,48 @@
 
 ---
 
-## 0. État actuel (dernier déploiement)
+## 0. État actuel
 
 | Élément | Valeur |
 |---|---|
 | Worker | `gorex-luxury-concierge` |
-| URL temporaire | `https://gorex-luxury-concierge.determined-pint.workers.dev` |
+| Compte Cloudflare | **Smoggy Shock** (réclamé ✅) |
+| URL permanente | `https://gorex-luxury-concierge.smoggy-shock.workers.dev` |
 | Statut | ✅ en ligne (toutes les pages 200, en-têtes de sécurité actifs) |
-| Lien de réclamation | `https://dash.cloudflare.com/claim-preview?claimToken=lYkaQV1dswlfWTT_vrPR-VCowilcXsPcV6cvrU-iU5U` |
-| Validité du lien | **~60 minutes** (régénérable — voir §4) |
+| Domaine final | `https://gorex-luxury-concierge.eu` — **zone Cloudflare ACTIVE**, à attacher au Worker |
 
-> ⚠️ Tant que le Worker n'est **pas réclamé**, l'URL `*.workers.dev` est
-> **temporaire** : elle peut expirer. La **réclamation** la rend **permanente**.
+> ➡️ **Pour brancher le domaine maintenant : voir `BRANCHER_DOMAINE_WORKER.md`.**
 
 ---
 
 ## Méthode A — Réclamation (claim) puis domaine
 
-### Étape 1 — Ouvrir le lien de réclamation
-Ouvrez dans votre navigateur :
+> ✅ **Déjà effectuée.** Le Worker a été réclamé dans le compte *Smoggy Shock* ;
+> l'URL `*.workers.dev` est désormais **permanente**.
 
+### Étape 1 — Ouvrir le lien de réclamation
 ```
-https://dash.cloudflare.com/claim-preview?claimToken=lYkaQV1dswlfWTT_vrPR-VCowilcXsPcV6cvrU-iU5U
+https://dash.cloudflare.com/claim-preview?claimToken=<JETON>
 ```
+> Le jeton **expire après ~60 min**. Pour en générer un nouveau : `npx wrangler@4 deploy --temporary`.
 
 ### Étape 2 — Créer / connecter un compte Cloudflare
 1. Cliquez sur **Claim / Réclamer**.
-2. Connectez-vous **ou** créez un compte gratuit :
-   - E-mail : `concierge@gorex.com`
-   - Mot de passe fort, puis validation de l'e-mail.
+2. Connectez-vous **ou** créez un compte gratuit.
 3. Autorisez la réclamation → le Worker est **copié dans votre compte**.
 
 ### Étape 3 — Vérifier l'URL permanente
 - Tableau de bord → **Workers & Pages** → `gorex-luxury-concierge`
-- L'URL `https://gorex-luxury-concierge.<votre-sous-domaine>.workers.dev`
-  est désormais **permanente**. Testez : la page de connexion GOREX s'affiche.
+- L'URL `https://gorex-luxury-concierge.<compte>.workers.dev` est **permanente**.
 
-### Étape 4 — Attacher `concierge.gorex.be`
+### Étape 4 — Attacher `gorex-luxury-concierge.eu`
 
-> **Prérequis** : la zone `gorex.be` doit être gérée par Cloudflare
-> (nameservers Cloudflare actifs). Si le domaine est ailleurs, ajoutez-le à
-> Cloudflare (gratuit) et changez les nameservers chez votre registrar.
+> **Prérequis** : la zone `gorex-luxury-concierge.eu` doit être gérée par Cloudflare
+> (serveurs de noms `nucum` / `tanner` actifs) — ✅ c'est le cas.
 
 1. **Workers & Pages** → `gorex-luxury-concierge` → onglet **Settings**
 2. **Domains & Routes** → **Add** → **Custom domain**
-3. Saisir `concierge.gorex.be` → **Add domain**
+3. Saisir `gorex-luxury-concierge.eu` → **Add domain**
 4. Cloudflare crée le **CNAME** + le **certificat TLS** automatiquement.
    Attendre l'état **Active** (< 1 min en général).
 
@@ -62,16 +59,16 @@ https://dash.cloudflare.com/claim-preview?claimToken=lYkaQV1dswlfWTT_vrPR-VCowil
 
 | Type | Nom | Cible | Proxy |
 |---|---|---|---|
-| CNAME | `concierge` | `gorex-luxury-concierge.<compte>.workers.dev` | 🟠 Proxied |
+| CNAME | `@` (racine) | `gorex-luxury-concierge.smoggy-shock.workers.dev` | 🟠 Proxied |
 
 > ⚠️ Le proxy **doit rester orange (Proxied)** : nécessaire pour les en-têtes
 > de sécurité, le cache et le TLS géré par Cloudflare.
 
 ### Étape 5 — Vérifier
 ```bash
-curl -sI https://concierge.gorex.be/ | grep -iE "strict-transport|content-security"
+curl -sI https://gorex-luxury-concierge.eu/ | grep -iE "strict-transport|content-security"
 for p in "" download privacy.html legal.html terms.html cookies.html legal-hub.html about.html; do
-  curl -s -o /dev/null -w "$p -> %{http_code}\n" "https://concierge.gorex.be/$p"
+  curl -s -o /dev/null -w "$p -> %{http_code}\n" "https://gorex-luxury-concierge.eu/$p"
 done
 ```
 **Attendu :** `200` partout, `strict-transport-security` + `content-security-policy` présents.
@@ -118,11 +115,11 @@ npx wrangler@4 deploy --temporary   # URL temporaire + lien de réclamation
 ```bash
 # Option 1 : route (zone du même compte)
 #   éditer wrangler.toml :
-#   routes = [ { pattern = "concierge.gorex.be/*", zone_name = "gorex.be" } ]
+#   routes = [ { pattern = "gorex-luxury-concierge.eu/*", zone_name = "gorex-luxury-concierge.eu" } ]
 #   puis : npx wrangler deploy
 #
-# Option 2 : Custom Domain (recommandé pour un sous-domaine)
-npx wrangler domains add concierge.gorex.be --service gorex-luxury-concierge
+# Option 2 : Custom Domain (recommandé pour un domaine racine)
+npx wrangler domains add gorex-luxury-concierge.eu --service gorex-luxury-concierge
 ```
 
 ---
@@ -215,9 +212,8 @@ vers ces URL.
 
 | État | URL |
 |---|---|
-| Temporaire (avant réclamation) | `https://gorex-luxury-concierge.determined-pint.workers.dev` |
-| Permanente (après réclamation) | `https://gorex-luxury-concierge.<compte>.workers.dev` |
-| Domaine final | `https://concierge.gorex.be` |
+| Permanente (compte réclamé) | `https://gorex-luxury-concierge.smoggy-shock.workers.dev` |
+| Domaine final | `https://gorex-luxury-concierge.eu` |
 
 ---
 

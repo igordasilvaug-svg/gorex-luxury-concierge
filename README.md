@@ -27,17 +27,18 @@ Plateforme de conciergerie d'exception éditée par **Gorex Group** (Belgique). 
 
 | Ressource | URL |
 |---|---|
-| Application web | https://gorex-luxury-concierge.determined-pint.workers.dev |
-| Téléchargement Android (APK) | https://gorex-luxury-concierge.determined-pint.workers.dev/download |
+| Application web | https://gorex-luxury-concierge.smoggy-shock.workers.dev |
+| Téléchargement Android (APK) | https://gorex-luxury-concierge.smoggy-shock.workers.dev/download |
 | Informations légales (hub) | .../legal-hub.html |
 | Mentions légales | .../legal.html |
 | CGV | .../terms.html |
 | Politique cookies | .../cookies.html |
 | Politique de confidentialité (RGPD) | .../privacy.html |
 
-> **Domaine cible** : `concierge.gorex.be` (à attacher après réclamation du Worker).
-> L'URL `*.workers.dev` est **temporaire** tant que le Worker n'est pas réclamé — voir la
-> [section Publication](#publication) ci-dessous.
+> **Domaine final** : `gorex-luxury-concierge.eu` (zone Cloudflare **active**).
+> Le compte Cloudflare a été **réclamé** (compte *Smoggy Shock*) : l'URL `*.workers.dev`
+> est désormais **permanente**. Il reste à **attacher le domaine au Worker** — voir
+> [`deploy/web-worker/BRANCHER_DOMAINE_WORKER.md`](deploy/web-worker/BRANCHER_DOMAINE_WORKER.md).
 
 > Sécurité : l'ensemble des pages (y compris `.html`) est servi avec des en-têtes stricts
 > (CSP, HSTS, `X-Content-Type-Options: nosniff`, Referrer-Policy, Permissions-Policy).
@@ -152,9 +153,10 @@ Données, captures 1080×1920, icône 512, bannière 1024×500) se trouve dans
 
 ### 3. Réclamation Cloudflare & domaine personnalisé
 
-L'URL `*.workers.dev` est **temporaire**. Pour la rendre permanente et attacher
-`concierge.gorex.be`, suivre :
+L'URL `*.workers.dev` est désormais **permanente** (compte réclamé). Pour **attacher le
+domaine `gorex-luxury-concierge.eu`**, suivre :
 
+- 📄 [`deploy/web-worker/BRANCHER_DOMAINE_WORKER.md`](deploy/web-worker/BRANCHER_DOMAINE_WORKER.md) — brancher le domaine (recommandé)
 - 📄 [`deploy/web-worker/CLOUDFLARE_CLAIM_GUIDE.md`](deploy/web-worker/CLOUDFLARE_CLAIM_GUIDE.md) — réclamation pas-à-pas
 - 📄 [`deploy/web-worker/CUSTOM_DOMAIN.md`](deploy/web-worker/CUSTOM_DOMAIN.md) — domaine personnalisé
 
@@ -177,12 +179,7 @@ automatiquement en mode local sans jamais planter.
 - ☁️ Synchronisation via **Sauvegarde → Synchronisation Cloud** (envoi / récupération)
 - ⚡ **Synchronisation temps réel** : écoute des modifications distantes (streams Firestore),
   anti-boucle, session conservée — activable par un interrupteur
-- 🔒 Règles de sécurité Firestore déployées (durcir avant production)
-
-Ressources :
-
-- 📄 [`deploy/firebase/FIREBASE_SETUP.md`](deploy/firebase/FIREBASE_SETUP.md) — guide complet
-- 🐍 [`deploy/firebase/create_backend_services.py`](deploy/firebase/create_backend_services.py) — (ré)initialisation des collections
+- 🔒 Règles de s��� [`deploy/firebase/create_backend_services.py`](deploy/firebase/create_backend_services.py) — (ré)initialisation des collections
 - 🛡️ [`deploy/firebase/set_firestore_security_rules.py`](deploy/firebase/set_firestore_security_rules.py) — déploiement des règles
 
 > ⚠️ La clé **Admin SDK** (`firebase-admin-sdk.json`) n'est **jamais** versionnée
@@ -193,6 +190,14 @@ Ressources :
 - 🌐 **Domaine personnalisé** : [`deploy/web-worker/GUIDE_DOMAINE_LUXURY_CONCIERGE.md`](deploy/web-worker/GUIDE_DOMAINE_LUXURY_CONCIERGE.md)
   → héberger sur **`gorex-luxury-concierge.eu`** / **`.com`** (disponibles ✅)
 - ☁️ **Hébergement Cloudflare** : [`deploy/web-worker/GUIDE_HERBERGEMENT_CLOUDFLARE.md`](deploy/web-worker/GUIDE_HERBERGEMENT_CLOUDFLARE.md)
+  (réclamation, mises à jour, distribution APK)
+
+---
+
+<div align="center">
+<sub>© Gorex Group — GOREX LUXURY CONCIERGE. Tous droits réservés.</sub>
+</div>
+UDFLARE.md)
   (réclamation, mises à jour, distribution APK)
 
 ---
