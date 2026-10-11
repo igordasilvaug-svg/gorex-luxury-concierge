@@ -1,8 +1,9 @@
-# 🔑 Créer un jeton API Cloudflare — pour attacher le domaine automatiquement
+# 🔑 Créer un jeton API Cloudflare — pour déployer le site
 
 Ce guide vous fait créer un **jeton API** (30 secondes). Une fois le jeton créé,
-je pourrai **attacher automatiquement** `gorex-luxury-concierge.eu` au Worker
-via le script [`attach_domain.py`](attach_domain.py).
+je pourrai **déployer automatiquement** le site `gorex-luxury-concierge.eu` sur
+votre compte via le script [`deploy_web.sh`](deploy_web.sh) (commande
+`npx wrangler@4 deploy`).
 
 > ⚠️ **Pourquoi vous et pas moi ?** Un jeton API s'obtient uniquement depuis une
 > session connectée à **votre** compte Cloudflare (mot de passe + 2FA). C'est une
@@ -25,7 +26,7 @@ via le script [`attach_domain.py`](attach_domain.py).
 
 ## Étape 3 — Configurer les permissions
 
-7. **Token name** (Nom du jeton) : `Gorex - attacher domaine`
+7. **Token name** (Nom du jeton) : `Gorex - deploiement site`
 8. **Permissions** — ajoutez **deux** lignes :
 
 | Ressource (Resource) | Niveau (Level) |
@@ -57,15 +58,17 @@ via le script [`attach_domain.py`](attach_domain.py).
 Collez le jeton dans votre prochain message. Je lancerai alors :
 
 ```bash
-export CLOUDFLARE_API_TOKEN="<votre_jeton>"
-python3 /home/user/flutter_app/deploy/web-worker/attach_domain.py
+cd /home/user/flutter_app/deploy/web-worker
+CLOUDFLARE_API_TOKEN="<votre_jeton>" ./deploy_web.sh
 ```
 
 Le script va automatiquement :
-1. ✅ vérifier le jeton ;
-2. ✅ trouver votre compte et la zone `gorex-luxury-concierge.eu` ;
-3. ✅ **attacher le domaine au Worker** ;
+1. ✅ vérifier que le build contient bien l'authentification Firebase ;
+2. ✅ **déployer le site** sur votre compte (`npx wrangler@4 deploy`) ;
+3. ✅ **vérifier que le site répond** en HTTP 200 ;
 4. ✅ afficher le statut final.
+
+> Le jeton est utilisé **une seule fois** puis peut être révoqué immédiatement.
 
 ---
 
@@ -75,7 +78,7 @@ Le script va automatiquement :
   supprimer votre compte ni accéder à votre facturation.
 - Donnez-lui une **expiration courte** (1 jour) : après l'opération, il devient inutile.
 - Après l'attachement, vous pouvez **révoquer** le jeton :
-  *My Profile → API Tokens → `Gorex - attacher domaine` → ... → Delete / Roll*.
+  *My Profile → API Tokens → `Gorex - deploiement site` → ... → Delete / Roll*.
 - **Alternative sans jeton** : vous pouvez aussi le faire vous-même en 4 clics
   (voir [`BRANCHER_DOMAINE_WORKER.md`](BRANCHER_DOMAINE_WORKER.md)) — c'est la
   méthode la plus sûre si vous préférez ne partager aucun secret.
