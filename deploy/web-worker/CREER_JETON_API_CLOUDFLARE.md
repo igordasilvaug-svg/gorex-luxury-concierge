@@ -24,27 +24,31 @@ votre compte via le script [`deploy_web.sh`](deploy_web.sh) (commande
 5. Faites défiler jusqu'à la section **Custom token** (jeton personnalisé)
 6. Cliquez sur **Get started** (Commencer) à droite de « Create Custom Token »
 
-## Étape 3 — Configurer les permissions
+## Étape 3 — Configurer les autorisations
 
-7. **Token name** (Nom du jeton) : `Gorex - deploiement site`
-8. **Permissions** — ajoutez **deux** lignes :
+> 💡 L'interface Cloudflare récente parle de **« Politiques d'autorisation »**
+> (au lieu de « Permissions »). La méthode la plus rapide est d'utiliser un
+> **modèle prêt à l'emploi**.
+
+7. **Nom du jeton** : `Gorex - deploiement site`
+8. **Politiques d'autorisation** → cliquez sur le modèle **« Edit Cloudflare Workers »**
+   (il pré-remplit tout le nécessaire pour déployer un Worker).
+   - *Variante manuelle* (« Commencer de zéro / Custom ») : ajoutez ces autorisations :
 
 | Ressource (Resource) | Niveau (Level) |
 |---|---|
 | **Account** → **Workers Scripts** | **Edit** |
 | **Zone** → **Zone** | **Read** |
 
-   - Cliquez sur **+ Add more** pour ajouter la 2ᵉ ligne si besoin.
-
-9. **Account Resources** (Ressources de compte) :
+9. **Ressources de compte** (Account Resources) :
    - **Include** → sélectionnez votre compte **« Smoggy Shock »**
 
-10. **Zone Resources** (Ressources de zone) :
+10. **Ressources de zone** (Zone Resources) :
     - **Include** → **Specific zone** → **`gorex-luxury-concierge.eu`**
 
-11. **Client IP Address Filtering** : laissez vide (ou votre IP si vous préférez)
-12. **TTL** (durée de vie) : choisissez une **date d'expiration proche**
-    (ex. *1 jour*) — c'est plus sûr ; le jeton ne servira qu'une fois.
+11. **Filtrage des adresses IP client** : laissez vide
+12. **Expiration du jeton** : choisissez **7 jours** (sécurité — le jeton ne sert
+    qu'une fois ; révoquez-le juste après).
 
 ## Étape 4 — Créer et copier
 
