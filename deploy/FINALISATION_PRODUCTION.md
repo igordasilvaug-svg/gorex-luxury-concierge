@@ -73,39 +73,33 @@ cd /home/user/flutter_app && ./build_release.sh --skip-tests
 
 ---
 
-## C. Règles Firestore de production — ⚠️ Action console requise
+## C. Règles Firestore de production — ✅ FAIT
 
-### Situation
-- L'application possède sa **propre authentification métier** (comptes internes).
-- La synchro cloud utilise Firestore **sans** Firebase Authentication.
-- Pour restreindre Firestore aux seules sessions authentifiées, il faut activer
-  **Firebase Authentication**, ce qui **exige la console Firebase** (mes permissions
-  API sont insuffisantes : `403`, et Identity Platform requiert la facturation).
+### État
+- **Authentification anonyme Firebase activée** (console, fournisseur « Anonyme » ON).
+- **Règles de production déployées** :
+  ```
+  match /{document=**} {
+    allow read, write: if request.auth != null;
+  }
+  ```
+  Release : `projects/gorex-concierge/releases/cloud.firestore`
+  Ruleset : `projects/gorex-concierge/rulesets/89132cf0-b33a-4638-a46d-0167fb9b61d9`
+- **Vérifié** : accès **sans** auth → `403` (refusé) ; accès **avec** jeton anonyme → autorisé.
+- Côté application : `firebase_auth: 5.3.1` + session anonyme automatique
+  (`lib/core/firebase/firebase_auth_service.dart`), établie dans `FirebaseBootstrap.init()`.
 
-### Ce qui a été préparé (côté application)
-- `firebase_auth: 5.3.1` ajouté.
-- `lib/core/firebase/firebase_auth_service.dart` : session **anonyme** automatique.
-- `FirebaseBootstrap.init()` établit la session anonyme au démarrage (défensif).
-- `deploy/firebase/set_production_rules.py` : déploie les règles **PROD**
-  (`allow read, write: if request.auth != null`).
+### ⚠️ Conséquence : redéployer le web
+L'ancien build **en ligne** (sans `firebase_auth`) reçoit désormais `403` sur Firestore
+→ la synchro cloud bascule en mode local. Il faut **redéployer le nouveau build**
+(staging, avec `firebase_auth`) — voir la section **D** ci-dessous.
 
-### Procédure (2 minutes, dans la console)
-1. **https://console.firebase.google.com** → projet **gorex-concierge**
-2. **Build → Authentication → Commencer**
-3. Onglet **Sign-in method** → **Anonyme** → **Activer** → Enregistrer
-4. Puis déployer les règles :
-   ```bash
-   cd /home/user/flutter_app/deploy/firebase
-   python3 set_production_rules.py
-   ```
-
-> ⚠️ **NE PAS** déployer les règles PROD **avant** d'activer l'auth anonyme,
-> sinon l'application ne pourra plus lire/écrire Firestore (perte de synchro).
-
-### En attendant
-Les règles actuelles (**développement, accès ouvert**) restent en place et
-fonctionnelles. Le site étant public, il est **recommandé** d'activer l'auth
-anonyme + les règles PROD dès que possible.
+### Régénérer / redéployer les règles
+```bash
+cd /home/user/flutter_app/deploy/firebase
+python3 set_production_rules.py        # règles PROD (auth requise)
+python3 set_firestore_security_rules.py # revenir aux règles dev (si besoin)
+```
 
 ---
 
