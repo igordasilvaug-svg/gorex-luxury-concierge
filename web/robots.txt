@@ -1,0 +1,11 @@
+# GOREX LUXURY CONCIERGE — robots.txt
+# Autorise l'indexation du site public par les moteurs de recherche.
+
+User-agent: *
+Allow: /
+
+# Pages techniques / applicatives non destinées à l'indexation
+Disallow: /download/
+
+# Plan du site
+Sitemap: https://gorex-luxury-concierge.eu/sitemap.xml
