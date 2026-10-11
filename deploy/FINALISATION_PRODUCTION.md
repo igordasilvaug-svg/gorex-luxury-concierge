@@ -103,37 +103,33 @@ python3 set_firestore_security_rules.py # revenir aux règles dev (si besoin)
 
 ---
 
-## D. Déployer la nouvelle version du site (Cloudflare)
+## D. Déployer la nouvelle version du site (Cloudflare) — ✅ FAIT
 
-Le build web (avec `firebase_auth`) et la page `/download` (nouveaux APK) sont
-prêts dans le staging `/home/user/gorex_web_stage`, mais **le déploiement nécessite
-une authentification Cloudflare** (jeton API ou `wrangler login`).
+**Déployé le 11 octobre 2026** sur le compte *Smoggy Shock*
+(compte `057bea67e583635360b8686e985dd036`).
 
-### Méthode 1 — Jeton API (recommandé)
-1. Créez un jeton : voir **`deploy/web-worker/CREER_JETON_API_CLOUDFLARE.md`**
-   (permissions : *Account → Workers Scripts → Edit*).
-2. Déployez :
-   ```bash
-   cd /home/user/gorex_web_worker
-   CLOUDFLARE_API_TOKEN="<votre_jeton>" npx wrangler@4 deploy
-   ```
+| Élément | Résultat |
+|---|---|
+| Worker | `gorex-luxury-concierge` — version `22b34312-7718-4a8c-b014-73fb70433715` |
+| Assets | 64 fichiers (build avec `firebase_auth`) |
+| Site | `https://gorex-luxury-concierge.eu/` → **HTTP 200** |
+| Build en ligne | contient `signInAnonymously` ✅ (nouveau build) |
+| En-têtes sécurité | CSP, HSTS, nosniff, frame-ancestors ✅ |
+| Firestore sans auth | **403** (règles PRODUCTION actives) |
+| Firestore avec auth anonyme | **200** lecture + écriture ✅ |
 
-### Méthode 2 — `wrangler login`
+### Pour redéployer plus tard
 ```bash
-cd /home/user/gorex_web_worker
-npx wrangler@4 login        # ouvre le navigateur
-npx wrangler@4 deploy
+cd /home/user/flutter_app/deploy/web-worker
+CLOUDFLARE_API_TOKEN="<jeton>" CLOUDFLARE_ACCOUNT_ID="057bea67e583635360b8686e985dd036" ./deploy_web.sh
 ```
+Créer un jeton : voir **`deploy/web-worker/CREER_JETON_API_CLOUDFLARE.md`**.
 
 ### Vérification
 ```bash
-curl -sI https://gorex-luxury-concierge.eu/download | grep -iE "http/"
-curl -s  https://gorex-luxury-concierge.eu/download/manifest.json | head
+curl -s -o /dev/null -w "%{http_code}\n" https://gorex-luxury-concierge.eu/
+curl -s https://gorex-luxury-concierge.eu/main.dart.js | grep -c signInAnonymously
 ```
-
-> ℹ️ Le staging est déjà synchronisé (`build/web` → `gorex_web_stage`), les `.wasm`
-> CanvasKit retirés (servis via le CDN gstatic) et les APK découpés. Il ne reste
-> que la commande `wrangler deploy`.
 
 ---
 
