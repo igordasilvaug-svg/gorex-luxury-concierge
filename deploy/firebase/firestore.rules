@@ -3,10 +3,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ─────────────────────────────────────────────────────────────────────
-    // GOREX GROUP — Règles de sécurité Firestore (production)
+    // GOREX GROUP — Règles de sécurité Firestore (production, Phase B)
     //
-    // Principe : tout accès requiert une session authentifiée.
-    // Le personnel possède un rôle dans son jeton (`role`) ; le CEO est admin.
+    //  • Personnel : rôle dans le jeton (`role`) ; CEO = administrateur.
+    //  • Client   : identifié par `user_profiles/{uid}.clientId`.
+    //  • Un client ne lit QUE ses propres dossiers ; ne peut pas les modifier.
+    //  • Le journal d'audit est append-only.
     // ─────────────────────────────────────────────────────────────────────
 
     function isSignedIn() {
@@ -19,18 +21,43 @@ service cloud.firestore {
              && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
+    function role() {
+      return isRealUser() ? request.auth.token.role : null;
+    }
+
     function isAdmin() {
-      return isRealUser() && request.auth.token.role == 'ceo';
+      return isRealUser() && role() == 'ceo';
     }
 
     function isStaff() {
-      return isRealUser() && request.auth.token.role is string
-             && request.auth.token.role != 'vipClient';
+      return isRealUser() && role() is string && role() != 'vipClient';
     }
 
-    // ── Gestion des comptes du personnel ──
-    // Lecture : utilisateur nominatif (résolution de son propre profil).
-    // Écriture : administrateur (CEO) uniquement → empêche toute auto-promotion.
+    function isClient() {
+      return isRealUser() && role() == 'vipClient';
+    }
+
+    // clientId du client connecté (document user_profiles/{uid}).
+    function clientId() {
+      return exists(/databases/$(database)/documents/user_profiles/$(request.auth.uid))
+             ? get(/databases/$(database)/documents/user_profiles/$(request.auth.uid)).data.clientId
+             : '';
+    }
+
+    // Le document appartient-il au client connecté ?
+    function ownsClientData(d) {
+      return isClient() && d.clientId == clientId();
+    }
+
+    // ── Profils d'identité (uid → clientId / rôle) ──
+    match /user_profiles/{uid} {
+      allow read: if isRealUser() && (request.auth.uid == uid || isStaff());
+      allow create, update: if isRealUser() && request.auth.uid == uid;
+      allow delete: if isAdmin();
+    }
+
+    // ── Comptes du personnel ──
+    // Lecture : utilisateur nominatif. Écriture : CEO uniquement (pas d'auto-promotion).
     match /staff/{uid} {
       allow read: if isRealUser();
       allow write: if isAdmin();
@@ -43,35 +70,63 @@ service cloud.firestore {
     }
 
     // ── Journal d'audit : append-only ──
-    // Tout utilisateur nominatif peut journaliser ; ni modification ni suppression.
     match /audit_log/{entry} {
       allow read: if isRealUser();
       allow create: if isRealUser();
       allow update, delete: if false;
     }
 
-    // ── État applicatif synchronisé (document unique) ──
-    match /gorex_cloud/{doc} {
-      allow read, write: if isRealUser();
+    // ── Clients ──
+    // Personnel : accès complet. Client : lecture de sa seule fiche (par e-mail).
+    match /clients/{doc} {
+      allow read: if isStaff() || (isClient() && resource.data.email == request.auth.token.email);
+      allow write: if isStaff();
     }
 
-    // ── Données métier ──
-    // Réservées aux sessions nominatives. L'isolation fine par client s'applique
-    // au niveau applicatif ; un durcissement par collection est prévu en Phase B
-    // (voir AUDIT_MISE_EN_PRODUCTION.md).
-    match /clients/{doc}      { allow read, write: if isRealUser(); }
-    match /requests/{doc}     { allow read, write: if isRealUser(); }
-    match /bookings/{doc}     { allow read, write: if isRealUser(); }
-    match /itineraries/{doc}  { allow read, write: if isRealUser(); }
-    match /providers/{doc}    { allow read, write: if isRealUser(); }
-    match /finance_docs/{doc} { allow read, write: if isRealUser(); }
-    match /expenses/{doc}     { allow read, write: if isRealUser(); }
-    match /conversations/{doc} { allow read, write: if isRealUser(); }
-    match /appointments/{doc} { allow read, write: if isRealUser(); }
+    // ── Dossiers métier : le client ne lit que les siens, n'écrit pas ──
+    match /requests/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow create: if isStaff() || ownsClientData(request.resource.data);
+      allow update, delete: if isStaff();
+    }
+    match /bookings/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow create: if isStaff() || ownsClientData(request.resource.data);
+      allow update, delete: if isStaff();
+    }
+    match /finance_docs/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow write: if isStaff();
+    }
+    match /itineraries/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow write: if isStaff();
+    }
+    match /conversations/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow create: if isStaff() || ownsClientData(request.resource.data);
+      allow update: if isStaff() || ownsClientData(resource.data);
+      allow delete: if isStaff();
+    }
+    match /appointments/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow write: if isStaff();
+    }
 
-    // ── Tout le reste : session nominative requise ──
+    // ── État synchronisé global : RÉSERVÉ AU PERSONNEL ──
+    // (les clients reçoivent leurs données via les collections ci-dessus).
+    match /gorex_cloud/{doc} {
+      allow read, write: if isStaff();
+    }
+
+    // ── Fournisseurs, dépenses, CRM, etc. : personnel uniquement ──
+    match /providers/{doc}  { allow read, write: if isStaff(); }
+    match /expenses/{doc}   { allow read, write: if isStaff(); }
+    match /prospects/{doc}  { allow read, write: if isStaff(); }
+
+    // ── Tout le reste : personnel uniquement ──
     match /{document=**} {
-      allow read, write: if isRealUser();
+      allow read, write: if isStaff();
     }
   }
 }

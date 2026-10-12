@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/firebase/firebase_auth_service.dart';
+import '../../core/firebase/firestore_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/client.dart';
@@ -101,6 +102,23 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
       createdAt: DateTime.now(),
     );
     final client = await state.createClient(draft);
+
+    // 2b. Persistance de la fiche client dans Firestore (si disponible).
+    try {
+      await FirestoreService.updateDocument('clients', client.id, client.toMap());
+    } catch (_) {}
+
+    // 2c. Profil d'identité (uid → clientId) pour l'isolation des données.
+    if (res.uid != null) {
+      try {
+        await FirestoreService.updateDocument('user_profiles', res.uid!, {
+          'uid': res.uid,
+          'email': email,
+          'role': 'vipClient',
+          'clientId': client.id,
+        });
+      } catch (_) {}
+    }
 
     // 3. Compte applicatif lié au client.
     await state.createUser(

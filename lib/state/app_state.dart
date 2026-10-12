@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/i18n/app_localizations.dart';
+import '../core/app_config.dart';
 import '../core/firebase/firebase_auth_service.dart';
 import '../core/firebase/firestore_service.dart';
 import '../core/billing/peppol_service.dart';
@@ -87,6 +88,36 @@ class AppState extends ChangeNotifier {
   }
 
   void _seed() {
+    // En PRODUCTION : aucune donnée de démonstration.
+    // Les données réelles proviennent de Firestore (profils, clients, dossiers).
+    // En développement : jeu de démonstration pour le prototypage.
+    if (AppConfig.isProduction) {
+      users = [];
+      clients = [];
+      requests = [];
+      providers = [];
+      bookings = [];
+      itineraries = [];
+      financeDocs = [];
+      expenses = [];
+      bankTransactions = [];
+      conversations = [];
+      appointments = [];
+      prospects = [];
+      tiers = SeedData.tiers();
+      auditLog = [
+        AuditEntry(
+          id: 'aud_0',
+          timestamp: DateTime.now(),
+          actor: 'Système',
+          actorRole: 'System',
+          action: 'Initialisation plateforme',
+          target: 'GOREX GROUP',
+        ),
+      ];
+      _persist();
+      return;
+    }
     users = SeedData.users();
     clients = SeedData.clients();
     tiers = SeedData.tiers();
@@ -471,12 +502,12 @@ class AppState extends ChangeNotifier {
       return false;
     }
 
-    // Résolution du profil métier.
+    // Résolution du profil métier : personnel (staff) puis client.
     AppUser? profile;
     final uid = res.uid;
     if (uid != null) {
       try {
-        final rows = await FirestoreService.fetchCollection('staff', limit: 50);
+        final rows = await FirestoreService.fetchCollection('staff', limit: 100);
         for (final r in rows) {
           if (r['uid'] == uid || r['id'] == uid) {
             profile = _profileFromStaff(r);
@@ -485,15 +516,80 @@ class AppState extends ChangeNotifier {
         }
       } catch (_) {}
     }
-    profile ??= _localUserByEmail(e);
-
-    if (profile != null) {
-      currentUser = profile.copyWith(lastLogin: DateTime.now());
-      _persist();
+    // Pas du personnel → tentative de résolution en tant que client.
+    if (profile == null) {
+      try {
+        final rows = await FirestoreService.fetchCollection('clients', limit: 300);
+        for (final r in rows) {
+          final re = (r['email'] as String?)?.toLowerCase();
+          if (re != null && re == e) {
+            profile = _profileFromClientRow(r);
+            _upsertClientFromRow(r);
+            break;
+          }
+        }
+      } catch (_) {}
     }
+    // Repli local : UNIQUEMENT hors production (comptes de démonstration).
+    if (profile == null && AppConfig.showDemoAccounts) {
+      profile = _localUserByEmail(e);
+    }
+
+    if (profile == null) {
+      // Compte Firebase valide mais sans profil métier : accès refusé.
+      await FirebaseAuthService.signOut();
+      await _logAudit('Connexion refusée', e, detail: 'profil introuvable');
+      return false;
+    }
+
+    // Écrit le profil d'identité (uid → clientId/rôle) pour l'isolation Firestore.
+    if (uid != null) {
+      try {
+        await FirestoreService.updateDocument('user_profiles', uid, {
+          'uid': uid,
+          'email': e,
+          'role': profile.role.name,
+          if (profile.clientId != null) 'clientId': profile.clientId,
+        });
+      } catch (_) {}
+    }
+
+    currentUser = profile.copyWith(lastLogin: DateTime.now());
+    await _persist();
     await _logAudit('Connexion', e, detail: 'firebase');
     notifyListeners();
     return true;
+  }
+
+  /// Construit un [AppUser] depuis une fiche Firestore `clients/{id}`.
+  AppUser? _profileFromClientRow(Map<String, dynamic> r) {
+    final email = (r['email'] as String?) ?? '';
+    if (email.isEmpty) return null;
+    final id = (r['id'] as String?) ?? email;
+    return AppUser(
+      id: 'client_$id',
+      fullName: (r['fullName'] as String?) ?? email,
+      email: email,
+      password: '',
+      role: UserRole.vipClient,
+      phone: r['phone'] as String?,
+      clientId: id,
+      active: (r['active'] as bool?) ?? true,
+      mustChangePassword: false,
+    );
+  }
+
+  /// Charge (ou met à jour) un client depuis une ligne Firestore `clients`.
+  void _upsertClientFromRow(Map<String, dynamic> r) {
+    try {
+      final c = Client.fromMap(Map<String, dynamic>.from(r));
+      final i = clients.indexWhere((e) => e.id == c.id);
+      if (i >= 0) {
+        clients[i] = c;
+      } else {
+        clients.insert(0, c);
+      }
+    } catch (_) {}
   }
 
   /// Construit un [AppUser] depuis une fiche Firestore `staff/{uid}`.
