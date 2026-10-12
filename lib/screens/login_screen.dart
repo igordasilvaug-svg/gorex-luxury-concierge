@@ -9,6 +9,7 @@ import '../widgets/common.dart';
 import 'legal/user_guide_screen.dart';
 import 'legal/legal_hub_screen.dart';
 import 'about/about_screen.dart';
+import 'access/client_signup_screen.dart';
 import '../widgets/language_selector.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -190,6 +191,29 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: _demoGrid(),
                   ),
                 ],
+                const SizedBox(height: 22),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ClientSignupScreen(),
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.person_add_alt_1_outlined,
+                      size: 16,
+                      color: AppColors.champagne,
+                    ),
+                    label: const Text(
+                      'Accès client — Créer un compte',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.champagne,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 28),
                 const FadeSlideIn(
                   delay: Duration(milliseconds: 520),

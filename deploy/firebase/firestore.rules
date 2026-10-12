@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────────────────────────────
+    // GOREX GROUP — Règles de sécurité Firestore (production)
+    //
+    // Principe : tout accès requiert une session authentifiée.
+    // Le personnel possède un rôle dans son jeton (`role`) ; le CEO est admin.
+    // ─────────────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Session NOMINATIVE réelle (exclut la session anonyme technique).
+    function isRealUser() {
+      return isSignedIn()
+             && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function isAdmin() {
+      return isRealUser() && request.auth.token.role == 'ceo';
+    }
+
+    function isStaff() {
+      return isRealUser() && request.auth.token.role is string
+             && request.auth.token.role != 'vipClient';
+    }
+
+    // ── Gestion des comptes du personnel ──
+    // Lecture : utilisateur nominatif (résolution de son propre profil).
+    // Écriture : administrateur (CEO) uniquement → empêche toute auto-promotion.
+    match /staff/{uid} {
+      allow read: if isRealUser();
+      allow write: if isAdmin();
+    }
+
+    // ── Comptes utilisateurs (collection applicative) ──
+    match /users/{uid} {
+      allow read: if isRealUser();
+      allow write: if isAdmin();
+    }
+
+    // ── Journal d'audit : append-only ──
+    // Tout utilisateur nominatif peut journaliser ; ni modification ni suppression.
+    match /audit_log/{entry} {
+      allow read: if isRealUser();
+      allow create: if isRealUser();
+      allow update, delete: if false;
+    }
+
+    // ── État applicatif synchronisé (document unique) ──
+    match /gorex_cloud/{doc} {
+      allow read, write: if isRealUser();
+    }
+
+    // ── Données métier ──
+    // Réservées aux sessions nominatives. L'isolation fine par client s'applique
+    // au niveau applicatif ; un durcissement par collection est prévu en Phase B
+    // (voir AUDIT_MISE_EN_PRODUCTION.md).
+    match /clients/{doc}      { allow read, write: if isRealUser(); }
+    match /requests/{doc}     { allow read, write: if isRealUser(); }
+    match /bookings/{doc}     { allow read, write: if isRealUser(); }
+    match /itineraries/{doc}  { allow read, write: if isRealUser(); }
+    match /providers/{doc}    { allow read, write: if isRealUser(); }
+    match /finance_docs/{doc} { allow read, write: if isRealUser(); }
+    match /expenses/{doc}     { allow read, write: if isRealUser(); }
+    match /conversations/{doc} { allow read, write: if isRealUser(); }
+    match /appointments/{doc} { allow read, write: if isRealUser(); }
+
+    // ── Tout le reste : session nominative requise ──
+    match /{document=**} {
+      allow read, write: if isRealUser();
+    }
+  }
+}

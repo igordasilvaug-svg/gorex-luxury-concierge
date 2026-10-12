@@ -106,6 +106,57 @@ class FirebaseAuthService {
     }
   }
 
+  /// Inscription d'un nouveau client (e-mail / mot de passe).
+  ///
+  /// Envoie automatiquement un e-mail de vérification d'adresse.
+  static Future<FirebaseSignInResult> signUp(
+    String email,
+    String password,
+  ) async {
+    try {
+      final auth = FirebaseAuth.instance;
+      if (auth.currentUser != null && auth.currentUser!.isAnonymous) {
+        await auth.signOut();
+      }
+      final cred = await auth.createUserWithEmailAndPassword(
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
+      try {
+        await cred.user?.sendEmailVerification();
+      } catch (_) {}
+      _signedIn = cred.user != null;
+      _uid = cred.user?.uid;
+      return FirebaseSignInResult(ok: true, uid: _uid);
+    } on FirebaseAuthException catch (e) {
+      _signedIn = false;
+      return FirebaseSignInResult(ok: false, error: _messageFor(e));
+    } catch (e) {
+      return FirebaseSignInResult.unavailable;
+    }
+  }
+
+  /// L'adresse e-mail de la session courante est-elle vérifiée ?
+  static bool get emailVerified {
+    try {
+      return FirebaseAuth.instance.currentUser?.emailVerified ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Renvoie l'e-mail de vérification.
+  static Future<bool> resendVerification() async {
+    try {
+      final u = FirebaseAuth.instance.currentUser;
+      if (u == null || u.emailVerified) return false;
+      await u.sendEmailVerification();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Ré-authentifie l'utilisateur courant (requis avant changement sensible).
   static Future<bool> reauthenticate(String currentPassword) async {
     try {
