@@ -36,7 +36,7 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
     if (!_formKey.currentState!.validate()) return;
     final s = context.read<AppState>();
     setState(() => _saving = true);
-    await s.changeOwnPassword(_next.text);
+    await s.changeOwnPassword(_next.text, currentPassword: _current.text);
     if (!mounted) return;
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -100,7 +100,10 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
                       if (v == null || v.isEmpty) {
                         return 'Saisissez le mot de passe reçu';
                       }
-                      if (v != user?.password) return 'Mot de passe incorrect';
+                      if (user != null && user.password.isNotEmpty &&
+                          v != user.password) {
+                        return 'Mot de passe incorrect';
+                      }
                       return null;
                     },
                   ),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/i18n/app_localizations.dart';
+import '../core/firebase/firebase_auth_service.dart';
 import '../core/firebase/firestore_service.dart';
 import '../core/billing/peppol_service.dart';
 import '../core/billing/peppol_ubl_generator.dart';
@@ -424,6 +425,8 @@ class AppState extends ChangeNotifier {
   }
 
   // ─────────────────────────── AUTH ───────────────────────────
+  /// Authentification de repli (locale). Conservée pour les tests unitaires et
+  /// le mode hors-ligne. En production, la connexion passe par [signInWithFirebase].
   AppUser? authenticate(String email, String password) {
     final e = email.trim().toLowerCase();
     for (var i = 0; i < users.length; i++) {
@@ -441,27 +444,162 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  /// Change le mot de passe de l'utilisateur connecté (client VIP ou personnel)
-  Future<void> changeOwnPassword(String newPassword) async {
+  /// Connexion RÉELLE via Firebase Auth (e-mail / mot de passe).
+  ///
+  /// Retourne `true` si la connexion réussit. L'utilisateur métier est ensuite
+  /// résolu depuis Firestore (`staff/{uid}` puis `users` par e-mail).
+  /// En l'absence de Firebase (tests, hors-ligne), retombe sur le repli local.
+  Future<bool> signInWithFirebase(String email, String password) async {
+    final e = email.trim().toLowerCase();
+    FirebaseSignInResult res;
+    try {
+      res = await FirebaseAuthService.signIn(e, password);
+    } catch (_) {
+      res = FirebaseSignInResult.unavailable;
+    }
+
+    // Firebase indisponible (tests / hors-ligne) → repli local.
+    if (res.error == 'FIREBASE_UNAVAILABLE' && !res.ok) {
+      final local = authenticate(email, password);
+      if (local != null) {
+        await _logAudit('Connexion', local.email, detail: 'mode local');
+      }
+      return local != null;
+    }
+
+    if (!res.ok) {
+      return false;
+    }
+
+    // Résolution du profil métier.
+    AppUser? profile;
+    final uid = res.uid;
+    if (uid != null) {
+      try {
+        final rows = await FirestoreService.fetchCollection('staff', limit: 50);
+        for (final r in rows) {
+          if (r['uid'] == uid || r['id'] == uid) {
+            profile = _profileFromStaff(r);
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+    profile ??= _localUserByEmail(e);
+
+    if (profile != null) {
+      currentUser = profile.copyWith(lastLogin: DateTime.now());
+      _persist();
+    }
+    await _logAudit('Connexion', e, detail: 'firebase');
+    notifyListeners();
+    return true;
+  }
+
+  /// Construit un [AppUser] depuis une fiche Firestore `staff/{uid}`.
+  AppUser? _profileFromStaff(Map<String, dynamic> r) {
+    final email = (r['email'] as String?) ?? '';
+    if (email.isEmpty) return null;
+    return AppUser(
+      id: (r['uid'] as String?) ?? (r['id'] as String?) ?? email,
+      fullName: (r['displayName'] as String?) ?? email,
+      email: email,
+      password: '',
+      role: UserRole.fromName((r['role'] as String?) ?? 'concierge'),
+      title: r['department'] as String?,
+      active: (r['active'] as bool?) ?? true,
+      mustChangePassword: (r['mustChangePassword'] as bool?) ?? false,
+    );
+  }
+
+  AppUser? _localUserByEmail(String email) {
+    for (final u in users) {
+      if (u.email.toLowerCase() == email) return u;
+    }
+    return null;
+  }
+
+  /// Envoie un lien de réinitialisation de mot de passe (Firebase).
+  Future<bool> sendPasswordReset(String email) =>
+      FirebaseAuthService.sendPasswordReset(email);
+
+  /// Change le mot de passe de l'utilisateur connecté (client VIP ou personnel).
+  ///
+  /// En production (session Firebase nominative), le mot de passe est mis à jour
+  /// côté Firebase après ré-authentification ; en mode local, il est mis à jour
+  /// dans l'état persisté.
+  Future<void> changeOwnPassword(String newPassword,
+      {String? currentPassword}) async {
     final u = currentUser;
     if (u == null) return;
-    final i = users.indexWhere((e) => e.id == u.id);
-    if (i < 0) return;
-    final updated = users[i].copyWith(
-      password: newPassword,
-      mustChangePassword: false,
-    );
-    users[i] = updated;
-    currentUser = updated;
-    log('Changement mot de passe', updated.email);
+
+    if (FirebaseAuthService.isNamedUser) {
+      if (currentPassword != null) {
+        final ok = await FirebaseAuthService.reauthenticate(currentPassword);
+        if (!ok) return;
+      }
+      await FirebaseAuthService.updatePassword(newPassword);
+      await _persistStaffFlag(clearMustChange: true);
+    }
+
+    final i = users.indexWhere((e) => e.id == u.id || e.email == u.email);
+    if (i >= 0) {
+      final updated = users[i].copyWith(
+        password: newPassword,
+        mustChangePassword: false,
+      );
+      users[i] = updated;
+      currentUser = updated;
+    } else {
+      currentUser = u.copyWith(mustChangePassword: false);
+    }
+    log('Changement mot de passe', u.email);
     await _persist();
     notifyListeners();
   }
 
+  /// Met à jour le drapeau `mustChangePassword` dans la fiche Firestore `staff`.
+  Future<void> _persistStaffFlag({required bool clearMustChange}) async {
+    try {
+      final rows = await FirestoreService.fetchCollection('staff', limit: 50);
+      for (final r in rows) {
+        final email = (r['email'] as String?)?.toLowerCase();
+        if (email != null && email == currentUser?.email.toLowerCase()) {
+          await FirestoreService.updateDocument(
+            'staff',
+            (r['id'] as String),
+            {'mustChangePassword': !clearMustChange},
+          );
+          break;
+        }
+      }
+    } catch (_) {}
+  }
+
   void logout() {
     if (currentUser != null) log('Déconnexion', currentUser!.email);
+    // Ferme la session Firebase puis rétablit une session anonyme technique
+    // (nécessaire pour Firestore sous règles de production).
+    FirebaseAuthService.signOut().then((_) {
+      FirebaseAuthService.ensureSignedIn();
+    });
     currentUser = null;
     notifyListeners();
+  }
+
+  /// Écrit une entrée dans le journal d'audit (local + Firestore si dispo).
+  Future<void> _logAudit(String action, String target,
+      {String? detail}) async {
+    log(action, target);
+    try {
+      await FirestoreService.addDocument('audit_log', {
+        'type': 'auth_event',
+        'action': action,
+        'actor': target,
+        'target': detail ?? target,
+        'at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
   }
 
   // ─────────────────────────── LANGUE ───────────────────────────

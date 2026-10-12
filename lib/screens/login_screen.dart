@@ -31,20 +31,34 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit(AppState state) {
+  Future<void> _submit(AppState state) async {
     setState(() {
       _busy = true;
       _error = null;
     });
-    final user = state.authenticate(_email.text, _password.text);
-    if (user == null) {
-      setState(() {
-        _busy = false;
-        _error = state.tr('login.invalid');
-      });
-    } else {
-      setState(() => _busy = false);
+    final ok = await state.signInWithFirebase(_email.text, _password.text);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (!ok) _error = state.tr('login.invalid');
+    });
+  }
+
+  Future<void> _forgotPassword(AppState state) async {
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'Saisissez votre e-mail pour recevoir le lien.');
+      return;
     }
+    final sent = await state.sendPasswordReset(email);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(sent
+            ? 'Lien de réinitialisation envoyé à $email.'
+            : 'Impossible d\'envoyer le lien pour le moment.'),
+      ),
+    );
   }
 
   void _quickFill(String email) {
@@ -138,6 +152,23 @@ class _LoginScreenState extends State<LoginScreen> {
                         icon: Icons.arrow_forward,
                         fullWidth: true,
                         onPressed: _busy ? null : () => _submit(state),
+                      ),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.center,
+                        child: TextButton(
+                          onPressed:
+                              _busy ? null : () => _forgotPassword(state),
+                          child: const Text(
+                            'Mot de passe oublié ?',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: AppColors.grey,
+                              decoration: TextDecoration.underline,
+                              decorationColor: AppColors.greyDark,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),

@@ -200,4 +200,32 @@ class FirestoreService {
               .toList(),
         );
   }
+
+  /// Crée un document (identifiant auto) dans une collection.
+  static Future<String> addDocument(
+    String name,
+    Map<String, dynamic> data,
+  ) async {
+    _ensure();
+    try {
+      final ref = await _db.collection(name).add(data);
+      return ref.id;
+    } catch (e) {
+      throw CloudException('Écriture « $name » impossible : $e');
+    }
+  }
+
+  /// Met à jour un document existant (fusion partielle).
+  static Future<void> updateDocument(
+    String name,
+    String id,
+    Map<String, dynamic> data,
+  ) async {
+    _ensure();
+    try {
+      await _db.collection(name).doc(id).set(data, SetOptions(merge: true));
+    } catch (e) {
+      throw CloudException('Mise à jour « $name/$id » impossible : $e');
+    }
+  }
 }
