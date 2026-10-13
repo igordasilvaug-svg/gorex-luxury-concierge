@@ -27,7 +27,11 @@ const SECURITY_HEADERS = {
   // *.googleapis.com / *.firebaseio.com → autorisés en connect-src.
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval' https://www.gstatic.com https://apis.google.com",
+    // FlutterFire (SDK Firebase Web) injecte un court script inline qui charge le
+    // SDK modulaire depuis gstatic (firebase-app / firebase-auth / firebase-firestore).
+    // Ces 3 scripts sont autorisés par EMPREINTE SHA-256 (aucun 'unsafe-inline').
+    // ⚠️ Si la version du SDK Firebase JS change, recalculer ces empreintes.
+    "script-src 'self' 'wasm-unsafe-eval' 'sha256-lxybZtu/9pEo9t2cXF8OdVCueZV6paBpNEQpBgqbYWA=' 'sha256-Kd6jrSJ+A8S4mbnMXfLL0WXdMJ02uYTrwrdvhPTpDug=' 'sha256-JAe3kXNkLbcxHg2ubdnFd1ozxf8byMAcYA7B4I7gV5I=' https://www.gstatic.com https://apis.google.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob:",
     "font-src 'self' data: https://fonts.gstatic.com",
