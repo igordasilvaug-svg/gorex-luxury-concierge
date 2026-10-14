@@ -24,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _password = TextEditingController();
   String? _error;
   bool _busy = false;
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -114,6 +115,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextField(
                         controller: _email,
                         keyboardType: TextInputType.emailAddress,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        textCapitalization: TextCapitalization.none,
+                        autofillHints: const [AutofillHints.email],
                         style: AppTypography.bodyMedium.copyWith(
                           color: AppColors.white,
                         ),
@@ -129,7 +134,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: _password,
-                        obscureText: true,
+                        obscureText: _obscure,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        textCapitalization: TextCapitalization.none,
+                        autofillHints: const [AutofillHints.password],
                         style: AppTypography.bodyMedium.copyWith(
                           color: AppColors.white,
                         ),
@@ -140,6 +149,20 @@ class _LoginScreenState extends State<LoginScreen> {
                             Icons.lock_outline,
                             size: 18,
                             color: AppColors.champagne,
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscure
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              size: 18,
+                              color: AppColors.grey,
+                            ),
+                            tooltip: _obscure
+                                ? 'Afficher le mot de passe'
+                                : 'Masquer le mot de passe',
+                            onPressed: () =>
+                                setState(() => _obscure = !_obscure),
                           ),
                         ),
                       ),
