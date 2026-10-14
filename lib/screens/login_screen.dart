@@ -38,7 +38,12 @@ class _LoginScreenState extends State<LoginScreen> {
       _busy = true;
       _error = null;
     });
-    final ok = await state.signInWithFirebase(_email.text, _password.text);
+    // Assainissement défensif : on retire les espaces parasites en début/fin
+    // (fréquents après un copier-coller) qui provoquent un échec de connexion.
+    final ok = await state.signInWithFirebase(
+      _email.text.trim(),
+      _password.text.trim(),
+    );
     if (!mounted) return;
     setState(() {
       _busy = false;
