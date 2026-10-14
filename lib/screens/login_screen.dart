@@ -47,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() {
       _busy = false;
-      if (!ok) _error = state.tr('login.invalid');
+      if (!ok) _error = state.lastAuthError ?? state.tr('login.invalid');
     });
   }
 

@@ -119,6 +119,29 @@
   <script src="flutter_bootstrap.js" async></script>
   <script src="cookie-consent.js" defer></script>
 
+  <!-- ─── Auto-réparation : purge des Service Worker / caches résiduels ──────
+       L'ancien Service Worker Flutter mettait l'application en cache et
+       servait une version obsolète SANS contacter le serveur (empêchait toute
+       mise à jour / correction de connexion). Ce script supprime tout service
+       worker et tout cache à chaque chargement pour garantir la version à jour.
+  -->
+  <script>
+    (function () {
+      try {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
+          });
+        }
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (names) {
+            names.forEach(function (n) { try { caches.delete(n); } catch (e) {} });
+          });
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <!-- ─── Contenu indexable (moteurs de recherche & sans JavaScript) ─────── -->
   <noscript>
     <div style="max-width:860px;margin:0 auto;padding:40px 24px;font-family:Georgia,serif;background:#0A0A0B;color:#F6F4EF">

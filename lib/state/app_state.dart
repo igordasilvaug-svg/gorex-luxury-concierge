@@ -36,6 +36,11 @@ class AppState extends ChangeNotifier {
 
   AppUser? currentUser;
 
+  /// Message de diagnostic de la dernière tentative de connexion (null = aucune
+  /// erreur). Permet d'afficher une cause précise à l'utilisateur au lieu du
+  /// générique « identifiants invalides » (aide au support).
+  String? lastAuthError;
+
   /// Coordonnées officielles de l'émetteur (Gorex Group) — facturation.
   CompanyProfile company = const CompanyProfile();
 
@@ -481,10 +486,14 @@ class AppState extends ChangeNotifier {
   /// résolu depuis Firestore (`staff/{uid}` puis `users` par e-mail).
   /// En l'absence de Firebase (tests, hors-ligne), retombe sur le repli local.
   Future<bool> signInWithFirebase(String email, String password) async {
+    // Message de diagnostic précis de la dernière tentative (affiché à l'écran).
+    lastAuthError = null;
     final e = email.trim().toLowerCase();
+    // Assainissement : on retire tout espace (copier-coller, clavier mobile).
+    final pwd = password.replaceAll(RegExp(r'\s'), '');
     FirebaseSignInResult res;
     try {
-      res = await FirebaseAuthService.signIn(e, password);
+      res = await FirebaseAuthService.signIn(e, pwd);
     } catch (_) {
       res = FirebaseSignInResult.unavailable;
     }
@@ -494,11 +503,15 @@ class AppState extends ChangeNotifier {
       final local = authenticate(email, password);
       if (local != null) {
         await _logAudit('Connexion', local.email, detail: 'mode local');
+        return true;
       }
-      return local != null;
+      lastAuthError =
+          'Service de connexion indisponible. Vérifiez votre connexion internet.';
+      return false;
     }
 
     if (!res.ok) {
+      lastAuthError = _authMessage(res.error);
       return false;
     }
 
@@ -539,6 +552,8 @@ class AppState extends ChangeNotifier {
       // Compte Firebase valide mais sans profil métier : accès refusé.
       await FirebaseAuthService.signOut();
       await _logAudit('Connexion refusée', e, detail: 'profil introuvable');
+      lastAuthError =
+          'Ce compte n\'est pas habilité à accéder au portail. Contactez l\'administrateur.';
       return false;
     }
 
@@ -559,6 +574,33 @@ class AppState extends ChangeNotifier {
     await _logAudit('Connexion', e, detail: 'firebase');
     notifyListeners();
     return true;
+  }
+
+  /// Traduit un code d'erreur Firebase en message utilisateur explicite.
+  String _authMessage(String? code) {
+    switch (code) {
+      case 'EMAIL_NOT_FOUND':
+        return 'Aucun compte ne correspond à cet e-mail.';
+      case 'WRONG_PASSWORD':
+        return 'Mot de passe incorrect. Attention aux majuscules/minuscules.';
+      case 'INVALID_EMAIL':
+        return 'Adresse e-mail invalide (vérifiez qu\'il n\'y a pas d\'espace).';
+      case 'INVALID_LOGIN_CREDENTIALS':
+      case 'INVALID_CREDENTIAL':
+        return 'E-mail ou mot de passe incorrect.';
+      case 'USER_DISABLED':
+        return 'Ce compte a été désactivé. Contactez l\'administrateur.';
+      case 'TOO_MANY_REQUESTS':
+        return 'Trop de tentatives. Patientez quelques minutes.';
+      case 'OPERATION_NOT_ALLOWED':
+        return 'La connexion par e-mail n\'est pas activée sur le projet.';
+      case 'NETWORK_REQUEST_FAILED':
+        return 'Problème de réseau. Vérifiez votre connexion.';
+      default:
+        return code == null || code.isEmpty
+            ? 'Identifiants invalides. Veuillez réessayer.'
+            : 'Erreur de connexion ($code).';
+    }
   }
 
   /// Construit un [AppUser] depuis une fiche Firestore `clients/{id}`.
