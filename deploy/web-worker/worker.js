@@ -98,12 +98,27 @@ export default {
     const headers = new Headers(assetRes.headers);
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) headers.set(k, v);
 
-    // Cache : HTML jamais mis en cache, assets versionnés 1 an
+    // Cache :
+    //  - HTML + fichiers NON versionnés (main.dart.js, bootstrap, service worker,
+    //    manifest, robots, sitemap) → TOUJOURS revalidés : sinon le navigateur
+    //    garde une ancienne version du code indéfiniment (bug de connexion vécu).
+    //  - Uniquement les assets réellement versionnés (nom avec hash) → 1 an.
+    const NON_VERSIONED = [
+      '/main.dart.js',
+      '/flutter.js',
+      '/flutter_bootstrap.js',
+      '/flutter_service_worker.js',
+      '/version.json',
+      '/manifest.json',
+      '/robots.txt',
+      '/sitemap.xml',
+    ];
     if (path === '/index.html' || path.endsWith('.html')) {
       headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    } else if (NON_VERSIONED.includes(path)) {
+      headers.set('Cache-Control', 'no-cache, must-revalidate');
     } else if (
       path.startsWith('/canvaskit/') ||
-      path === '/main.dart.js' ||
       path.startsWith('/assets/') ||
       path.startsWith('/icons/')
     ) {
