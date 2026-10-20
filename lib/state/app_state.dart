@@ -831,14 +831,22 @@ class AppState extends ChangeNotifier {
   Future<void> _logAudit(String action, String target,
       {String? detail}) async {
     log(action, target);
+    final payload = {
+      'type': 'auth_event',
+      'action': action,
+      'actor': target,
+      'target': detail ?? target,
+      // UTC impératif : Firestore REST refuse un horodatage sans fuseau.
+      'at': DateTime.now().toUtc().toIso8601String(),
+    };
+    // REST d'abord : la piste d'audit doit être persistée même lorsque le SDK
+    // Firebase est indisponible (Safari notamment).
+    if (restIdToken != null) {
+      final ok = await RestAuthService.appendAuditLog(restIdToken!, payload);
+      if (ok) return;
+    }
     try {
-      await FirestoreService.addDocument('audit_log', {
-        'type': 'auth_event',
-        'action': action,
-        'actor': target,
-        'target': detail ?? target,
-        'at': DateTime.now().toIso8601String(),
-      });
+      await FirestoreService.addDocument('audit_log', payload);
     } catch (_) {}
   }
 

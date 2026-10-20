@@ -356,4 +356,69 @@ class RestAuthService {
       return false;
     }
   }
+
+  // ─────────────────────── PISTE D'AUDIT ───────────────────────
+
+  /// Ajoute une entrée dans `audit_log` (append-only) via Firestore REST.
+  ///
+  /// Indispensable au respect de l'exigence « journal d'audit » : sans cela,
+  /// les événements de connexion ne sont pas persistés sur les navigateurs où
+  /// le SDK Firebase est indisponible (Safari notamment).
+  static Future<bool> appendAuditLog(
+    String idToken,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final resp = await http
+          .post(
+            Uri.parse('$_firestoreBase/audit_log'),
+            headers: _jsonHeaders(idToken),
+            body: jsonEncode({'fields': _encodeFields(data)}),
+          )
+          .timeout(_timeout);
+      return resp.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Encode une carte Dart en « fields » Firestore REST (types explicites).
+  static Map<String, dynamic> _encodeFields(Map<String, dynamic> data) {
+    final out = <String, dynamic>{};
+    data.forEach((k, v) {
+      final enc = _encodeValue(v);
+      if (enc != null) out[k] = enc;
+    });
+    return out;
+  }
+
+  static Map<String, dynamic>? _encodeValue(dynamic v) {
+    if (v == null) return {'nullValue': null};
+    if (v is bool) return {'booleanValue': v};
+    if (v is int) return {'integerValue': '$v'};
+    if (v is double) return {'doubleValue': v};
+    if (v is String) {
+      // Un horodatage ISO 8601 est mappé sur le type natif `timestampValue`.
+      // Firestore REST EXIGE un fuseau : si la chaîne n'en porte pas, on
+      // suppose l'UTC et on l'explicite (sinon erreur 400).
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}T').hasMatch(v)) {
+        final hasZone = RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(v);
+        return {'timestampValue': hasZone ? v : '${v}Z'};
+      }
+      return {'stringValue': v};
+    }
+    if (v is List) {
+      return {
+        'arrayValue': {
+          'values': v.map(_encodeValue).whereType<Map<String, dynamic>>().toList(),
+        },
+      };
+    }
+    if (v is Map) {
+      return {
+        'mapValue': {'fields': _encodeFields(Map<String, dynamic>.from(v))},
+      };
+    }
+    return {'stringValue': '$v'};
+  }
 }
