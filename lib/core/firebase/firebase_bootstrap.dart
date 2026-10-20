@@ -7,7 +7,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
-import 'firebase_auth_service.dart';
 import 'firebase_options.dart';
 
 class FirebaseBootstrap {
@@ -27,6 +26,11 @@ class FirebaseBootstrap {
   ///
   /// Ne lève jamais d'exception : retourne simplement [available] = false en cas
   /// de problème afin que l'application continue en mode local.
+  ///
+  /// ⚠️ Aucune session anonyme n'est créée ici : les règles de production
+  /// exigent un utilisateur NOMINATIF (`isRealUser()`), et le SDK Web échouait
+  /// précisément sur `signInAnonymously()` (cause du blocage Safari). La
+  /// connexion nominative se fait via l'API REST (voir AppState).
   static Future<bool> init() async {
     if (_initialized) return _available;
     _initialized = true;
@@ -38,9 +42,6 @@ class FirebaseBootstrap {
         );
       }
       _available = true;
-      // Session Firebase (anonyme) pour accéder à Firestore sous règles de
-      // production. Défensif : si indisponible, l'app reste en mode local.
-      await FirebaseAuthService.ensureSignedIn();
       if (kDebugMode) {
         debugPrint('[Firebase] initialisé — projet gorex-concierge');
       }

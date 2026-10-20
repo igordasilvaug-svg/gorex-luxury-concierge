@@ -57,8 +57,14 @@ class FirebaseAuthService {
     }
   }
 
-  /// Établit une session anonyme technique (idempotente).
-  /// Utilisée uniquement pour accéder à Firestore avant toute connexion.
+  /// ⚠️ DÉPRÉCIÉ — n'est plus appelée.
+  ///
+  /// Les règles de production (`isRealUser()`) REFUSENT les sessions anonymes :
+  /// une session anonyme n'ouvre donc aucun accès Firestore. De plus, sur le Web
+  /// `signInAnonymously()` échouait (cause du blocage d'authentification sur
+  /// Safari) et chaque tentative créait un compte orphelin dans Firebase Auth.
+  /// La connexion se fait désormais exclusivement en nominatif via l'API REST.
+  @Deprecated('Aucune session anonyme : la connexion est nominative (API REST).')
   static Future<bool> ensureSignedIn() async {
     if (_attempted && _signedIn) return true;
     _attempted = true;
@@ -69,13 +75,10 @@ class FirebaseAuthService {
         _uid = auth.currentUser!.uid;
         return true;
       }
-      final cred = await auth.signInAnonymously();
-      _signedIn = cred.user != null;
-      _uid = cred.user?.uid;
-      return _signedIn;
+      return false;
     } catch (e) {
       _signedIn = false;
-      if (kDebugMode) debugPrint('[Auth] anonyme indisponible : $e');
+      if (kDebugMode) debugPrint('[Auth] session indisponible : $e');
       return false;
     }
   }

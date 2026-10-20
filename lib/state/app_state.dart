@@ -816,11 +816,9 @@ class AppState extends ChangeNotifier {
 
   void logout() {
     if (currentUser != null) log('Déconnexion', currentUser!.email);
-    // Ferme la session Firebase puis rétablit une session anonyme technique
-    // (nécessaire pour Firestore sous règles de production).
-    FirebaseAuthService.signOut().then((_) {
-      FirebaseAuthService.ensureSignedIn();
-    });
+    // Ferme toute session Firebase. Aucune session anonyme n'est recréée :
+    // les règles de production exigent un utilisateur nominatif.
+    FirebaseAuthService.signOut();
     currentUser = null;
     restIdToken = null;
     restUid = null;
