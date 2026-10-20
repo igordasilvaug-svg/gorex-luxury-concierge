@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/i18n/app_localizations.dart';
 import '../core/app_config.dart';
 import '../core/firebase/firebase_auth_service.dart';
+import '../core/firebase/rest_auth_service.dart';
 import '../core/firebase/firestore_service.dart';
 import '../core/billing/peppol_service.dart';
 import '../core/billing/peppol_ubl_generator.dart';
@@ -40,6 +41,13 @@ class AppState extends ChangeNotifier {
   /// erreur). Permet d'afficher une cause précise à l'utilisateur au lieu du
   /// générique « identifiants invalides » (aide au support).
   String? lastAuthError;
+
+  /// Jeton de session obtenu via l'API REST (repli sans SDK JavaScript).
+  /// Conservé pour permettre le changement de mot de passe en cours de session.
+  String? restIdToken;
+
+  /// Identifiant Firebase de la session REST.
+  String? restUid;
 
   /// Coordonnées officielles de l'émetteur (Gorex Group) — facturation.
   CompanyProfile company = const CompanyProfile();
@@ -491,6 +499,20 @@ class AppState extends ChangeNotifier {
     final e = email.trim().toLowerCase();
     // Assainissement : on retire tout espace (copier-coller, clavier mobile).
     final pwd = password.replaceAll(RegExp(r'\s'), '');
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ÉTAPE 1 — VOIE PRINCIPALE : API REST officielle Google/Firebase.
+    //
+    // Aucun SDK JavaScript, aucun script tiers, aucun pré-vol CORS : c'est la
+    // voie la plus robuste et elle fonctionne sur Safari (macOS / iOS) comme
+    // sur Chrome, Firefox, Edge et sur Android.
+    // ═══════════════════════════════════════════════════════════════════════
+    final rest = await _signInViaRest(e, pwd);
+    if (rest != null) return rest; // true = connecté, false = refus définitif.
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ÉTAPE 2 — SECOURS : SDK Firebase (si le réseau REST est injoignable).
+    // ═══════════════════════════════════════════════════════════════════════
     FirebaseSignInResult res;
     try {
       res = await FirebaseAuthService.signIn(e, pwd);
@@ -498,14 +520,14 @@ class AppState extends ChangeNotifier {
       res = FirebaseSignInResult.unavailable;
     }
 
-    // Firebase indisponible (tests / hors-ligne) → repli local.
+    // SDK totalement indisponible → dernier repli local (hors production).
     if (res.error == 'FIREBASE_UNAVAILABLE' && !res.ok) {
       final local = authenticate(email, password);
       if (local != null) {
         await _logAudit('Connexion', local.email, detail: 'mode local');
         return true;
       }
-      lastAuthError =
+      lastAuthError ??=
           'Service de connexion indisponible. Vérifiez votre connexion internet.';
       return false;
     }
@@ -576,6 +598,70 @@ class AppState extends ChangeNotifier {
     return true;
   }
 
+  /// Connexion via les API REST officielles (sans SDK JavaScript).
+  ///
+  /// VOIE PRINCIPALE sur le Web. Retourne :
+  ///   • `true`  → connexion réussie, [currentUser] renseigné ;
+  ///   • `false` → refus définitif (identifiants invalides, compte non habilité) :
+  ///               le message est déjà positionné dans [lastAuthError] ;
+  ///   • `null`  → réseau REST injoignable : l'appelant enchaîne sur le SDK.
+  Future<bool?> _signInViaRest(String email, String password) async {
+    final r = await RestAuthService.signIn(email, password);
+
+    if (!r.ok) {
+      // Panne réseau / réponse inexploitable → on laisse sa chance au SDK.
+      if (r.error == 'NETWORK' || r.error == 'UNKNOWN') return null;
+      // Erreur d'identifiants : message précis, inutile d'insister.
+      lastAuthError = _authMessage(r.error);
+      return false;
+    }
+
+    final uid = r.uid;
+    final token = r.idToken;
+    if (uid == null || token == null || token.isEmpty) return null;
+
+    // Résolution du profil métier : personnel (`staff`) puis client (`clients`).
+    AppUser? profile;
+
+    final staffFetch = await RestAuthService.fetchStaffProfile(uid, token);
+    var row = staffFetch.data;
+    if (row == null) {
+      final byEmail = await RestAuthService.findStaffByEmail(email, token);
+      row = byEmail.data;
+    }
+    if (row != null) profile = _profileFromStaff(row);
+
+    if (profile == null) {
+      final clientFetch = await RestAuthService.findClientByEmail(email, token);
+      final clientRow = clientFetch.data;
+      if (clientRow != null) {
+        profile = _profileFromClientRow(clientRow);
+        _upsertClientFromRow(clientRow);
+      }
+    }
+
+    // Repli local : UNIQUEMENT hors production (comptes de démonstration).
+    if (profile == null && AppConfig.showDemoAccounts) {
+      profile = _localUserByEmail(email);
+    }
+
+    if (profile == null) {
+      await _logAudit('Connexion refusée', email, detail: 'profil introuvable');
+      lastAuthError =
+          'Ce compte n\'est pas habilité à accéder au portail. '
+          'Contactez l\'administrateur.';
+      return false;
+    }
+
+    currentUser = profile.copyWith(lastLogin: DateTime.now());
+    restIdToken = token;
+    restUid = uid;
+    await _persist();
+    await _logAudit('Connexion', email, detail: 'firebase-rest');
+    notifyListeners();
+    return true;
+  }
+
   /// Traduit un code d'erreur Firebase en message utilisateur explicite.
   String _authMessage(String? code) {
     switch (code) {
@@ -592,10 +678,14 @@ class AppState extends ChangeNotifier {
         return 'Ce compte a été désactivé. Contactez l\'administrateur.';
       case 'TOO_MANY_REQUESTS':
         return 'Trop de tentatives. Patientez quelques minutes.';
+      case 'NETWORK_REQUEST_FAILED':
+      case 'NETWORK-REQUEST-FAILED':
+      case 'NETWORK':
+        return 'Connexion au serveur impossible. Vérifiez votre connexion internet.';
+      case 'UNKNOWN':
+        return 'Connexion au serveur impossible. Réessayez dans un instant.';
       case 'OPERATION_NOT_ALLOWED':
         return 'La connexion par e-mail n\'est pas activée sur le projet.';
-      case 'NETWORK_REQUEST_FAILED':
-        return 'Problème de réseau. Vérifiez votre connexion.';
       default:
         return code == null || code.isEmpty
             ? 'Identifiants invalides. Veuillez réessayer.'
@@ -657,9 +747,13 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  /// Envoie un lien de réinitialisation de mot de passe (Firebase).
-  Future<bool> sendPasswordReset(String email) =>
-      FirebaseAuthService.sendPasswordReset(email);
+  /// Envoie un lien de réinitialisation de mot de passe.
+  ///
+  /// REST d'abord (robuste, sans SDK), puis SDK en secours.
+  Future<bool> sendPasswordReset(String email) async {
+    if (await RestAuthService.sendPasswordReset(email)) return true;
+    return FirebaseAuthService.sendPasswordReset(email);
+  }
 
   /// Change le mot de passe de l'utilisateur connecté (client VIP ou personnel).
   ///
@@ -671,7 +765,13 @@ class AppState extends ChangeNotifier {
     final u = currentUser;
     if (u == null) return;
 
-    if (FirebaseAuthService.isNamedUser) {
+    // Session REST (voie principale sur le Web) : mise à jour via l'API
+    // officielle avec le jeton obtenu à la connexion.
+    if (restIdToken != null && restUid != null) {
+      final ok = await RestAuthService.updatePassword(restIdToken!, newPassword);
+      if (!ok) return; // échec : on ne modifie pas l'état local
+      await RestAuthService.clearMustChangePassword(restUid!, restIdToken!);
+    } else if (FirebaseAuthService.isNamedUser) {
       if (currentPassword != null) {
         final ok = await FirebaseAuthService.reauthenticate(currentPassword);
         if (!ok) return;
@@ -722,6 +822,8 @@ class AppState extends ChangeNotifier {
       FirebaseAuthService.ensureSignedIn();
     });
     currentUser = null;
+    restIdToken = null;
+    restUid = null;
     notifyListeners();
   }
 
