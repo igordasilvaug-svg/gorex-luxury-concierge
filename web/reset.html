@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>GOREX — Réinitialisation du cache</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #0A0A0B; color: #F6F4EF; font-family: Georgia, 'Times New Roman', serif;
+      padding: 24px;
+    }
+    .card {
+      max-width: 460px; width: 100%; text-align: center;
+      border: 1px solid #1E1E20; border-radius: 8px; padding: 40px 28px;
+      background: linear-gradient(160deg, #121214 0%, #0A0A0B 100%);
+    }
+    .logo { font-size: 40px; letter-spacing: 8px; color: #C9A227; font-weight: 700; }
+    .sub { font-family: Arial, sans-serif; font-size: 10px; letter-spacing: 4px; color: #7A7A7E; margin-top: 6px; }
+    h1 { font-size: 19px; font-weight: 400; margin: 26px 0 10px; }
+    p { font-family: Arial, sans-serif; font-size: 13px; line-height: 1.65; color: #B9B9BC; margin: 10px 0; }
+    .status { font-family: Arial, sans-serif; font-size: 13px; margin-top: 22px; min-height: 20px; }
+    .ok { color: #7AD18A; }
+    .spin { color: #C9A227; }
+    button, .btn {
+      display: inline-block; margin-top: 26px; padding: 14px 30px; border: none; cursor: pointer;
+      background: linear-gradient(135deg, #C9A227, #E4C766); color: #0A0A0B;
+      font-family: Arial, sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+      border-radius: 4px; text-decoration: none;
+    }
+    .checklist { text-align: left; font-family: Arial, sans-serif; font-size: 12.5px; color: #B9B9BC; margin: 18px 0 0; }
+    .checklist li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">GX</div>
+    <div class="sub">GOREX GROUP — LUXURY CONCIERGE</div>
+    <h1>Réinitialisation du portail</h1>
+    <p>Cette page nettoie l'ancienne version mise en cache sur votre appareil,
+       puis recharge le portail à jour.</p>
+    <ul class="checklist" id="steps">
+      <li>Désinstallation de l'ancien service worker…</li>
+      <li>Purge des caches…</li>
+      <li>Rechargement du portail…</li>
+    </ul>
+    <div class="status spin" id="status">Nettoyage en cours…</div>
+    <a class="btn" id="go" href="/" style="display:none">Accéder au portail</a>
+  </div>
+
+  <!-- Script EXTERNE (les scripts inline sont bloqués par la CSP du site). -->
+  <script src="reset.js"></script>
+</body>
+</html>

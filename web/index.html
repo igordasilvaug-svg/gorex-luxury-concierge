@@ -122,25 +122,10 @@
   <!-- ─── Auto-réparation : purge des Service Worker / caches résiduels ──────
        L'ancien Service Worker Flutter mettait l'application en cache et
        servait une version obsolète SANS contacter le serveur (empêchait toute
-       mise à jour / correction de connexion). Ce script supprime tout service
-       worker et tout cache à chaque chargement pour garantir la version à jour.
+       mise à jour / correction de connexion). Script EXTERNE car la CSP du
+       site bloque les scripts « inline ».
   -->
-  <script>
-    (function () {
-      try {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function (regs) {
-            regs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
-          });
-        }
-        if (window.caches && caches.keys) {
-          caches.keys().then(function (names) {
-            names.forEach(function (n) { try { caches.delete(n); } catch (e) {} });
-          });
-        }
-      } catch (e) {}
-    })();
-  </script>
+  <script src="sw-repair.js"></script>
 
   <!-- ─── Contenu indexable (moteurs de recherche & sans JavaScript) ─────── -->
   <noscript>
