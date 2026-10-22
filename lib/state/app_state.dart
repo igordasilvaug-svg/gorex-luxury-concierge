@@ -35,6 +35,21 @@ import '../models/subscription_tier.dart';
 class AppState extends ChangeNotifier {
   static const _storageKey = 'gorex_state_v1';
 
+  /// Version du schéma des données locales.
+  ///
+  /// Incrémentée à chaque changement incompatible. Une donnée locale d'une
+  /// version antérieure est PURGÉE au démarrage : les anciennes versions de
+  /// démonstration avaient laissé des exemples fictifs (clients, demandes,
+  /// réservations, finances) dans le stockage des navigateurs.
+  static const int _dataVersion = 2;
+
+  /// Clé de stockage de la version des données.
+  static const _versionKey = 'gorex_data_version';
+
+  /// Instance SharedPreferences conservée après [init] (évite les accès async
+  /// répétés lors des écritures successives).
+  SharedPreferences? _cachedPrefs;
+
   AppUser? currentUser;
 
   /// Message de diagnostic de la dernière tentative de connexion (null = aucune
@@ -85,6 +100,24 @@ class AppState extends ChangeNotifier {
   // ─────────────────────────── INIT ───────────────────────────
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
+    _cachedPrefs = prefs;
+    final storedVersion = prefs.getInt(_versionKey);
+
+    // ── PURGE UNIQUE DES DONNÉES HÉRITÉES ──────────────────────────────
+    // Les versions précédentes (démonstration) ont persisté des exemples
+    // fictifs dans le navigateur. Si la donnée locale provient d'une version
+    // antérieure, elle est supprimée définitivement, une seule fois.
+    if (storedVersion != _dataVersion) {
+      await prefs.remove(_storageKey);
+      await prefs.setInt(_versionKey, _dataVersion);
+      if (kDebugMode) {
+        debugPrint(
+          '[State] Données locales v${storedVersion ?? 0} purgées '
+          '(schéma courant : v$_dataVersion).',
+        );
+      }
+    }
+
     final raw = prefs.getString(_storageKey);
     if (raw != null) {
       try {
@@ -96,13 +129,85 @@ class AppState extends ChangeNotifier {
     } else {
       _seed();
     }
+
+    // En production, on récupère les comptes réels d'équipe depuis Firestore
+    // dès qu'une session authentifiée existe (voir `_afterSignIn`). Sans jeton
+    // valide, Firestore refuse la lecture : on n'affiche donc aucun compte
+    // plutôt que des exemples inventés.
+    if (AppConfig.isProduction && restIdToken != null) {
+      await loadTeamFromCloud();
+    }
+
     _ready = true;
     notifyListeners();
   }
 
+  /// Charge la liste réelle des comptes d'équipe depuis Firestore (`staff`).
+  ///
+  /// Alimente les onglets « Équipe » et « Accès personnel » avec les comptes
+  /// réellement existants. Aucune donnée n'est inventée : si la lecture
+  /// échoue (session absente, droits, réseau), la liste reste vide.
+  ///
+  /// Deux voies de lecture, dans cet ordre :
+  ///   1. API REST Firestore — fonctionne même quand le SDK est bloqué
+  ///      (cas constaté sur Safari) ;
+  ///   2. SDK Firestore — secours.
+  Future<void> loadTeamFromCloud() async {
+    final token = restIdToken;
+    var rows = <Map<String, dynamic>>[];
+
+    if (token != null && token.isNotEmpty) {
+      rows = await RestAuthService.fetchCollection('staff', token, limit: 100);
+    }
+    if (rows.isEmpty && FirestoreService.available) {
+      try {
+        rows = await FirestoreService.fetchCollection('staff', limit: 100);
+      } catch (e) {
+        if (kDebugMode) debugPrint('[State] équipe (SDK) : $e');
+      }
+    }
+    if (rows.isEmpty) return;
+
+    final loaded = <AppUser>[];
+    for (final r in rows) {
+      final p = _profileFromStaff(r);
+      if (p == null) continue;
+      // Le mot de passe n'est JAMAIS rapatrié côté navigateur.
+      loaded.add(p.copyWith(password: '', mustChangePassword: false));
+    }
+    if (loaded.isEmpty) return;
+
+    // La base fait foi : la liste affichée est exactement celle de Firestore.
+    // Aucune fiche locale antérieure n'est conservée, pour qu'une entrée
+    // supprimée côté serveur disparaisse aussi de l'interface.
+    users = loaded
+      ..sort(
+        (a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()),
+      );
+
+    // Ré-aligne la session courante sur la fiche fraîche (rôle à jour).
+    final email = currentUser?.email.toLowerCase();
+    if (email != null) {
+      for (final fresh in loaded) {
+        if (fresh.email.toLowerCase() == email) {
+          currentUser = currentUser!.copyWith(
+            role: fresh.role,
+            title: fresh.title,
+            active: fresh.active,
+          );
+          break;
+        }
+      }
+    }
+
+    await _persist();
+    notifyListeners();
+  }
+
   void _seed() {
-    // En PRODUCTION : aucune donnée de démonstration.
-    // Les données réelles proviennent de Firestore (profils, clients, dossiers).
+    // En PRODUCTION : AUCUNE donnée de démonstration, dans AUCUNE collection.
+    // Les données réelles proviennent exclusivement de Firestore (profils
+    // d'équipe, clients, dossiers saisis par les utilisateurs).
     // En développement : jeu de démonstration pour le prototypage.
     if (AppConfig.isProduction) {
       users = [];
@@ -117,7 +222,10 @@ class AppState extends ChangeNotifier {
       conversations = [];
       appointments = [];
       prospects = [];
-      tiers = SeedData.tiers();
+      // La grille d'abonnements était encore générée en dur : ce sont des
+      // tarifs fictifs. Elle est désormais vide en production et doit être
+      // renseignée par l'entreprise depuis l'écran Abonnements.
+      tiers = [];
       auditLog = [
         AuditEntry(
           id: 'aud_0',
@@ -189,7 +297,11 @@ class AppState extends ChangeNotifier {
     appointments = _mapList(m['appointments'], Appointment.fromMap);
     prospects = _mapList(m['prospects'], Prospect.fromMap);
     auditLog = _mapList(m['auditLog'], AuditEntry.fromMap);
-    if (users.isEmpty || clients.isEmpty) _seed();
+    // ⚠️ En production, une liste vide est un état NORMAL (démarrage à zéro) :
+    // il ne faut surtout pas relancer le jeu de démonstration. L'ancien test
+    // `users.isEmpty || clients.isEmpty` recréait les exemples fictifs à chaque
+    // chargement puisqu'aucun client n'existe avant la première saisie.
+    if (!AppConfig.isProduction && (users.isEmpty || clients.isEmpty)) _seed();
   }
 
   List<T> _mapList<T>(dynamic v, T Function(Map<String, dynamic>) f) =>
@@ -198,7 +310,8 @@ class AppState extends ChangeNotifier {
       : (v as List).map((e) => f(Map<String, dynamic>.from(e as Map))).toList();
 
   Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+    _cachedPrefs = prefs;
     await prefs.setString(
       _storageKey,
       jsonEncode({
@@ -594,6 +707,7 @@ class AppState extends ChangeNotifier {
     currentUser = profile.copyWith(lastLogin: DateTime.now());
     await _persist();
     await _logAudit('Connexion', e, detail: 'firebase');
+    await loadTeamFromCloud();
     notifyListeners();
     return true;
   }
@@ -658,6 +772,9 @@ class AppState extends ChangeNotifier {
     restUid = uid;
     await _persist();
     await _logAudit('Connexion', email, detail: 'firebase-rest');
+    // Le jeton existe maintenant : on charge l'équipe réelle depuis Firestore
+    // pour que « Équipe » et « Accès personnel » affichent les vrais comptes.
+    await loadTeamFromCloud();
     notifyListeners();
     return true;
   }

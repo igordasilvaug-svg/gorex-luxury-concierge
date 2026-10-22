@@ -42,6 +42,27 @@ class SubscriptionsScreen extends StatelessWidget {
               style: AppTypography.caption.copyWith(color: AppColors.grey),
             ),
             const SizedBox(height: 18),
+            if (tiers.isEmpty)
+              LuxuryCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Aucune formule enregistrée',
+                      style: AppTypography.title.copyWith(fontSize: 15),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'La grille d\'abonnements n\'est pas préremplie : les tarifs '
+                      'doivent être définis par la direction, puis saisis ici. '
+                      'Aucun prix n\'est fixé par défaut.',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             LayoutBuilder(
               builder: (context, c) {
                 final cols = c.maxWidth > 1100 ? 4 : (c.maxWidth > 760 ? 2 : 1);

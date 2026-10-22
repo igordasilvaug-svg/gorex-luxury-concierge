@@ -335,12 +335,14 @@ class ClientProfileScreen extends StatelessWidget {
               const SizedBox(height: 18),
               LuxuryCard(
                 child: Column(
-                  children: const [
-                    InfoRow(label: 'Ligne 24/7', value: '+32 2 555 01 99'),
-                    Divider(height: 1),
-                    InfoRow(label: 'E-mail', value: 'sos@gorex.com'),
-                    Divider(height: 1),
-                    InfoRow(
+                  children: [
+                    // Les coordonnées proviennent du profil officiel Gorex Group
+                    // saisi par la direction : plus aucun numéro d'exemple en dur.
+                    InfoRow(label: 'Ligne 24/7', value: s.company.phone),
+                    const Divider(height: 1),
+                    InfoRow(label: 'E-mail', value: s.company.email),
+                    const Divider(height: 1),
+                    const InfoRow(
                       label: 'Concierge dédié',
                       value: 'Via la messagerie',
                     ),

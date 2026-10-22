@@ -421,4 +421,58 @@ class RestAuthService {
     }
     return {'stringValue': '$v'};
   }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LECTURE DE COLLECTIONS PAR REST (sans SDK)
+  //
+  // Indispensable en production : le SDK Firebase est précisément défaillant
+  // sur Safari, donc `FirestoreService` (bâti sur le SDK) ne peut pas
+  // alimenter les écrans. Ces méthodes rendent la liste réellement présente
+  // en base, indépendamment du SDK.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /// Lit au maximum [limit] documents d'une collection.
+  ///
+  /// Retourne une liste vide en cas d'échec : l'appelant ne doit jamais
+  /// afficher de données inventées pour masquer une panne.
+  static Future<List<Map<String, dynamic>>> fetchCollection(
+    String collection,
+    String idToken, {
+    int limit = 100,
+  }) async {
+    http.Response resp;
+    try {
+      resp = await http
+          .get(
+            Uri.parse('$_firestoreBase/$collection?pageSize=$limit'),
+            headers: _jsonHeaders(idToken),
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      return const [];
+    }
+    if (resp.statusCode != 200) return const [];
+
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(resp.body);
+    } catch (_) {
+      return const [];
+    }
+    if (decoded is! Map) return const [];
+    final docs = decoded['documents'];
+    if (docs is! List) return const [];
+
+    final out = <Map<String, dynamic>>[];
+    for (final d in docs) {
+      if (d is! Map) continue;
+      final name = d['name'];
+      final docId = name is String && name.contains('/')
+          ? name.split('/').last
+          : '';
+      final flat = _flatDocument('', raw: d, id: docId);
+      if (flat != null) out.add(flat);
+    }
+    return out;
+  }
 }
