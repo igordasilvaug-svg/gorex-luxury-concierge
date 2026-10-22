@@ -222,10 +222,10 @@ class AppState extends ChangeNotifier {
       conversations = [];
       appointments = [];
       prospects = [];
-      // La grille d'abonnements était encore générée en dur : ce sont des
-      // tarifs fictifs. Elle est désormais vide en production et doit être
-      // renseignée par l'entreprise depuis l'écran Abonnements.
-      tiers = [];
+      // La grille d'abonnements commerciale est rétablie : c'est l'offre
+      // publique de Gorex Group, et non un jeu de démonstration.
+      // Elle reste entièrement modifiable depuis l'écran Abonnements.
+      tiers = SeedData.tiers();
       auditLog = [
         AuditEntry(
           id: 'aud_0',
@@ -286,6 +286,15 @@ class AppState extends ChangeNotifier {
     users = _mapList(m['users'], AppUser.fromMap);
     clients = _mapList(m['clients'], Client.fromMap);
     tiers = _mapList(m['tiers'], SubscriptionTier.fromMap);
+    // ── MIGRATION CIBLÉE UNIQUEMENT ─────────────────────────────────────
+    // Une version intermédiaire avait vidé la grille d'abonnements. Les
+    // navigateurs l'ayant déjà chargée conservent `tiers: []` en mémoire :
+    // on rétablit donc l'offre commerciale SANS toucher aux autres données
+    // (clients, dossiers, finances…) qui pourraient être réelles.
+    // Si la grille a été personnalisée en base, elle n'est pas touchée.
+    if (AppConfig.isProduction && tiers.isEmpty) {
+      tiers = SeedData.tiers();
+    }
     requests = _mapList(m['requests'], ServiceRequest.fromMap);
     providers = _mapList(m['providers'], Provider.fromMap);
     bookings = _mapList(m['bookings'], Booking.fromMap);

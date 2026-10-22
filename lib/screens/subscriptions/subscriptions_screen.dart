@@ -53,9 +53,9 @@ class SubscriptionsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'La grille d\'abonnements n\'est pas préremplie : les tarifs '
-                      'doivent être définis par la direction, puis saisis ici. '
-                      'Aucun prix n\'est fixé par défaut.',
+                      'La grille d\'abonnements n\'a pas pu être chargée sur cet '
+                      'appareil. Rechargez la page ; si le problème persiste, '
+                      'contactez l\'administrateur.',
                       style: AppTypography.caption.copyWith(
                         color: AppColors.grey,
                       ),
