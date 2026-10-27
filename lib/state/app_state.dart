@@ -29,6 +29,21 @@ import '../models/reminder_config.dart';
 import '../models/service_request.dart';
 import '../models/subscription_tier.dart';
 
+/// Erreur de persistance côté serveur.
+///
+/// Levée lorsqu'une modification a été appliquée à l'écran mais que la
+/// sauvegarde serveur a échoué. L'appelant DOIT en informer l'utilisateur :
+/// sans cela, une saisie semblerait enregistrée alors qu'elle serait perdue
+/// au rechargement suivant.
+class CloudWriteException implements Exception {
+  const CloudWriteException(this.what);
+  final String what;
+
+  @override
+  String toString() => '$what : la sauvegarde sur le serveur a échoué. '
+      'La modification n\'a pas été conservée.';
+}
+
 /// État applicatif central — persistance locale (shared_preferences JSON)
 /// Architecture API-ready : chaque mutation passe par une méthode dédiée
 /// qui pourra être remplacée par un appel HTTP.
@@ -317,6 +332,68 @@ class AppState extends ChangeNotifier {
       v == null
       ? <T>[]
       : (v as List).map((e) => f(Map<String, dynamic>.from(e as Map))).toList();
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PERSISTANCE SERVEUR
+  //
+  // Toute modification métier doit être écrite dans Firestore, et pas
+  // seulement dans le stockage local du navigateur. Sans cela, une saisie
+  // disparaît dès que l'utilisateur change d'appareil ou vide son cache.
+  //
+  // Voie principale : API REST Firestore (fonctionne même quand le SDK est
+  // bloqué, cas constaté sur Safari). Repli : SDK. Le code HTTP est
+  // remonté à l'appelant, qui décide d'informer l'utilisateur.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /// Identifiant fixe du document Firestore contenant les réglages société.
+  ///
+  /// Constant et non dérivé du numéro d'entreprise : ce dernier est un champ
+  /// modifiable (et encore un placeholder), il ne peut pas servir de clé.
+  static const String _companyDocId = 'gorex-group';
+
+  /// Résultat de la dernière écriture serveur (diagnostic).
+  String? lastCloudError;
+
+  /// Écrit (ou met à jour partiellement) un document Firestore.
+  ///
+  /// [collection] et [docId] désignent le document cible ; [data] ne contient
+  /// que les champs à modifier (mise à jour partielle par `updateMask`).
+  /// Retourne `true` si le serveur a confirmé l'écriture.
+  Future<bool> _pushToCloud(
+    String collection,
+    Map<String, dynamic> data, {
+    String? docId,
+  }) async {
+    // Hors production, la persistance locale suffit au prototypage.
+    if (!AppConfig.isProduction) return true;
+    if (data.isEmpty) return true;
+
+    final token = restIdToken;
+    final id = docId ?? restUid;
+    if (token == null || token.isEmpty || id == null || id.isEmpty) {
+      lastCloudError = 'session absente';
+      return false;
+    }
+
+    final path = '$collection/$id';
+    final code = await RestAuthService.updateDocument(path, token, data);
+    if (code == 200) {
+      lastCloudError = null;
+      return true;
+    }
+
+    // Repli SDK si la requête n'a pas abouti pour une raison réseau.
+    if (code == 0 && FirestoreService.available) {
+      try {
+        await FirestoreService.updateDocument(collection, id, data);
+        lastCloudError = null;
+        return true;
+      } catch (_) {}
+    }
+    lastCloudError = 'HTTP $code';
+    if (kDebugMode) debugPrint('[Cloud] écriture $path refusée : HTTP $code');
+    return false;
+  }
 
   Future<void> _persist() async {
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
@@ -1269,6 +1346,80 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ───────────────────── ESPACE PERSONNEL (MON COMPTE) ─────────────────────
+
+  /// Enregistre les informations personnelles de l'utilisateur connecté,
+  /// qu'il soit membre du personnel ou client.
+  ///
+  /// Écrit réellement sur le serveur : les modifications sont donc retrouvées
+  /// lors d'une connexion depuis un autre appareil. Lève une
+  /// [CloudWriteException] si la sauvegarde échoue, afin que l'interface
+  /// l'annonce au lieu de laisser croire à un enregistrement.
+  Future<void> saveMyProfile({
+    required String fullName,
+    required String phone,
+    String? language,
+  }) async {
+    final me = currentUser;
+    if (me == null) throw const CloudWriteException('Profil');
+
+    final name = fullName.trim();
+    if (name.isEmpty) {
+      throw const CloudWriteException('Profil');
+    }
+
+    final updated = me.copyWith(
+      fullName: name,
+      phone: phone.trim().isEmpty ? null : phone.trim(),
+    );
+
+    users = [
+      for (final u in users) u.id == updated.id ? updated : u,
+    ];
+    currentUser = updated;
+
+    // Côté client, le nom et le téléphone vivent aussi dans la fiche `clients`.
+    final clientId = updated.clientId;
+    if (updated.role == UserRole.vipClient && clientId != null) {
+      final i = clients.indexWhere((e) => e.id == clientId);
+      if (i >= 0) {
+        clients[i] = clients[i].copyWith(
+          fullName: name,
+          phone: updated.phone,
+          language: language,
+        );
+      }
+    }
+
+    log('Mise à jour profil personnel', updated.email);
+    await _persist();
+    notifyListeners();
+
+    final Map<String, dynamic> payload = {
+      'displayName': name,
+      'fullName': name,
+      'phone': updated.phone ?? '',
+      if (language != null) 'language': language,
+    };
+
+    final bool ok;
+    if (updated.role == UserRole.vipClient) {
+      final id = clientId ?? '';
+      if (id.isEmpty) throw const CloudWriteException('Profil');
+      ok = await _pushToCloud('clients', payload, docId: id);
+    } else {
+      ok = await _pushToCloud('staff', payload, docId: updated.id);
+    }
+    // Le profil d'identité reste synchronisé pour l'isolation des données.
+    if (restUid != null) {
+      await _pushToCloud('user_profiles', {
+        'email': updated.email,
+        'displayName': name,
+      }, docId: restUid);
+    }
+    if (!ok) throw const CloudWriteException('Profil');
+  }
+
   // ─────────────────────────── CLIENTS ───────────────────────────
   Future<void> updateClient(Client c) async {
     final i = clients.indexWhere((e) => e.id == c.id);
@@ -1277,6 +1428,11 @@ class AppState extends ChangeNotifier {
     log('Mise à jour client', c.code);
     await _persist();
     notifyListeners();
+    // Sauvegarde serveur : la fiche doit survivre à un changement d'appareil.
+    final ok = await _pushToCloud('clients', c.toMap(), docId: c.id);
+    if (!ok) {
+      throw const CloudWriteException('Fiche client');
+    }
   }
 
   String _nextClientCode() =>
@@ -1369,7 +1525,10 @@ class AppState extends ChangeNotifier {
     return u;
   }
 
-  /// Met à jour un accès existant
+  /// Met à jour un accès existant.
+  ///
+  /// Persiste côté serveur : le mot de passe n'est JAMAIS écrit (il est géré
+  /// exclusivement par Firebase Authentication).
   Future<void> updateUser(AppUser updated) async {
     final i = users.indexWhere((e) => e.id == updated.id);
     if (i < 0) return;
@@ -1378,6 +1537,28 @@ class AppState extends ChangeNotifier {
     log('Mise à jour accès', updated.email);
     await _persist();
     notifyListeners();
+
+    // Le compte du personnel est stocké dans `staff/{uid}`, la fiche client
+    // dans `clients/{clientId}` : on route selon la nature du compte.
+    final Map<String, dynamic> payload = {
+      'email': updated.email,
+      'displayName': updated.fullName,
+      'fullName': updated.fullName,
+      'role': updated.role.name,
+      'department': updated.title ?? updated.role.department,
+      'phone': updated.phone ?? '',
+      'active': updated.active,
+    };
+
+    final bool ok;
+    if (updated.role == UserRole.vipClient) {
+      final clientId = updated.clientId;
+      if (clientId == null || clientId.isEmpty) return;
+      ok = await _pushToCloud('clients', payload, docId: clientId);
+    } else {
+      ok = await _pushToCloud('staff', payload, docId: updated.id);
+    }
+    if (!ok) throw const CloudWriteException('Compte utilisateur');
   }
 
   /// Active / désactive un accès
@@ -1421,6 +1602,8 @@ class AppState extends ChangeNotifier {
     log('Mise à jour abonnement', t.name);
     await _persist();
     notifyListeners();
+    final ok = await _pushToCloud('subscription_tiers', t.toMap(), docId: t.id);
+    if (!ok) throw const CloudWriteException('Formule d\'abonnement');
   }
 
   // ─────────────────────────── BOOKINGS ───────────────────────────
@@ -1713,6 +1896,9 @@ class AppState extends ChangeNotifier {
     log('Configuration Peppol', config.enabled ? 'Activée' : 'Désactivée');
     await _persist();
     notifyListeners();
+    final ok = await _pushToCloud('company', {'peppol': config.toMap()},
+        docId: _companyDocId);
+    if (!ok) throw const CloudWriteException('Configuration Peppol');
   }
 
   /// Simule la confirmation de distribution Peppol (accusé du destinataire).
@@ -1733,6 +1919,11 @@ class AppState extends ChangeNotifier {
     log('Mise à jour coordonnées société', profile.legalName);
     await _persist();
     notifyListeners();
+    final ok = await _pushToCloud('company', company.toMap(),
+        docId: _companyDocId);
+    if (!ok) {
+      throw const CloudWriteException('Coordonnées de la société');
+    }
   }
 
   // ─────────────────────── COMPTABILITÉ & ENCAISSEMENT ───────────────────────
@@ -1912,6 +2103,9 @@ class AppState extends ChangeNotifier {
     log('Configuration relances', config.enabled ? 'Activée' : 'Désactivée');
     await _persist();
     notifyListeners();
+    final ok = await _pushToCloud('company', {'reminderConfig': config.toMap()},
+        docId: _companyDocId);
+    if (!ok) throw const CloudWriteException('Configuration des relances');
   }
 
   /// Email de relance (sujet + corps) pour une facture.

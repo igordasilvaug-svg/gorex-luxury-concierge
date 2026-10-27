@@ -12,6 +12,7 @@ import '../legal/privacy_policy_screen.dart';
 import '../legal/user_guide_screen.dart';
 import '../legal/legal_hub_screen.dart';
 import '../about/about_screen.dart';
+import '../account/my_account_edit_screen.dart';
 import '../../widgets/language_selector.dart';
 
 class ClientProfileScreen extends StatelessWidget {
@@ -207,6 +208,13 @@ class ClientProfileScreen extends StatelessWidget {
             ),
 
             const SizedBox(height: 20),
+            GoldButton(
+              label: 'MODIFIER MES INFORMATIONS',
+              icon: Icons.edit_outlined,
+              fullWidth: true,
+              onPressed: () => _editProfile(context, s),
+            ),
+            const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () =>
                   DocumentService.exportClientFile(context, s, client),
@@ -313,6 +321,25 @@ class ClientProfileScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Ouvre le formulaire d'édition des informations personnelles.
+  Future<void> _editProfile(BuildContext context, AppState s) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const MyAccountEditScreen(),
+      ),
+    );
+    if (saved == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Informations enregistrées sur le serveur. '
+            'Vous les retrouverez à votre prochaine connexion.',
+          ),
+        ),
+      );
+    }
   }
 
   void _contactGorex(BuildContext context, AppState s) {

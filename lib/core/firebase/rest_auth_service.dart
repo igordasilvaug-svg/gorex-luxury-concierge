@@ -475,4 +475,146 @@ class RestAuthService {
     }
     return out;
   }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ÉCRITURE DE DOCUMENTS PAR REST
+  //
+  // Ces méthodes sont le cœur de la persistance serveur : sans elles, une
+  // modification saisie dans l'interface ne survivait pas au rechargement
+  // de la page, car elle restait dans le stockage local du navigateur.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /// Crée ou remplace intégralement un document (`PATCH`).
+  ///
+  /// Retourne le code HTTP (200 = succès, 0 = réseau injoignable).
+  static Future<int> setDocument(
+    String path,
+    String idToken,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final resp = await http
+          .patch(
+            Uri.parse('$_firestoreBase/$path'),
+            headers: _jsonHeaders(idToken),
+            body: jsonEncode({'fields': _encodeFields(data)}),
+          )
+          .timeout(_timeout);
+      return resp.statusCode;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Met à jour UNIQUEMENT les champs fournis (`PATCH` + `updateMask`).
+  ///
+  /// Indispensable : un `PATCH` sans masque remplacerait tout le document et
+  /// effacerait les champs non transmis (rôle, uid, date de création…).
+  static Future<int> updateDocument(
+    String path,
+    String idToken,
+    Map<String, dynamic> data,
+  ) async {
+    if (data.isEmpty) return 200;
+    try {
+      final mask = data.keys
+          .map((k) => 'updateMask.fieldPaths=${Uri.encodeQueryComponent(k)}')
+          .join('&');
+      final resp = await http
+          .patch(
+            Uri.parse('$_firestoreBase/$path?$mask'),
+            headers: _jsonHeaders(idToken),
+            body: jsonEncode({'fields': _encodeFields(data)}),
+          )
+          .timeout(_timeout);
+      return resp.statusCode;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Lit un document unique. Retourne `null` s'il n'existe pas.
+  static Future<Map<String, dynamic>?> fetchDocument(
+    String path,
+    String idToken,
+  ) async {
+    try {
+      final resp = await http
+          .get(Uri.parse('$_firestoreBase/$path'), headers: _jsonHeaders(idToken))
+          .timeout(_timeout);
+      if (resp.statusCode != 200) return null;
+      return _flatDocument(resp.body);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Crée un compte Firebase Auth (inscription) SANS le SDK.
+  ///
+  /// Renvoie l'`idToken` et l'`uid` du compte créé, ou un code d'erreur
+  /// normalisé dans [error] (EMAIL_EXISTS, WEAK_PASSWORD, …).
+  static Future<RestSignInResult> signUp(String email, String password) async {
+    http.Response resp;
+    try {
+      resp = await http
+          .post(
+            Uri.parse('$_identityBase/accounts:signUp?key=$_apiKey'),
+            headers: _plainHeaders,
+            body: jsonEncode({
+              'email': email.trim().toLowerCase(),
+              'password': password,
+              'returnSecureToken': true,
+            }),
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      return const RestSignInResult(ok: false, error: 'NETWORK');
+    }
+
+    if (resp.statusCode == 200) {
+      try {
+        final m = jsonDecode(resp.body) as Map<String, dynamic>;
+        return RestSignInResult(
+          ok: true,
+          uid: m['localId'] as String?,
+          idToken: m['idToken'] as String?,
+          email: (m['email'] as String?) ?? email.trim().toLowerCase(),
+        );
+      } catch (_) {
+        return const RestSignInResult(ok: false, error: 'UNKNOWN');
+      }
+    }
+    return RestSignInResult(ok: false, error: _normalize(_errorCode(resp.body)));
+  }
+
+  /// Envoie l'e-mail de vérification d'adresse pour le compte courant.
+  static Future<bool> sendEmailVerification(String idToken) async {
+    try {
+      final resp = await http
+          .post(
+            Uri.parse('$_identityBase/accounts:sendOobCode?key=$_apiKey'),
+            headers: _plainHeaders,
+            body: jsonEncode({
+              'requestType': 'VERIFY_EMAIL',
+              'idToken': idToken,
+            }),
+          )
+          .timeout(_timeout);
+      return resp.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Extrait le message d'erreur renvoyé par Identity Toolkit.
+  static String _errorCode(String body) {
+    try {
+      final m = jsonDecode(body);
+      if (m is Map && m['error'] is Map) {
+        final msg = (m['error'] as Map)['message'];
+        if (msg is String) return msg;
+      }
+    } catch (_) {}
+    return 'UNKNOWN';
+  }
 }

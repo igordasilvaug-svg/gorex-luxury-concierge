@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/app_config.dart';
 import '../core/theme/app_colors.dart';
@@ -21,6 +22,13 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
+
+  /// Groupe de remplissage automatique : c'est lui qui indique au navigateur
+  /// (Safari/trousseau iCloud, Chrome/Google Password Manager) que le couple
+  /// identifiant + mot de passe vient d'être soumis et peut être proposé à
+  /// l'enregistrement. Sans clôture explicite du contexte, aucun gestionnaire
+  /// de mots de passe ne propose l'enregistrement.
+  final GlobalKey<FormState> _autofillKey = GlobalKey<FormState>();
   final _password = TextEditingController();
   String? _error;
   bool _busy = false;
@@ -45,6 +53,18 @@ class _LoginScreenState extends State<LoginScreen> {
       _password.text.trim(),
     );
     if (!mounted) return;
+
+    // ── ENREGISTREMENT DU MOT DE PASSE PAR LE NAVIGATEUR ──
+    // `finishAutofillContext()` signale au navigateur que la saisie est
+    // terminée. Appelé uniquement en cas de SUCCÈS : c'est ce signal qui
+    // déclenche, sur iOS/macOS (trousseau iCloud) comme sur Chrome
+    // (Google Password Manager) ou Android, la proposition d'enregistrer
+    // le couple identifiant / mot de passe. Sur échec, on ne clôture pas,
+    // pour éviter de mémoriser un mot de passe erroné.
+    if (ok) {
+      TextInput.finishAutofillContext(shouldSave: true);
+    }
+
     setState(() {
       _busy = false;
       if (!ok) _error = state.lastAuthError ?? state.tr('login.invalid');
@@ -61,9 +81,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(sent
-            ? 'Lien de réinitialisation envoyé à $email.'
-            : 'Impossible d\'envoyer le lien pour le moment.'),
+        content: Text(
+          sent
+              ? 'Lien de réinitialisation envoyé à $email.'
+              : 'Impossible d\'envoyer le lien pour le moment.',
+        ),
       ),
     );
   }
@@ -94,114 +116,131 @@ class _LoginScreenState extends State<LoginScreen> {
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 160),
                   child: Container(
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.cardGradient,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.divider, width: 0.6),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Center(child: GoldDivider(width: 44)),
-                      const SizedBox(height: 20),
-                      Text(
-                        state.tr('login.secure_access'),
-                        textAlign: TextAlign.center,
-                        style: AppTypography.eyebrow,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        state.tr('login.subtitle'),
-                        textAlign: TextAlign.center,
-                        style: AppTypography.caption,
-                      ),
-                      const SizedBox(height: 26),
-                      TextField(
-                        controller: _email,
-                        keyboardType: TextInputType.emailAddress,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        textCapitalization: TextCapitalization.none,
-                        autofillHints: const [AutofillHints.email],
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: AppColors.white,
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.cardGradient,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.divider, width: 0.6),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Center(child: GoldDivider(width: 44)),
+                        const SizedBox(height: 20),
+                        Text(
+                          state.tr('login.secure_access'),
+                          textAlign: TextAlign.center,
+                          style: AppTypography.eyebrow,
                         ),
-                        decoration: InputDecoration(
-                          labelText: state.tr('login.email'),
-                          prefixIcon: const Icon(
-                            Icons.alternate_email,
-                            size: 18,
-                            color: AppColors.champagne,
+                        const SizedBox(height: 8),
+                        Text(
+                          state.tr('login.subtitle'),
+                          textAlign: TextAlign.center,
+                          style: AppTypography.caption,
+                        ),
+                        const SizedBox(height: 26),
+                        AutofillGroup(
+                          key: _autofillKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              TextField(
+                                controller: _email,
+                                keyboardType: TextInputType.emailAddress,
+                                autocorrect: false,
+                                enableSuggestions: false,
+                                textCapitalization: TextCapitalization.none,
+                                autofillHints: const [
+                                  AutofillHints.username,
+                                  AutofillHints.email,
+                                ],
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: AppColors.white,
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: state.tr('login.email'),
+                                  prefixIcon: const Icon(
+                                    Icons.alternate_email,
+                                    size: 18,
+                                    color: AppColors.champagne,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              TextField(
+                                controller: _password,
+                                obscureText: _obscure,
+                                autocorrect: false,
+                                enableSuggestions: false,
+                                textCapitalization: TextCapitalization.none,
+                                autofillHints: const [AutofillHints.password],
+                                // `current-password` : indique qu'il s'agit du mot de passe
+                                // EXISTANT, condition pour que le gestionnaire propose
+                                // l'enregistrement du couple identifiant / mot de passe.
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: AppColors.white,
+                                ),
+                                onSubmitted: (_) => _submit(state),
+                                decoration: InputDecoration(
+                                  labelText: state.tr('login.password'),
+                                  prefixIcon: const Icon(
+                                    Icons.lock_outline,
+                                    size: 18,
+                                    color: AppColors.champagne,
+                                  ),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscure
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      size: 18,
+                                      color: AppColors.grey,
+                                    ),
+                                    tooltip: _obscure
+                                        ? 'Afficher le mot de passe'
+                                        : 'Masquer le mot de passe',
+                                    onPressed: () =>
+                                        setState(() => _obscure = !_obscure),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _password,
-                        obscureText: _obscure,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        textCapitalization: TextCapitalization.none,
-                        autofillHints: const [AutofillHints.password],
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: AppColors.white,
+                        if (_error != null) ...[
+                          const SizedBox(height: 16),
+                          ErrorBanner(message: _error!),
+                        ],
+                        const SizedBox(height: 22),
+                        GoldButton(
+                          label: _busy
+                              ? state.tr('login.checking')
+                              : state.tr('login.signin'),
+                          icon: Icons.arrow_forward,
+                          fullWidth: true,
+                          onPressed: _busy ? null : () => _submit(state),
                         ),
-                        onSubmitted: (_) => _submit(state),
-                        decoration: InputDecoration(
-                          labelText: state.tr('login.password'),
-                          prefixIcon: const Icon(
-                            Icons.lock_outline,
-                            size: 18,
-                            color: AppColors.champagne,
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscure
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              size: 18,
-                              color: AppColors.grey,
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.center,
+                          child: TextButton(
+                            onPressed: _busy
+                                ? null
+                                : () => _forgotPassword(state),
+                            child: const Text(
+                              'Mot de passe oublié ?',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: AppColors.grey,
+                                decoration: TextDecoration.underline,
+                                decorationColor: AppColors.greyDark,
+                              ),
                             ),
-                            tooltip: _obscure
-                                ? 'Afficher le mot de passe'
-                                : 'Masquer le mot de passe',
-                            onPressed: () =>
-                                setState(() => _obscure = !_obscure),
                           ),
                         ),
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 16),
-                        ErrorBanner(message: _error!),
                       ],
-                      const SizedBox(height: 22),
-                      GoldButton(
-                        label: _busy ? state.tr('login.checking') : state.tr('login.signin'),
-                        icon: Icons.arrow_forward,
-                        fullWidth: true,
-                        onPressed: _busy ? null : () => _submit(state),
-                      ),
-                      const SizedBox(height: 4),
-                      Align(
-                        alignment: Alignment.center,
-                        child: TextButton(
-                          onPressed:
-                              _busy ? null : () => _forgotPassword(state),
-                          child: const Text(
-                            'Mot de passe oublié ?',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: AppColors.grey,
-                              decoration: TextDecoration.underline,
-                              decorationColor: AppColors.greyDark,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
                 ),
                 if (AppConfig.showDemoAccounts) ...[
                   const SizedBox(height: 26),
@@ -334,11 +373,8 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _footSep() => Container(
-    width: 1,
-    height: 12,
-    color: AppColors.divider,
-  );
+  Widget _footSep() =>
+      Container(width: 1, height: 12, color: AppColors.divider);
 
   Widget _demoGrid() {
     final accounts = [

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/firebase/firebase_auth_service.dart';
+import '../../core/firebase/rest_auth_service.dart';
 import '../../core/firebase/firestore_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -64,12 +65,34 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
 
     final email = _email.text.trim().toLowerCase();
 
-    // 1. Création du compte Firebase (e-mail / mot de passe + vérification).
-    final res = await FirebaseAuthService.signUp(email, _password.text);
-    if (!res.ok) {
+    // 1. Création du compte Firebase (e-mail / mot de passe).
+    //
+    // VOIE PRINCIPALE : API REST officielle, qui ne dépend d'aucun SDK et
+    // fonctionne sur Safari comme sur Chrome/Android. Le SDK ne sert que de
+    // secours si le réseau REST est injoignable.
+    String? uid;
+    String? idToken;
+    final rest = await RestAuthService.signUp(email, _password.text);
+    if (rest.ok) {
+      uid = rest.uid;
+      idToken = rest.idToken;
+      if (idToken != null) {
+        await RestAuthService.sendEmailVerification(idToken);
+      }
+    } else if (rest.error == 'NETWORK' || rest.error == 'UNKNOWN') {
+      final res = await FirebaseAuthService.signUp(email, _password.text);
+      if (!res.ok) {
+        setState(() {
+          _busy = false;
+          _error = _signupError(res.error);
+        });
+        return;
+      }
+      uid = res.uid;
+    } else {
       setState(() {
         _busy = false;
-        _error = _signupError(res.error);
+        _error = _signupError(rest.error);
       });
       return;
     }
@@ -103,21 +126,65 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
     );
     final client = await state.createClient(draft);
 
-    // 2b. Persistance de la fiche client dans Firestore (si disponible).
-    try {
-      await FirestoreService.updateDocument('clients', client.id, client.toMap());
-    } catch (_) {}
+    // 2b. Enregistrement RÉEL de la fiche client sur le serveur.
+    //
+    // Ces deux écritures sont bloquantes : si elles échouent, le compte
+    // existerait sans fiche exploitable et le client se retrouverait sans
+    // accès à ses données. On l'annonce donc explicitement au lieu de
+    // poursuivre silencieusement.
+    final tok = idToken;
+    bool persisted = false;
 
-    // 2c. Profil d'identité (uid → clientId) pour l'isolation des données.
-    if (res.uid != null) {
+    if (tok != null) {
+      final codeClient = await RestAuthService.setDocument(
+        'clients/${client.id}',
+        tok,
+        client.toMap(),
+      );
+      if (codeClient == 200) {
+        final codeProfile = await RestAuthService.setDocument(
+          'user_profiles/$uid',
+          tok,
+          {
+            'uid': uid,
+            'email': email,
+            'role': 'vipClient',
+            'clientId': client.id,
+          },
+        );
+        persisted = codeProfile == 200;
+      }
+    } else if (FirestoreService.available) {
+      // Repli SDK (session ouverte par le SDK).
       try {
-        await FirestoreService.updateDocument('user_profiles', res.uid!, {
-          'uid': res.uid,
-          'email': email,
-          'role': 'vipClient',
-          'clientId': client.id,
-        });
-      } catch (_) {}
+        await FirestoreService.updateDocument(
+          'clients',
+          client.id,
+          client.toMap(),
+        );
+        if (uid != null) {
+          await FirestoreService.updateDocument('user_profiles', uid, {
+            'uid': uid,
+            'email': email,
+            'role': 'vipClient',
+            'clientId': client.id,
+          });
+        }
+        persisted = true;
+      } catch (_) {
+        persisted = false;
+      }
+    }
+
+    if (!persisted) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = 'Le compte a été créé, mais l\'enregistrement de votre '
+            'dossier a échoué. Contactez concierge@gorex.com en indiquant '
+            'votre adresse e-mail : votre accès sera complété manuellement.';
+      });
+      return;
     }
 
     // 3. Compte applicatif lié au client.
