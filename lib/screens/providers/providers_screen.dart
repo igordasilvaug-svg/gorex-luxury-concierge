@@ -23,9 +23,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
   /// Ouvre le formulaire prestataire (création ou modification).
   Future<void> _openForm([model.Provider? existing]) async {
     await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => ProviderFormScreen(existing: existing),
-      ),
+      MaterialPageRoute(builder: (_) => ProviderFormScreen(existing: existing)),
     );
   }
 
@@ -189,97 +187,124 @@ class _ProviderCard extends StatelessWidget {
     ),
   );
 
-  void _showDetail(BuildContext context, model.Provider p, VoidCallback onEdit) {
-    showModalBottomSheet(
+  /// Ouvre la fiche détaillée puis, si l'utilisateur demande la
+  /// modification, ouvre le formulaire APRÈS la fermeture effective de la
+  /// feuille.
+  ///
+  /// La version précédente enchaînait `Navigator.pop()` puis l'ouverture du
+  /// formulaire dans le même frame : l'écran de saisie pouvait être avalé par
+  /// l'animation de fermeture et le bouton semblait sans effet. On attend ici
+  /// la fin de la feuille, qui renvoie la décision de l'utilisateur.
+  Future<void> _showDetail(
+    BuildContext context,
+    model.Provider p,
+    VoidCallback onEdit,
+  ) async {
+    final wantsEdit = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surfaceElevated,
       builder: (_) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(p.name, style: AppTypography.headline),
-              const SizedBox(height: 4),
-              Text(
-                '${p.category} · ${p.city}, ${p.country}',
-                style: AppTypography.caption,
-              ),
-              const SizedBox(height: 18),
-              LuxuryCard(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Contenu défilant…
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(22, 22, 22, 10),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    InfoRow(label: 'Contact', value: p.contactName),
-                    const Divider(height: 1),
-                    InfoRow(label: 'E-mail', value: p.contactEmail),
-                    const Divider(height: 1),
-                    InfoRow(label: 'Téléphone', value: p.contactPhone),
-                    const Divider(height: 1),
-                    InfoRow(
-                      label: 'Tarif indicatif',
-                      value: NumberFormat.currency(
-                        locale: 'fr_BE',
-                        symbol: '€',
-                        decimalDigits: 0,
-                      ).format(p.rate),
+                    Text(p.name, style: AppTypography.headline),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${p.category} · ${p.city}, ${p.country}',
+                      style: AppTypography.caption,
                     ),
-                    const Divider(height: 1),
-                    InfoRow(
-                      label: 'Commission',
-                      value: '${p.commissionPercent.toStringAsFixed(0)}%',
+                    const SizedBox(height: 18),
+                    LuxuryCard(
+                      child: Column(
+                        children: [
+                          InfoRow(label: 'Contact', value: p.contactName),
+                          const Divider(height: 1),
+                          InfoRow(label: 'E-mail', value: p.contactEmail),
+                          const Divider(height: 1),
+                          InfoRow(label: 'Téléphone', value: p.contactPhone),
+                          const Divider(height: 1),
+                          InfoRow(
+                            label: 'Tarif indicatif',
+                            value: NumberFormat.currency(
+                              locale: 'fr_BE',
+                              symbol: '€',
+                              decimalDigits: 0,
+                            ).format(p.rate),
+                          ),
+                          const Divider(height: 1),
+                          InfoRow(
+                            label: 'Commission',
+                            value: '${p.commissionPercent.toStringAsFixed(0)}%',
+                          ),
+                          const Divider(height: 1),
+                          InfoRow(
+                            label: 'Confiance',
+                            value: '${p.trustLevel}/5',
+                          ),
+                          const Divider(height: 1),
+                          InfoRow(
+                            label: 'Contrat',
+                            value: p.hasContract ? 'Signé' : 'En cours',
+                          ),
+                        ],
+                      ),
                     ),
-                    const Divider(height: 1),
-                    InfoRow(label: 'Confiance', value: '${p.trustLevel}/5'),
-                    const Divider(height: 1),
-                    InfoRow(
-                      label: 'Contrat',
-                      value: p.hasContract ? 'Signé' : 'En cours',
-                    ),
+                    if (p.documentNames.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text('DOCUMENTS', style: AppTypography.label),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: p.documentNames
+                            .map(
+                              (d) => StatusPill(
+                                label: d,
+                                color: AppColors.greyLight,
+                                icon: Icons.description_outlined,
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
+                    if (p.internalNotes != null) ...[
+                      const SizedBox(height: 16),
+                      Text('NOTES INTERNES', style: AppTypography.label),
+                      const SizedBox(height: 6),
+                      Text(p.internalNotes!, style: AppTypography.bodyMedium),
+                    ],
                   ],
                 ),
               ),
-              if (p.documentNames.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text('DOCUMENTS', style: AppTypography.label),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: p.documentNames
-                      .map(
-                        (d) => StatusPill(
-                          label: d,
-                          color: AppColors.greyLight,
-                          icon: Icons.description_outlined,
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
-              if (p.internalNotes != null) ...[
-                const SizedBox(height: 16),
-                Text('NOTES INTERNES', style: AppTypography.label),
-                const SizedBox(height: 6),
-                Text(p.internalNotes!, style: AppTypography.bodyMedium),
-              ],
-              const SizedBox(height: 20),
-              // Accès direct à la modification depuis la fiche détaillée :
-              // c'est le geste naturel après consultation.
-              GoldButton(
+            ),
+            // …et pied de feuille FIXE : le bouton reste atteignable même
+            // sur un écran court, quel que soit le volume d'informations.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 4, 22, 18),
+              child: GoldButton(
                 label: 'Modifier ce prestataire',
                 icon: Icons.edit_outlined,
                 fullWidth: true,
-                onPressed: () {
-                  Navigator.pop(context);
-                  onEdit();
-                },
+                // On ferme en signalant l'intention ; l'ouverture du
+                // formulaire est faite par l'appelant, une fois la feuille
+                // réellement refermée.
+                onPressed: () => Navigator.pop(context, true),
               ),
-              const SizedBox(height: 22),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+
+    if (wantsEdit == true) onEdit();
   }
 }

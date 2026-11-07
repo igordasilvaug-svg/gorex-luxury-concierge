@@ -220,7 +220,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
                               '${d.clientName} · ${DateFormat('dd/MM/yyyy', 'fr_BE').format(d.date)}',
                               style: AppTypography.caption,
                             ),
-                            if (d.peppolStatus != PeppolStatus.notApplicable) ...[
+                            if (d.peppolStatus !=
+                                PeppolStatus.notApplicable) ...[
                               const SizedBox(height: 5),
                               _peppolPill(d.peppolStatus),
                             ],
@@ -513,7 +514,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Accusé Peppol enregistré (distribué).'),
+                            content: Text(
+                              'Accusé Peppol enregistré (distribué).',
+                            ),
                           ),
                         );
                       }
@@ -589,7 +592,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Fichier UBL — ${ubl.filename}', style: AppTypography.headline),
+              Text(
+                'Fichier UBL — ${ubl.filename}',
+                style: AppTypography.headline,
+              ),
               const SizedBox(height: 4),
               Text(
                 'UBL 2.1 · Peppol BIS Billing 3.0 (EN 16931)',
@@ -627,11 +633,15 @@ class _FinanceScreenState extends State<FinanceScreen> {
     );
   }
 
-  void _newDoc(BuildContext context, AppState s) {
-    showModalBottomSheet(
+  Future<void> _newDoc(BuildContext context, AppState s) async {
+    // La feuille renvoie le type choisi ; le formulaire n'est ouvert
+    // qu'APRÈS sa fermeture effective. Enchaîner `pop` puis l'ouverture dans
+    // le même frame faisait perdre l'écran de saisie (même défaut que sur la
+    // fiche prestataire).
+    final type = await showModalBottomSheet<FinanceDocType>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
-      builder: (_) => SafeArea(
+      builder: (sheetCtx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -650,10 +660,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   t.label,
                   style: AppTypography.title.copyWith(fontSize: 14),
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _createDoc(context, s, t);
-                },
+                onTap: () => Navigator.pop(sheetCtx, t),
               ),
             ),
             const SizedBox(height: 10),
@@ -661,6 +668,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
         ),
       ),
     );
+
+    if (type == null || !context.mounted) return;
+    _createDoc(context, s, type);
   }
 
   void _createDoc(BuildContext context, AppState s, FinanceDocType type) {
