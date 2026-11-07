@@ -411,30 +411,39 @@ class _ItineraryBuilderScreenState extends State<ItineraryBuilderScreen> {
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    await s.createItinerary(
-      Itinerary(
-        id: '',
-        reference: '',
-        clientId: _clientId!,
-        clientName: client?.fullName ?? 'Client',
-        title: _title.text.trim(),
-        destination: _destination.text.trim().isEmpty
-            ? 'À préciser'
-            : _destination.text.trim(),
-        startDate: _start,
-        endDate: _end,
-        items: _items,
-        flightInfo: _flight.text.trim().isEmpty ? null : _flight.text.trim(),
-        hotelInfo: _hotel.text.trim().isEmpty ? null : _hotel.text.trim(),
-        transferInfo: _transfer.text.trim().isEmpty
-            ? null
-            : _transfer.text.trim(),
-        contacts: contacts,
-        securityIncluded: _security,
-        status: RequestStatus.underReview,
-        createdAt: DateTime.now(),
-      ),
-    );
+    try {
+      await s.createItinerary(
+        Itinerary(
+          id: '',
+          reference: '',
+          clientId: _clientId!,
+          clientName: client?.fullName ?? 'Client',
+          title: _title.text.trim(),
+          destination: _destination.text.trim().isEmpty
+              ? 'À préciser'
+              : _destination.text.trim(),
+          startDate: _start,
+          endDate: _end,
+          items: _items,
+          flightInfo: _flight.text.trim().isEmpty ? null : _flight.text.trim(),
+          hotelInfo: _hotel.text.trim().isEmpty ? null : _hotel.text.trim(),
+          transferInfo: _transfer.text.trim().isEmpty
+              ? null
+              : _transfer.text.trim(),
+          contacts: contacts,
+          securityIncluded: _security,
+          status: RequestStatus.underReview,
+          createdAt: DateTime.now(),
+        ),
+      );
+    } on CloudWriteException {
+      // L'itinéraire n'existe pas en base : on ne referme pas l'écran pour
+      // ne pas perdre la saisie, et on annonce l'échec.
+      if (!mounted) return;
+      setState(() => _saving = false);
+      showCloudFailure(context, 'Création de l\'itinéraire');
+      return;
+    }
     if (!mounted) return;
     setState(() => _saving = false);
     Navigator.pop(context);

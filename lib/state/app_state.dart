@@ -1420,54 +1420,137 @@ class AppState extends ChangeNotifier {
 
   // ───────────────────── CHARGEMENT DES DONNÉES OPÉRATIONNELLES ─────────────────────
 
-  /// Charge les demandes et les réservations réelles depuis Firestore.
+  /// Charge depuis Firestore les données opérationnelles réelles :
+  /// demandes, réservations, itinéraires, factures et transactions bancaires.
   ///
-  /// Sans cela, chaque connexion repartait d'une liste vide : les demandes
-  /// saisies lors d'une session précédente n'étaient jamais réaffichées.
-  /// Les erreurs de lecture sont silencieuses (liste vide) : elles ne doivent
-  /// pas bloquer la connexion.
+  /// Sans cela, chaque connexion repartait de listes vides : ce qui avait été
+  /// saisi lors d'une session précédente n'était jamais réaffiché.
+  ///
+  /// Les erreurs de lecture sont silencieuses : un échec réseau ne doit pas
+  /// empêcher l'utilisateur de se connecter. En revanche aucune donnée
+  /// fictive n'est injectée en remplacement.
   Future<void> loadOperationalFromCloud() async {
     final token = restIdToken;
     if (token == null || token.isEmpty) return;
 
-    List<Map<String, dynamic>> rows;
+    // Un client ne voit que ce qui lui appartient. Les règles de sécurité
+    // s'appuient sur `resource.data` : Firestore refuse alors une lecture de
+    // collection non filtrée (403) et exige une requête filtrée sur le champ
+    // concerné. On filtre donc explicitement pour un client.
+    final email = currentUser?.email.trim().toLowerCase();
+    final clientId = currentUser?.clientId;
+    final staff = isStaff;
 
-    if (isStaff) {
-      // Le personnel voit toutes les demandes (règle `isStaff()`).
-      rows = await RestAuthService.fetchCollection('requests', token, limit: 300);
-      if (rows.isEmpty && FirestoreService.available) {
-        try {
-          rows = await FirestoreService.fetchCollection('requests', limit: 300);
-        } catch (_) {}
+    // Lit une collection selon le profil courant.
+    //   · staff  → collection entière
+    //   · client → uniquement les documents dont [ownerField] vaut [ownerValue]
+    Future<List<Map<String, dynamic>>> read(
+      String collection, {
+      String? ownerField,
+      String? ownerValue,
+    }) async {
+      try {
+        if (staff) {
+          final rows = await RestAuthService.fetchCollection(
+            collection,
+            token,
+            limit: 300,
+          );
+          if (rows.isNotEmpty) return rows;
+          if (FirestoreService.available) {
+            try {
+              return await FirestoreService.fetchCollection(collection,
+                  limit: 300);
+            } catch (_) {}
+          }
+          return rows;
+        }
+        if (ownerField == null ||
+            ownerValue == null ||
+            ownerValue.isEmpty) {
+          return const [];
+        }
+        return await RestAuthService.queryCollection(
+          collection,
+          token,
+          field: ownerField,
+          value: ownerValue,
+          limit: 300,
+        );
+      } catch (_) {
+        return const [];
       }
-    } else {
-      // Un client ne voit QUE ses propres demandes. La règle de sécurité
-      // s'appuie sur `resource.data.clientEmail` : Firestore exige donc une
-      // requête explicitement filtrée sur ce champ, sinon il répond 403
-      // (« Missing or insufficient permissions »).
-      final email = currentUser?.email.trim().toLowerCase();
-      if (email == null || email.isEmpty) return;
-      rows = await RestAuthService.queryCollection(
-        'requests',
-        token,
-        field: 'clientEmail',
-        value: email,
-        limit: 300,
-      );
     }
 
-    if (rows.isNotEmpty) {
-      final loaded = <ServiceRequest>[];
+    // Convertit des cartes en objets, en ignorant les documents incomplets
+    // plutôt que de faire échouer tout le lot.
+    List<T> decode<T>(
+      List<Map<String, dynamic>> rows,
+      T Function(Map<String, dynamic>) fromMap,
+    ) {
+      final out = <T>[];
       for (final r in rows) {
         try {
-          loaded.add(ServiceRequest.fromMap(Map<String, dynamic>.from(r)));
-        } catch (_) {
-          // Document incomplet : ignoré plutôt que de faire échouer le lot.
-        }
+          out.add(fromMap(Map<String, dynamic>.from(r)));
+        } catch (_) {}
       }
-      if (loaded.isNotEmpty) {
-        requests = loaded
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return out;
+    }
+
+    // ── Demandes de service ──
+    final requestRows = await read(
+      'requests',
+      ownerField: 'clientEmail',
+      ownerValue: email,
+    );
+    final loadedRequests = decode(requestRows, ServiceRequest.fromMap);
+    if (loadedRequests.isNotEmpty) {
+      requests = loadedRequests
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+
+    // ── Réservations ──
+    final bookingRows = await read(
+      'bookings',
+      ownerField: 'clientId',
+      ownerValue: clientId,
+    );
+    final loadedBookings = decode(bookingRows, Booking.fromMap);
+    if (loadedBookings.isNotEmpty) {
+      bookings = loadedBookings
+        ..sort((a, b) => b.date.compareTo(a.date));
+    }
+
+    // ── Itinéraires ──
+    final itineraryRows = await read(
+      'itineraries',
+      ownerField: 'clientId',
+      ownerValue: clientId,
+    );
+    final loadedItineraries = decode(itineraryRows, Itinerary.fromMap);
+    if (loadedItineraries.isNotEmpty) {
+      itineraries = loadedItineraries
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+
+    // ── Factures et devis ──
+    final financeRows = await read(
+      'finance_docs',
+      ownerField: 'clientId',
+      ownerValue: clientId,
+    );
+    final loadedFinance = decode(financeRows, FinanceDocument.fromMap);
+    if (loadedFinance.isNotEmpty) {
+      financeDocs = loadedFinance..sort((a, b) => b.date.compareTo(a.date));
+    }
+
+    // ── Transactions bancaires (donnée interne : personnel uniquement) ──
+    List<BankTransaction> loadedTx = const [];
+    if (staff) {
+      final txRows = await read('bank_transactions');
+      loadedTx = decode(txRows, BankTransaction.fromMap);
+      if (loadedTx.isNotEmpty) {
+        bankTransactions = loadedTx;
       }
     }
 
@@ -1618,6 +1701,23 @@ class AppState extends ChangeNotifier {
       billingEmail: draft.billingEmail,
       peppolEnabled: draft.peppolEnabled,
     );
+
+    // Serveur d'abord : une fiche client créée par le personnel doit être
+    // retrouvée depuis n'importe quel appareil. Sans elle, les réservations
+    // et factures rattachées à ce clientId seraient orphelines ailleurs.
+    //
+    // EXCEPTION VOULUE — parcours d'inscription : à ce moment précis, le
+    // compte vient d'être créé par l'API REST mais la session n'est pas
+    // encore établie dans l'état applicatif (aucun jeton disponible). Ce
+    // n'est pas un échec serveur : l'écran d'inscription écrit lui-même la
+    // fiche juste après, avec le jeton qu'il possède. On ne lève donc pas
+    // d'exception dans ce cas, sous peine de bloquer toute inscription.
+    final hasSession = (restIdToken ?? '').isNotEmpty;
+    if (hasSession) {
+      final ok = await _pushToCloud('clients', c.toMap(), docId: c.id);
+      if (!ok) throw const CloudWriteException('Fiche client');
+    }
+
     clients.insert(0, c);
     log(
       'Création client',
@@ -1754,8 +1854,24 @@ class AppState extends ChangeNotifier {
   }
 
   // ─────────────────────────── BOOKINGS ───────────────────────────
-  String _nextBookingRef() =>
-      'GRX-BK-2025-${(bookings.length + 1).toString().padLeft(4, '0')}';
+
+  /// Prochain numéro de référence de réservation.
+  ///
+  /// On repart du PLUS GRAND numéro déjà présent (et non du nombre de lignes) :
+  /// après une suppression, `bookings.length` régresse et produirait un doublon
+  /// de référence — inacceptable pour un document engageant.
+  String _nextBookingRef() {
+    var max = 0;
+    final re = RegExp(r'(\d+)\s*$');
+    for (final b in bookings) {
+      final m = re.firstMatch(b.reference);
+      if (m != null) {
+        final n = int.tryParse(m.group(1)!) ?? 0;
+        if (n > max) max = n;
+      }
+    }
+    return 'GRX-BK-2025-${(max + 1).toString().padLeft(4, '0')}';
+  }
 
   Future<void> createBooking(Booking b) async {
     final nb = Booking(
@@ -1779,6 +1895,13 @@ class AppState extends ChangeNotifier {
       documentNames: b.documentNames,
       notes: b.notes,
     );
+
+    // Serveur d'abord : une réservation engage le prestataire et le client.
+    // Si l'écriture échoue, rien n'apparaît à l'écran — on ne montre jamais
+    // une réservation que la base ne contient pas.
+    final ok = await _pushToCloud('bookings', nb.toMap(), docId: nb.id);
+    if (!ok) throw const CloudWriteException('Réservation');
+
     bookings.insert(0, nb);
     log('Création réservation', nb.reference);
     await _persist();
@@ -1788,14 +1911,34 @@ class AppState extends ChangeNotifier {
   Future<void> updateBooking(Booking b) async {
     final i = bookings.indexWhere((e) => e.id == b.id);
     if (i < 0) return;
+    final previous = bookings[i];
+
+    final ok = await _pushToCloud('bookings', b.toMap(), docId: b.id);
+    if (!ok) throw const CloudWriteException('Réservation');
+
     bookings[i] = b;
+    if (previous.status != b.status) {
+      log('Statut réservation', b.reference, detail: b.status.label);
+    }
     await _persist();
     notifyListeners();
   }
 
   // ─────────────────────────── ITINERARIES ───────────────────────────
-  String _nextItineraryRef() =>
-      'GRX-ITN-2025-${(itineraries.length + 1).toString().padLeft(4, '0')}';
+
+  /// Prochain numéro d'itinéraire (basé sur le plus grand existant).
+  String _nextItineraryRef() {
+    var max = 0;
+    final re = RegExp(r'(\d+)\s*$');
+    for (final it in itineraries) {
+      final m = re.firstMatch(it.reference);
+      if (m != null) {
+        final n = int.tryParse(m.group(1)!) ?? 0;
+        if (n > max) max = n;
+      }
+    }
+    return 'GRX-ITN-2025-${(max + 1).toString().padLeft(4, '0')}';
+  }
 
   Future<Itinerary> createItinerary(Itinerary draft) async {
     final it = Itinerary(
@@ -1816,6 +1959,12 @@ class AppState extends ChangeNotifier {
       status: draft.status,
       createdAt: DateTime.now(),
     );
+
+    // Serveur d'abord : le client doit retrouver son itinéraire depuis
+    // n'importe quel appareil.
+    final ok = await _pushToCloud('itineraries', it.toMap(), docId: it.id);
+    if (!ok) throw const CloudWriteException('Itinéraire');
+
     itineraries.insert(0, it);
     log('Création itinéraire', it.reference);
     await _persist();
@@ -1826,12 +1975,21 @@ class AppState extends ChangeNotifier {
   Future<void> updateItinerary(Itinerary it) async {
     final i = itineraries.indexWhere((e) => e.id == it.id);
     if (i < 0) return;
+
+    final ok = await _pushToCloud('itineraries', it.toMap(), docId: it.id);
+    if (!ok) throw const CloudWriteException('Itinéraire');
+
     itineraries[i] = it;
     await _persist();
     notifyListeners();
   }
 
   // ─────────────────────────── FINANCE ───────────────────────────
+
+  /// Prochain numéro de document financier.
+  ///
+  /// Basé sur le plus grand numéro existant pour ce type : une facture ne doit
+  /// JAMAIS réutiliser une référence (obligation légale de séquence continue).
   String _nextFinanceRef(FinanceDocType t) {
     final prefix = {
       FinanceDocType.invoice: 'GRX-INV',
@@ -1839,8 +1997,16 @@ class AppState extends ChangeNotifier {
       FinanceDocType.deposit: 'GRX-DEP',
       FinanceDocType.credit: 'GRX-CN',
     }[t]!;
-    final count = financeDocs.where((f) => f.type == t).length + 1;
-    return '$prefix-2025-${count.toString().padLeft(4, '0')}';
+    var max = 0;
+    final re = RegExp(r'(\d+)\s*$');
+    for (final f in financeDocs.where((f) => f.type == t)) {
+      final m = re.firstMatch(f.reference);
+      if (m != null) {
+        final n = int.tryParse(m.group(1)!) ?? 0;
+        if (n > max) max = n;
+      }
+    }
+    return '$prefix-2025-${(max + 1).toString().padLeft(4, '0')}';
   }
 
   Future<FinanceDocument> createFinanceDoc(FinanceDocument draft) async {
@@ -1872,6 +2038,13 @@ class AppState extends ChangeNotifier {
       structuredCommunication: VatService.structuredCommunication(reference),
       clientReference: draft.clientReference,
     );
+
+    // Serveur d'abord : une facture est une pièce comptable. Si l'écriture
+    // échoue, on ne l'affiche pas — sinon le comptable croirait la pièce émise
+    // alors qu'elle n'existe que sur ce poste.
+    final ok = await _pushToCloud('finance_docs', d.toMap(), docId: d.id);
+    if (!ok) throw const CloudWriteException('Document financier');
+
     financeDocs.insert(0, d);
     log(
       'Création document',
@@ -2086,12 +2259,26 @@ class AppState extends ChangeNotifier {
     final d = financeDocs[i];
     final newPaid = amount == null ? d.total : (d.amountPaid + amount);
     final paid = newPaid >= d.total - 0.005;
-    financeDocs[i] = d.copyWith(
+    final updated = d.copyWith(
       amountPaid: newPaid.clamp(0, d.total),
       status: paid ? InvoiceStatus.paid : d.status,
       paidAt: paid ? (date ?? DateTime.now()) : null,
       paymentMethod: method,
     );
+
+    // Serveur d'abord : un encaissement mal enregistré fausse la comptabilité
+    // et le solde client. En cas de refus, le solde affiché reste inchangé.
+    // Seuls les champs de paiement sont transmis (updateMask) : on n'écrase
+    // jamais les lignes ni la TVA validées à l'émission.
+    final ok = await _pushToCloud('finance_docs', {
+      'amountPaid': updated.amountPaid,
+      'status': updated.status.name,
+      'paidAt': updated.paidAt?.toUtc().toIso8601String(),
+      'paymentMethod': updated.paymentMethod?.name,
+    }, docId: docId);
+    if (!ok) throw const CloudWriteException('Encaissement');
+
+    financeDocs[i] = updated;
     log(
       'Encaissement',
       d.reference,
@@ -2112,13 +2299,35 @@ class AppState extends ChangeNotifier {
     final ti = bankTransactions.indexWhere((t) => t.id == transactionId);
     if (ti < 0) return;
     final t = bankTransactions[ti];
-    bankTransactions[ti] = t.copyWith(matched: true, matchedDocumentId: docId);
-    await markInvoicePaid(
-      docId,
-      amount: t.amount,
-      method: method,
-      date: t.date,
+
+    // La transaction est marquée AVANT l'encaissement : si celui-ci échoue,
+    // le rapprochement est annulé pour rester cohérent.
+    final linked = t.copyWith(matched: true, matchedDocumentId: docId);
+    final okTx = await _pushToCloud(
+      'bank_transactions',
+      linked.toMap(),
+      docId: linked.id,
     );
+    if (!okTx) throw const CloudWriteException('Rapprochement bancaire');
+
+    try {
+      await markInvoicePaid(
+        docId,
+        amount: t.amount,
+        method: method,
+        date: t.date,
+      );
+    } on CloudWriteException {
+      // Retour arrière : la transaction ne doit pas rester liée à une facture
+      // dont l'encaissement n'a pas été enregistré.
+      await _pushToCloud('bank_transactions', {
+        'matched': false,
+        'matchedDocumentId': null,
+      }, docId: linked.id);
+      rethrow;
+    }
+
+    bankTransactions[ti] = linked;
     log(
       'Rapprochement bancaire',
       t.counterparty,
@@ -2132,10 +2341,19 @@ class AppState extends ChangeNotifier {
   Future<void> unmatchTransaction(String transactionId) async {
     final ti = bankTransactions.indexWhere((t) => t.id == transactionId);
     if (ti < 0) return;
-    bankTransactions[ti] = bankTransactions[ti].copyWith(
+    final previous = bankTransactions[ti];
+    final updated = previous.copyWith(
       matched: false,
       matchedDocumentId: null,
     );
+
+    final ok = await _pushToCloud('bank_transactions', {
+      'matched': false,
+      'matchedDocumentId': null,
+    }, docId: previous.id);
+    if (!ok) throw const CloudWriteException('Détachement du rapprochement');
+
+    bankTransactions[ti] = updated;
     await _persist();
     notifyListeners();
   }
@@ -2143,6 +2361,10 @@ class AppState extends ChangeNotifier {
   /// Rapprochement automatique : associe les crédits non rapprochés aux
   /// factures impayées via communication structurée / référence / montant.
   /// Retourne le nombre de rapprochements effectués.
+  ///
+  /// Un échec serveur sur une transaction n'interrompt pas le lot : les
+  /// suivantes sont tentées, et seules celles réellement enregistrées sont
+  /// comptées.
   Future<int> autoReconcile({double threshold = 0.5}) async {
     final open = bankTransactions
         .where((t) => !t.matched && t.amount > 0)
@@ -2154,17 +2376,29 @@ class AppState extends ChangeNotifier {
       threshold: threshold,
     );
     var n = 0;
+    var failed = 0;
     for (final m in matches) {
       if (m.matched) {
-        await reconcileTransaction(
-          m.transaction.id,
-          m.document!.id,
-          method: m.method,
-        );
-        n++;
+        try {
+          await reconcileTransaction(
+            m.transaction.id,
+            m.document!.id,
+            method: m.method,
+          );
+          n++;
+        } on CloudWriteException {
+          failed++;
+        }
       }
     }
     if (n > 0) log('Rapprochement auto', '$n transaction(s)');
+    if (failed > 0) {
+      log(
+        'Rapprochement auto',
+        '$failed échec(s)',
+        detail: 'Enregistrement serveur refusé',
+      );
+    }
     return n;
   }
 
@@ -2175,11 +2409,23 @@ class AppState extends ChangeNotifier {
     final d = financeDocs[i];
     final p = ReminderService.plan(d, minDays: reminderConfig.minDaysBetween);
     if (!p.due) return p;
-    financeDocs[i] = d.copyWith(
+    final updated = d.copyWith(
       reminderLevel: p.nextLevel,
       lastReminderAt: DateTime.now(),
       status: d.status == InvoiceStatus.paid ? d.status : InvoiceStatus.overdue,
     );
+
+    // Serveur d'abord : la relance est horodatée. Si elle n'est pas
+    // enregistrée, le moteur automatique la renverrait au prochain passage —
+    // le client recevrait deux fois la même relance.
+    final ok = await _pushToCloud('finance_docs', {
+      'reminderLevel': updated.reminderLevel.name,
+      'lastReminderAt': updated.lastReminderAt?.toUtc().toIso8601String(),
+      'status': updated.status.name,
+    }, docId: docId);
+    if (!ok) throw const CloudWriteException('Relance');
+
+    financeDocs[i] = updated;
     log(
       'Relance facture',
       d.reference,
@@ -2192,15 +2438,27 @@ class AppState extends ChangeNotifier {
 
   /// Relance toutes les factures échues nécessitant une action.
   /// Retourne le nombre de relances envoyées.
+  /// Relance toutes les factures échues nécessitant une action.
+  /// Retourne le nombre de relances réellement enregistrées.
+  ///
+  /// Un refus serveur sur une facture n'interrompt pas le lot : les autres
+  /// relances sont tentées et seules celles persistées sont comptées.
   Future<int> sendAllDueReminders() async {
     final plans = ReminderService.pending(
       financeDocs,
       minDays: reminderConfig.minDaysBetween,
     );
+    var sent = 0;
     for (final p in plans) {
-      await sendReminder(p.document.id);
+      try {
+        await sendReminder(p.document.id);
+        sent++;
+      } on CloudWriteException {
+        // Facture ignorée : le compteur ne l'inclut pas, l'interface
+        // n'annonce donc pas une relance qui n'a pas été enregistrée.
+      }
     }
-    return plans.length;
+    return sent;
   }
 
   /// ── Moteur de relance automatique (planifié) ──
@@ -2225,7 +2483,11 @@ class AppState extends ChangeNotifier {
     );
     if (reminderConfig.autoSend) {
       for (final p in plans) {
-        await sendReminder(p.document.id);
+        try {
+          await sendReminder(p.document.id);
+        } on CloudWriteException {
+          // Une facture non enregistrée ne doit pas empêcher les suivantes.
+        }
       }
     }
     reminderConfig = reminderConfig.copyWith(
@@ -2307,6 +2569,12 @@ class AppState extends ChangeNotifier {
   Future<void> updateFinanceDoc(FinanceDocument d) async {
     final i = financeDocs.indexWhere((e) => e.id == d.id);
     if (i < 0) return;
+
+    // Serveur d'abord : une pièce comptable modifiée doit l'être en base,
+    // sinon la version affichée et la version comptable divergent.
+    final ok = await _pushToCloud('finance_docs', d.toMap(), docId: d.id);
+    if (!ok) throw const CloudWriteException('Document financier');
+
     financeDocs[i] = d;
     await _persist();
     notifyListeners();

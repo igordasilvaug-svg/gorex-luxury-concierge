@@ -309,7 +309,15 @@ class _AccountingScreenState extends State<AccountingScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => s.unmatchTransaction(t.id),
+                    onPressed: () async {
+                      try {
+                        await s.unmatchTransaction(t.id);
+                      } on CloudWriteException {
+                        if (context.mounted) {
+                          showCloudFailure(context, 'Détachement');
+                        }
+                      }
+                    },
                     child: const Text('Détacher'),
                   ),
                 ],
@@ -388,7 +396,14 @@ class _AccountingScreenState extends State<AccountingScreen> {
           ),
           TextButton(
             onPressed: () async {
-              await s.reconcileTransaction(t.id, d.id, method: match.method);
+              try {
+                await s.reconcileTransaction(t.id, d.id, method: match.method);
+              } on CloudWriteException {
+                if (context.mounted) {
+                  showCloudFailure(context, 'Rapprochement bancaire');
+                }
+                return;
+              }
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -447,11 +462,17 @@ class _AccountingScreenState extends State<AccountingScreen> {
                 ),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  await s.reconcileTransaction(
-                    t.id,
-                    d.id,
-                    method: PaymentMatchMethod.manual,
-                  );
+                  try {
+                    await s.reconcileTransaction(
+                      t.id,
+                      d.id,
+                      method: PaymentMatchMethod.manual,
+                    );
+                  } on CloudWriteException {
+                    if (context.mounted) {
+                      showCloudFailure(context, 'Rapprochement bancaire');
+                    }
+                  }
                 },
               ),
             ),
@@ -648,7 +669,14 @@ class _AccountingScreenState extends State<AccountingScreen> {
                     label: 'Relancer',
                     icon: Icons.send_outlined,
                     onPressed: () async {
-                      await s.sendReminder(d.id);
+                      try {
+                        await s.sendReminder(d.id);
+                      } on CloudWriteException {
+                        if (context.mounted) {
+                          showCloudFailure(context, 'Relance');
+                        }
+                        return;
+                      }
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -744,7 +772,14 @@ class _AccountingScreenState extends State<AccountingScreen> {
                       icon: Icons.send_outlined,
                       onPressed: () async {
                         Navigator.pop(ctx);
-                        await s.sendReminder(d.id);
+                        try {
+                          await s.sendReminder(d.id);
+                        } on CloudWriteException {
+                          if (context.mounted) {
+                            showCloudFailure(context, 'Relance');
+                          }
+                          return;
+                        }
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(

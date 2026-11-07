@@ -422,7 +422,16 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   OutlinedButton.icon(
                     onPressed: () async {
                       Navigator.pop(ctx);
-                      await s.markInvoicePaid(d.id);
+                      // Le paiement est écrit en base avant d'être affiché :
+                      // en cas de refus, aucun message de réussite.
+                      try {
+                        await s.markInvoicePaid(d.id);
+                      } on CloudWriteException {
+                        if (context.mounted) {
+                          showCloudFailure(context, 'Encaissement');
+                        }
+                        return;
+                      }
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -442,7 +451,14 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     onPressed: () async {
                       final plan = ReminderService.plan(d);
                       Navigator.pop(ctx);
-                      await s.sendReminder(d.id);
+                      try {
+                        await s.sendReminder(d.id);
+                      } on CloudWriteException {
+                        if (context.mounted) {
+                          showCloudFailure(context, 'Relance');
+                        }
+                        return;
+                      }
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -711,26 +727,35 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 onPressed: () async {
                   if (desc.text.trim().isEmpty || clientId == null) return;
                   final client = s.clientById(clientId);
-                  await s.createFinanceDoc(
-                    FinanceDocument(
-                      id: '',
-                      reference: '',
-                      type: type,
-                      clientId: clientId!,
-                      clientName: client?.fullName ?? 'Client',
-                      date: DateTime.now(),
-                      dueDate: DateTime.now().add(const Duration(days: 30)),
-                      lines: [
-                        FinanceLine(
-                          description: desc.text.trim(),
-                          unitPrice: double.tryParse(amount.text) ?? 0,
-                        ),
-                      ],
-                      status: type == FinanceDocType.quote
-                          ? InvoiceStatus.draft
-                          : InvoiceStatus.sent,
-                    ),
-                  );
+                  try {
+                    await s.createFinanceDoc(
+                      FinanceDocument(
+                        id: '',
+                        reference: '',
+                        type: type,
+                        clientId: clientId!,
+                        clientName: client?.fullName ?? 'Client',
+                        date: DateTime.now(),
+                        dueDate: DateTime.now().add(const Duration(days: 30)),
+                        lines: [
+                          FinanceLine(
+                            description: desc.text.trim(),
+                            unitPrice: double.tryParse(amount.text) ?? 0,
+                          ),
+                        ],
+                        status: type == FinanceDocType.quote
+                            ? InvoiceStatus.draft
+                            : InvoiceStatus.sent,
+                      ),
+                    );
+                  } on CloudWriteException {
+                    // La pièce n'a pas été enregistrée : on garde la fenêtre
+                    // ouverte pour ne pas perdre la saisie.
+                    if (ctx.mounted) {
+                      showCloudFailure(ctx, 'Création du document');
+                    }
+                    return;
+                  }
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
               ),

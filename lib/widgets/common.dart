@@ -486,3 +486,24 @@ class ErrorBanner extends StatelessWidget {
     );
   }
 }
+
+/// Signale visuellement qu'une écriture serveur a échoué.
+///
+/// Toutes les opérations sensibles (demande, réservation, facture,
+/// encaissement, rapprochement…) écrivent d'abord dans Firestore. Quand le
+/// serveur refuse l'écriture, l'interface ne doit jamais laisser croire que
+/// l'opération a réussi : cet utilitaire affiche un message rouge explicite.
+void showCloudFailure(BuildContext context, String action) {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger == null) return;
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(
+        '$action : la modification n\'a pas été enregistrée sur le serveur. '
+        'Vérifiez votre connexion puis réessayez.',
+      ),
+      backgroundColor: AppColors.urgent,
+      duration: const Duration(seconds: 6),
+    ),
+  );
+}
