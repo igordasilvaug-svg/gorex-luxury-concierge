@@ -152,6 +152,7 @@ class AppState extends ChangeNotifier {
     if (AppConfig.isProduction && restIdToken != null) {
       await loadTeamFromCloud();
       await loadOperationalFromCloud();
+      await loadProvidersFromCloud();
     }
 
     _ready = true;
@@ -801,6 +802,7 @@ class AppState extends ChangeNotifier {
     await _logAudit('Connexion', e, detail: 'firebase');
     await loadTeamFromCloud();
     await loadOperationalFromCloud();
+    await loadProvidersFromCloud();
     notifyListeners();
     return true;
   }
@@ -869,6 +871,7 @@ class AppState extends ChangeNotifier {
     // pour que « Équipe » et « Accès personnel » affichent les vrais comptes.
     await loadTeamFromCloud();
     await loadOperationalFromCloud();
+    await loadProvidersFromCloud();
     notifyListeners();
     return true;
   }
@@ -2608,10 +2611,124 @@ class AppState extends ChangeNotifier {
   }
 
   // ─────────────────────────── PROVIDERS ───────────────────────────
+
+  /// Crée un prestataire et l'enregistre sur le serveur.
+  ///
+  /// Un prestataire est une contrepartie contractuelle : sans écriture en
+  /// base, il n'existerait que sur ce poste et les réservations qui le
+  /// référencent deviendraient orphelines ailleurs.
+  Future<Provider> createProvider(Provider draft) async {
+    final p = Provider(
+      id: 'p_${DateTime.now().microsecondsSinceEpoch}',
+      name: draft.name,
+      category: draft.category,
+      domain: draft.domain,
+      country: draft.country,
+      city: draft.city,
+      contactName: draft.contactName,
+      contactEmail: draft.contactEmail,
+      contactPhone: draft.contactPhone,
+      rate: draft.rate,
+      commissionPercent: draft.commissionPercent,
+      trustLevel: draft.trustLevel,
+      active: draft.active,
+      documentNames: draft.documentNames,
+      hasContract: draft.hasContract,
+      internalNotes: draft.internalNotes,
+    );
+
+    final ok = await _pushToCloud('providers', p.toMap(), docId: p.id);
+    if (!ok) throw const CloudWriteException('Prestataire');
+
+    providers.insert(0, p);
+    log('Création prestataire', p.name, detail: p.category);
+    await _persist();
+    notifyListeners();
+    return p;
+  }
+
   Future<void> updateProvider(Provider p) async {
     final i = providers.indexWhere((e) => e.id == p.id);
     if (i < 0) return;
+
+    // Serveur d'abord : le tarif et la commission conditionnent les marges
+    // des réservations. Une valeur non enregistrée fausserait la facturation.
+    final ok = await _pushToCloud('providers', p.toMap(), docId: p.id);
+    if (!ok) throw const CloudWriteException('Prestataire');
+
     providers[i] = p;
+    log('Mise à jour prestataire', p.name);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Supprime un prestataire.
+  ///
+  /// Refusé si des réservations y sont rattachées : les supprimer laisserait
+  /// des rendez-vous sans contrepartie identifiée.
+  Future<void> deleteProvider(String id) async {
+    final i = providers.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+
+    final linked = bookings.where((b) => b.providerId == id).length;
+    if (linked > 0) {
+      throw CloudWriteException(
+        'Prestataire : $linked réservation(s) y sont rattachées. '
+        'Désactivez-le plutôt que de le supprimer',
+      );
+    }
+
+    final removed = providers[i];
+    final code = await RestAuthService.deleteDocument(
+      'providers/$id',
+      restIdToken ?? '',
+    );
+    // Un document déjà absent (404) n'est pas un échec : l'objectif est atteint.
+    if (code != 200 && code != 404) {
+      throw const CloudWriteException('Suppression du prestataire');
+    }
+
+    providers.removeAt(i);
+    log('Suppression prestataire', removed.name);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Charge le carnet de prestataires depuis Firestore.
+  ///
+  /// Sans cela, un prestataire saisi sur un poste restait invisible partout
+  /// ailleurs, et le formulaire de réservation proposait une liste vide.
+  Future<void> loadProvidersFromCloud() async {
+    final token = restIdToken;
+    if (token == null || token.isEmpty) return;
+
+    List<Map<String, dynamic>> rows;
+    try {
+      rows = await RestAuthService.fetchCollection('providers', token, limit: 500);
+      // Le repli SDK ne sert que si la voie REST n'a rien renvoyé.
+      if (rows.isEmpty && FirestoreService.available) {
+        try {
+          rows = await FirestoreService.fetchCollection('providers', limit: 500);
+        } catch (_) {}
+      }
+    } catch (_) {
+      return;
+    }
+
+    if (rows.isEmpty) return;
+
+    final loaded = <Provider>[];
+    for (final r in rows) {
+      try {
+        loaded.add(Provider.fromMap(Map<String, dynamic>.from(r)));
+      } catch (_) {
+        // Fiche incomplète : ignorée plutôt que de faire échouer le lot.
+      }
+    }
+    if (loaded.isEmpty) return;
+
+    loaded.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    providers = loaded;
     await _persist();
     notifyListeners();
   }

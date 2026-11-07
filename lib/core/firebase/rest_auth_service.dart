@@ -597,6 +597,24 @@ class RestAuthService {
     }
   }
 
+  /// Supprime un document.
+  ///
+  /// Retourne le code HTTP : 200 = supprimé, 404 = déjà absent (objectif
+  /// atteint, ce n'est pas une erreur), 0 = réseau injoignable.
+  static Future<int> deleteDocument(String path, String idToken) async {
+    try {
+      final resp = await http
+          .delete(
+            Uri.parse('$_firestoreBase/$path'),
+            headers: _jsonHeaders(idToken),
+          )
+          .timeout(_timeout);
+      return resp.statusCode;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   /// Lit un document unique. Retourne `null` s'il n'existe pas.
   static Future<Map<String, dynamic>?> fetchDocument(
     String path,

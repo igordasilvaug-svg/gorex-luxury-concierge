@@ -8,6 +8,7 @@ import '../../models/enums.dart';
 import '../../models/provider_booking.dart' as model;
 import '../../state/app_state.dart';
 import '../../widgets/common.dart';
+import 'provider_form_screen.dart';
 
 class ProvidersScreen extends StatefulWidget {
   const ProvidersScreen({super.key});
@@ -19,11 +20,21 @@ class ProvidersScreen extends StatefulWidget {
 class _ProvidersScreenState extends State<ProvidersScreen> {
   ServiceDomain? _filter;
 
+  /// Ouvre le formulaire prestataire (création ou modification).
+  Future<void> _openForm([model.Provider? existing]) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ProviderFormScreen(existing: existing),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
     var list = [...s.providers];
     if (_filter != null) list = list.where((p) => p.domain == _filter).toList();
+    list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     return SafeArea(
       child: Column(
@@ -39,6 +50,14 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                 Text(
                   '${s.providers.length} partenaires · réseau premium international',
                   style: AppTypography.caption,
+                ),
+                const SizedBox(height: 14),
+                // Le bouton est présent même si le carnet est vide : sans lui,
+                // le premier prestataire ne pouvait pas être créé.
+                GoldButton(
+                  label: 'Nouveau prestataire',
+                  icon: Icons.add,
+                  onPressed: () => _openForm(),
                 ),
                 const SizedBox(height: 14),
                 SingleChildScrollView(
@@ -70,12 +89,24 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
             ),
           ),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(24, 6, 24, 24),
-              itemCount: list.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, i) => _ProviderCard(p: list[i]),
-            ),
+            child: list.isEmpty
+                ? EmptyState(
+                    icon: Icons.handshake_outlined,
+                    title: 'Aucun prestataire',
+                    message: s.providers.isEmpty
+                        ? 'Ajoutez votre premier partenaire avec le bouton '
+                              'ci-dessus.'
+                        : 'Aucun prestataire pour ce filtre.',
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(24, 6, 24, 24),
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, i) => _ProviderCard(
+                      p: list[i],
+                      onTap: () => _openForm(list[i]),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -85,12 +116,13 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
 
 class _ProviderCard extends StatelessWidget {
   final model.Provider p;
-  const _ProviderCard({required this.p});
+  final VoidCallback onTap;
+  const _ProviderCard({required this.p, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return LuxuryCard(
-      onTap: () => _showDetail(context, p),
+      onTap: () => _showDetail(context, p, onTap),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -157,7 +189,7 @@ class _ProviderCard extends StatelessWidget {
     ),
   );
 
-  void _showDetail(BuildContext context, model.Provider p) {
+  void _showDetail(BuildContext context, model.Provider p, VoidCallback onEdit) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -231,6 +263,18 @@ class _ProviderCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(p.internalNotes!, style: AppTypography.bodyMedium),
               ],
+              const SizedBox(height: 20),
+              // Accès direct à la modification depuis la fiche détaillée :
+              // c'est le geste naturel après consultation.
+              GoldButton(
+                label: 'Modifier ce prestataire',
+                icon: Icons.edit_outlined,
+                fullWidth: true,
+                onPressed: () {
+                  Navigator.pop(context);
+                  onEdit();
+                },
+              ),
               const SizedBox(height: 22),
             ],
           ),
