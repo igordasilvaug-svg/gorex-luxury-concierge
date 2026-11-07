@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/enums.dart';
+import '../../models/finance.dart';
 import '../../models/provider_booking.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common.dart';
@@ -23,10 +24,76 @@ class _BookingsScreenState extends State<BookingsScreen> {
   /// Ouvre le formulaire de réservation (création ou modification).
   Future<void> _openForm([Booking? existing]) async {
     await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => BookingFormScreen(existing: existing),
+      MaterialPageRoute(builder: (_) => BookingFormScreen(existing: existing)),
+    );
+  }
+
+  /// Établit la facture correspondant à une réservation.
+  ///
+  /// Le montant vient du prix client négocié : aucune ressaisie, donc aucune
+  /// divergence possible entre la prestation vendue et la pièce comptable.
+  Future<void> _invoice(Booking b) async {
+    final s = context.read<AppState>();
+    final eur = NumberFormat.currency(
+      locale: 'fr_BE',
+      symbol: '€',
+      decimalDigits: 2,
+    );
+
+    final already = s.invoiceForBooking(b.id);
+    if (already != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Cette réservation est déjà facturée (${already.reference}). '
+            'Une prestation ne peut donner lieu qu\'à une seule facture.',
+          ),
+          backgroundColor: AppColors.statusWaiting,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceElevated,
+        title: const Text('Établir la facture ?'),
+        content: Text(
+          '${b.title}\n'
+          '${b.clientName}\n\n'
+          'Montant facturé : ${eur.format(b.clientPrice)}\n'
+          'TVA et numéro de pièce complétés automatiquement.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ANNULER'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('FACTURER'),
+          ),
+        ],
       ),
     );
+    if (ok != true) return;
+
+    try {
+      final doc = await s.createInvoiceFromBooking(b.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Facture ${doc.reference} établie.'),
+          backgroundColor: AppColors.statusConfirmed,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } on CloudWriteException {
+      if (!mounted) return;
+      showCloudFailure(context, 'Facturation de la réservation');
+    }
   }
 
   @override
@@ -104,6 +171,8 @@ class _BookingsScreenState extends State<BookingsScreen> {
                     itemBuilder: (context, i) => _BookingCard(
                       b: list[i],
                       onTap: () => _openForm(list[i]),
+                      onInvoice: () => _invoice(list[i]),
+                      invoice: s.invoiceForBooking(list[i].id),
                     ),
                   ),
           ),
@@ -116,7 +185,17 @@ class _BookingsScreenState extends State<BookingsScreen> {
 class _BookingCard extends StatelessWidget {
   final Booking b;
   final VoidCallback onTap;
-  const _BookingCard({required this.b, required this.onTap});
+  final VoidCallback onInvoice;
+
+  /// Facture déjà émise pour cette réservation (null si aucune).
+  final FinanceDocument? invoice;
+
+  const _BookingCard({
+    required this.b,
+    required this.onTap,
+    required this.onInvoice,
+    this.invoice,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +305,45 @@ class _BookingCard extends StatelessWidget {
                 icon: Icons.check_circle_outline,
               ),
             ],
+            const SizedBox(height: 12),
+            // Maillon réservation → facture : la pièce reprend le prix client
+            // sans ressaisie. Une fois émise, le bouton devient un rappel de
+            // la référence pour éviter la double facturation.
+            if (invoice != null)
+              Row(
+                children: [
+                  const Icon(
+                    Icons.receipt_long_outlined,
+                    size: 14,
+                    color: AppColors.statusConfirmed,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Facturée · ${invoice!.reference}',
+                      style: AppTypography.caption.copyWith(
+                        fontSize: 11,
+                        color: AppColors.statusConfirmed,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onInvoice,
+                  icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                  label: const Text('ÉTABLIR LA FACTURE'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.champagne,
+                    side: const BorderSide(color: AppColors.champagne),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    textStyle: AppTypography.label.copyWith(fontSize: 11),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

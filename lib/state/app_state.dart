@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/i18n/app_localizations.dart';
@@ -1186,6 +1187,22 @@ class AppState extends ChangeNotifier {
   List<Booking> bookingsForRequest(String requestId) =>
       bookings.where((b) => b.requestId == requestId).toList();
 
+  /// Pièces déjà émises pour une réservation donnée.
+  List<FinanceDocument> financeForBooking(String bookingId) =>
+      financeDocs.where((f) => f.bookingId == bookingId).toList();
+
+  /// Facture (au sens strict) déjà émise pour cette réservation, s'il y en a
+  /// une. Sert de garde-fou contre la double facturation : une prestation ne
+  /// peut donner lieu qu'à UNE facture.
+  FinanceDocument? invoiceForBooking(String bookingId) {
+    for (final f in financeDocs) {
+      if (f.bookingId == bookingId && f.type == FinanceDocType.invoice) {
+        return f;
+      }
+    }
+    return null;
+  }
+
   List<Booking> bookingsForClient(String clientId) =>
       bookings.where((b) => b.clientId == clientId).toList();
 
@@ -2052,6 +2069,7 @@ class AppState extends ChangeNotifier {
       clientId: draft.clientId,
       clientName: draft.clientName,
       requestId: draft.requestId,
+      bookingId: draft.bookingId,
       date: draft.date,
       dueDate: draft.dueDate,
       lines: draft.lines,
@@ -2086,6 +2104,76 @@ class AppState extends ChangeNotifier {
     await _persist();
     notifyListeners();
     return d;
+  }
+
+  /// Établit la facture d'une réservation.
+  ///
+  /// Une prestation vendue au client final doit produire une pièce comptable
+  /// sans ressaisie : le montant vient du prix client négocié, le libellé de
+  /// la réservation. Le coût fournisseur reste interne et n'apparaît JAMAIS
+  /// sur la facture du client.
+  ///
+  /// Refus explicite si une facture existe déjà : la double facturation d'un
+  /// même événement est une faute comptable, pas un détail d'affichage.
+  Future<FinanceDocument> createInvoiceFromBooking(String bookingId) async {
+    Booking? b;
+    for (final e in bookings) {
+      if (e.id == bookingId) {
+        b = e;
+        break;
+      }
+    }
+    if (b == null) {
+      throw const CloudWriteException(
+        'Réservation introuvable : impossible d\'établir la facture',
+      );
+    }
+    if (b.clientId.isEmpty) {
+      throw const CloudWriteException(
+        'Aucun client rattaché à cette réservation : facture impossible',
+      );
+    }
+    final existing = invoiceForBooking(bookingId);
+    if (existing != null) {
+      throw CloudWriteException(
+        'Une facture existe déjà pour cette réservation (${existing.reference})',
+      );
+    }
+    if (b.clientPrice <= 0) {
+      throw const CloudWriteException(
+        'Prix client à zéro : renseignez le prix avant de facturer',
+      );
+    }
+
+    final date = DateFormat('dd/MM/yyyy', 'fr_BE').format(b.date);
+    final draft = FinanceDocument(
+      id: '',
+      reference: '',
+      type: FinanceDocType.invoice,
+      clientId: b.clientId,
+      clientName: b.clientName,
+      bookingId: b.id,
+      date: DateTime.now(),
+      dueDate: DateTime.now().add(const Duration(days: 30)),
+      // Le coût fournisseur n'est pas facturé au client : seule la ligne au
+      // prix de vente figure sur la pièce.
+      lines: [
+        FinanceLine(
+          description: '${b.title} — $date ${b.time} · ${b.location}',
+          unitPrice: b.clientPrice,
+        ),
+      ],
+      status: InvoiceStatus.sent,
+      notes: 'Réservation ${b.reference}',
+    );
+
+    final doc = await createFinanceDoc(draft);
+    log(
+      'Facturation réservation',
+      b.reference,
+      detail: '${doc.reference} · ${b.clientPrice.toStringAsFixed(2)} EUR',
+    );
+    return doc;
   }
 
   /// Transmet une facture via l'Access Point Peppol configuré.

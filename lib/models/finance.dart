@@ -39,6 +39,13 @@ class FinanceDocument {
   final String clientId;
   final String clientName;
   final String? requestId;
+
+  /// Réservation à l'origine de la pièce.
+  ///
+  /// Permet de savoir qu'une facture a déjà été émise pour une prestation et
+  /// d'éviter la double facturation d'un même événement.
+  final String? bookingId;
+
   final DateTime date;
   final DateTime? dueDate;
   final List<FinanceLine> lines;
@@ -81,6 +88,7 @@ class FinanceDocument {
     required this.clientId,
     required this.clientName,
     this.requestId,
+    this.bookingId,
     required this.date,
     this.dueDate,
     this.lines = const [],
@@ -179,6 +187,7 @@ class FinanceDocument {
     'clientId': clientId,
     'clientName': clientName,
     'requestId': requestId,
+    'bookingId': bookingId,
     'date': date.toIso8601String(),
     'dueDate': dueDate?.toIso8601String(),
     'lines': lines.map((e) => e.toMap()).toList(),
@@ -207,6 +216,7 @@ class FinanceDocument {
     clientId: m['clientId'] as String,
     clientName: m['clientName'] as String,
     requestId: m['requestId'] as String?,
+    bookingId: m['bookingId'] as String?,
     date: DateTime.parse(m['date'] as String),
     dueDate: m['dueDate'] != null
         ? DateTime.parse(m['dueDate'] as String)
