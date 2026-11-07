@@ -463,6 +463,70 @@ class RestAuthService {
     final docs = decoded['documents'];
     if (docs is! List) return const [];
 
+    return _flattenDocs(docs);
+  }
+
+  /// Lit les documents d'une collection dont [field] vaut [value].
+  ///
+  /// Indispensable quand la règle de sécurité s'appuie sur `resource.data`
+  /// (par exemple « un client ne voit que ses propres demandes ») : Firestore
+  /// refuse alors une lecture de collection non filtrée (403), mais accepte
+  /// une requête qui filtre explicitement sur le champ en question.
+  static Future<List<Map<String, dynamic>>> queryCollection(
+    String collection,
+    String idToken, {
+    required String field,
+    required String value,
+    int limit = 200,
+  }) async {
+    final query = jsonEncode({
+      'structuredQuery': {
+        'from': [
+          {'collectionId': collection},
+        ],
+        'where': {
+          'fieldFilter': {
+            'field': {'fieldPath': field},
+            'op': 'EQUAL',
+            'value': {'stringValue': value},
+          },
+        },
+        'limit': limit,
+      },
+    });
+
+    http.Response resp;
+    try {
+      resp = await http
+          .post(
+            Uri.parse('$_firestoreBase:runQuery'),
+            headers: _jsonHeaders(idToken),
+            body: query,
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      return const [];
+    }
+    if (resp.statusCode != 200) return const [];
+
+    dynamic list;
+    try {
+      list = jsonDecode(resp.body);
+    } catch (_) {
+      return const [];
+    }
+    if (list is! List) return const [];
+
+    // `:runQuery` renvoie une liste d'objets `{document: ...}`.
+    final docs = <dynamic>[];
+    for (final item in list) {
+      if (item is Map && item['document'] is Map) docs.add(item['document']);
+    }
+    return _flattenDocs(docs);
+  }
+
+  /// Aplatit une liste de documents Firestore REST en cartes Dart.
+  static List<Map<String, dynamic>> _flattenDocs(List<dynamic> docs) {
     final out = <Map<String, dynamic>>[];
     for (final d in docs) {
       if (d is! Map) continue;

@@ -1430,21 +1430,30 @@ class AppState extends ChangeNotifier {
     final token = restIdToken;
     if (token == null || token.isEmpty) return;
 
-    // ⚠️ Réservé au personnel : la règle Firestore actuellement publiée
-    // n'autorise la LECTURE de la collection `requests` qu'aux comptes staff
-    // (elle s'appuie sur `ownsClientData()`, qui appelle get() et n'est donc
-    // pas évaluable sur une requête de collection). Un client qui tenterait
-    // cette lecture recevrait un 403 à chaque connexion.
-    // Une règle indexable sur `clientEmail` est prête (voir /tmp/rules2.json)
-    // mais n'a pas pu être publiée : l'API Rules refuse la mise à jour de la
-    // release. Tant que ce n'est pas fait, on n'interroge pas pour les clients.
-    if (!isStaff) return;
+    List<Map<String, dynamic>> rows;
 
-    var rows = await RestAuthService.fetchCollection('requests', token, limit: 300);
-    if (rows.isEmpty && FirestoreService.available) {
-      try {
-        rows = await FirestoreService.fetchCollection('requests', limit: 300);
-      } catch (_) {}
+    if (isStaff) {
+      // Le personnel voit toutes les demandes (règle `isStaff()`).
+      rows = await RestAuthService.fetchCollection('requests', token, limit: 300);
+      if (rows.isEmpty && FirestoreService.available) {
+        try {
+          rows = await FirestoreService.fetchCollection('requests', limit: 300);
+        } catch (_) {}
+      }
+    } else {
+      // Un client ne voit QUE ses propres demandes. La règle de sécurité
+      // s'appuie sur `resource.data.clientEmail` : Firestore exige donc une
+      // requête explicitement filtrée sur ce champ, sinon il répond 403
+      // (« Missing or insufficient permissions »).
+      final email = currentUser?.email.trim().toLowerCase();
+      if (email == null || email.isEmpty) return;
+      rows = await RestAuthService.queryCollection(
+        'requests',
+        token,
+        field: 'clientEmail',
+        value: email,
+        limit: 300,
+      );
     }
 
     if (rows.isNotEmpty) {
