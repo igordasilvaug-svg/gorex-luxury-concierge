@@ -1509,6 +1509,33 @@ class AppState extends ChangeNotifier {
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
 
+    // ── Fiches clients (donnée métier indispensable au personnel) ──
+    //
+    // SANS CECI, un membre du personnel voyait « Aucun client enregistré » :
+    // la connexion ne chargeait que les demandes, si bien qu'aucune
+    // réservation ni facture ne pouvait être rattachée à un client, alors
+    // même que les fiches existaient en base. Le personnel a le droit de
+    // lire toute la collection (`isStaff()` dans les règles Firestore).
+    if (staff) {
+      final clientRows = await read('clients');
+      if (clientRows.isNotEmpty) {
+        final loadedClients = <Client>[];
+        for (final r in clientRows) {
+          try {
+            loadedClients.add(Client.fromMap(Map<String, dynamic>.from(r)));
+          } catch (_) {
+            // Fiche ancienne ou incomplète : ignorée sans faire échouer le lot.
+          }
+        }
+        if (loadedClients.isNotEmpty) {
+          clients = loadedClients
+            ..sort((a, b) => a.fullName.toLowerCase().compareTo(
+                  b.fullName.toLowerCase(),
+                ));
+        }
+      }
+    }
+
     // ── Réservations ──
     final bookingRows = await read(
       'bookings',

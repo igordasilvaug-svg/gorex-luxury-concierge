@@ -5,8 +5,10 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/enums.dart';
+import '../../models/provider_booking.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common.dart';
+import 'booking_form_screen.dart';
 
 class BookingsScreen extends StatefulWidget {
   const BookingsScreen({super.key});
@@ -17,6 +19,15 @@ class BookingsScreen extends StatefulWidget {
 
 class _BookingsScreenState extends State<BookingsScreen> {
   BookingType? _filter;
+
+  /// Ouvre le formulaire de réservation (création ou modification).
+  Future<void> _openForm([Booking? existing]) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => BookingFormScreen(existing: existing),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +50,14 @@ class _BookingsScreenState extends State<BookingsScreen> {
                 Text(
                   '${s.bookings.length} réservations · gestion fournisseurs & marges',
                   style: AppTypography.caption,
+                ),
+                const SizedBox(height: 14),
+                // Le bouton est présent même sans réservation : sans lui,
+                // la première réservation ne pouvait pas être créée.
+                GoldButton(
+                  label: 'Nouvelle réservation',
+                  icon: Icons.add,
+                  onPressed: () => _openForm(),
                 ),
                 const SizedBox(height: 14),
                 SingleChildScrollView(
@@ -71,16 +90,21 @@ class _BookingsScreenState extends State<BookingsScreen> {
           ),
           Expanded(
             child: list.isEmpty
-                ? const EmptyState(
+                ? EmptyState(
                     icon: Icons.event_available_outlined,
                     title: 'Aucune réservation',
-                    message: 'Les réservations apparaîtront ici.',
+                    message: s.bookings.isEmpty
+                        ? 'Créez la première réservation avec le bouton ci-dessus.'
+                        : 'Aucune réservation pour ce filtre.',
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(24, 6, 24, 24),
                     itemCount: list.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, i) => _BookingCard(b: list[i]),
+                    itemBuilder: (context, i) => _BookingCard(
+                      b: list[i],
+                      onTap: () => _openForm(list[i]),
+                    ),
                   ),
           ),
         ],
@@ -90,8 +114,9 @@ class _BookingsScreenState extends State<BookingsScreen> {
 }
 
 class _BookingCard extends StatelessWidget {
-  final dynamic b;
-  const _BookingCard({required this.b});
+  final Booking b;
+  final VoidCallback onTap;
+  const _BookingCard({required this.b, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -100,106 +125,109 @@ class _BookingCard extends StatelessWidget {
       symbol: '€',
       decimalDigits: 0,
     );
-    return LuxuryCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(b.type.icon, size: 16, color: AppColors.champagne),
-              const SizedBox(width: 10),
-              Text(b.reference, style: AppTypography.caption),
-              const Spacer(),
-              StatusPill(label: b.status.label, color: b.status.color),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(b.title, style: AppTypography.title),
-          const SizedBox(height: 5),
-          Text(
-            b.providerName,
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.champagne,
+    return InkWell(
+      onTap: onTap,
+      child: LuxuryCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(b.type.icon, size: 16, color: AppColors.champagne),
+                const SizedBox(width: 10),
+                Text(b.reference, style: AppTypography.caption),
+                const Spacer(),
+                StatusPill(label: b.status.label, color: b.status.color),
+              ],
             ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 16,
-            runSpacing: 6,
-            children: [
-              _meta(Icons.person_outline, b.clientName),
-              _meta(
-                Icons.event_outlined,
-                DateFormat('dd/MM/yyyy', 'fr_BE').format(b.date),
-              ),
-              _meta(Icons.schedule_outlined, b.time),
-              _meta(Icons.place_outlined, b.location),
-            ],
-          ),
-          const Divider(height: 22),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Prix client',
-                      style: AppTypography.caption.copyWith(fontSize: 10),
-                    ),
-                    Text(
-                      eur.format(b.clientPrice),
-                      style: AppTypography.title.copyWith(fontSize: 15),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Coût fournisseur',
-                      style: AppTypography.caption.copyWith(fontSize: 10),
-                    ),
-                    Text(
-                      eur.format(b.providerPrice),
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: AppColors.greyLight,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Marge',
-                      style: AppTypography.caption.copyWith(fontSize: 10),
-                    ),
-                    Text(
-                      eur.format(b.margin),
-                      style: AppTypography.title.copyWith(
-                        fontSize: 15,
-                        color: AppColors.champagne,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (b.confirmed) ...[
             const SizedBox(height: 10),
-            const StatusPill(
-              label: 'Confirmée',
-              color: AppColors.statusConfirmed,
-              icon: Icons.check_circle_outline,
+            Text(b.title, style: AppTypography.title),
+            const SizedBox(height: 5),
+            Text(
+              b.providerName,
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.champagne,
+              ),
             ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 16,
+              runSpacing: 6,
+              children: [
+                _meta(Icons.person_outline, b.clientName),
+                _meta(
+                  Icons.event_outlined,
+                  DateFormat('dd/MM/yyyy', 'fr_BE').format(b.date),
+                ),
+                _meta(Icons.schedule_outlined, b.time),
+                _meta(Icons.place_outlined, b.location),
+              ],
+            ),
+            const Divider(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Prix client',
+                        style: AppTypography.caption.copyWith(fontSize: 10),
+                      ),
+                      Text(
+                        eur.format(b.clientPrice),
+                        style: AppTypography.title.copyWith(fontSize: 15),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Coût fournisseur',
+                        style: AppTypography.caption.copyWith(fontSize: 10),
+                      ),
+                      Text(
+                        eur.format(b.providerPrice),
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.greyLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Marge',
+                        style: AppTypography.caption.copyWith(fontSize: 10),
+                      ),
+                      Text(
+                        eur.format(b.margin),
+                        style: AppTypography.title.copyWith(
+                          fontSize: 15,
+                          color: AppColors.champagne,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (b.confirmed) ...[
+              const SizedBox(height: 10),
+              const StatusPill(
+                label: 'Confirmée',
+                color: AppColors.statusConfirmed,
+                icon: Icons.check_circle_outline,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
