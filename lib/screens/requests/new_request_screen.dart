@@ -425,22 +425,37 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
       return;
     }
     setState(() => _saving = true);
-    await s.createRequest(
-      clientId: _clientId!,
-      domain: _domain,
-      subService: _subService ?? ServiceCatalog.forDomain(_domain).first,
-      title: _title.text.trim(),
-      description: _description.text.trim(),
-      date: _date,
-      time: _time.format(context),
-      location: _location.text.trim().isEmpty
-          ? 'À préciser'
-          : _location.text.trim(),
-      urgency: _urgency,
-      budget: double.tryParse(_budget.text) ?? 0,
-      securityEscalation: _securityEscalation,
-      escalationNote: _securityEscalation ? 'Transmis à GOREX SECURITY' : null,
-    );
+    try {
+      await s.createRequest(
+        clientId: _clientId!,
+        domain: _domain,
+        subService: _subService ?? ServiceCatalog.forDomain(_domain).first,
+        title: _title.text.trim(),
+        description: _description.text.trim(),
+        date: _date,
+        time: _time.format(context),
+        location: _location.text.trim().isEmpty
+            ? 'À préciser'
+            : _location.text.trim(),
+        urgency: _urgency,
+        budget: double.tryParse(_budget.text) ?? 0,
+        securityEscalation: _securityEscalation,
+        escalationNote: _securityEscalation ? 'Transmis à GOREX SECURITY' : null,
+      );
+    } on CloudWriteException {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enregistrement impossible : la demande n\'a pas été créée. '
+            'Vérifiez votre connexion puis réessayez.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     setState(() => _saving = false);
     Navigator.pop(context);

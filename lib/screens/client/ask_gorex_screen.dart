@@ -358,24 +358,41 @@ class _AskGorexScreenState extends State<AskGorexScreen> {
     final title = _text.text.trim().length > 60
         ? '${_text.text.trim().substring(0, 57)}...'
         : _text.text.trim();
-    await s.createRequest(
-      clientId: client.id,
-      domain: _domain,
-      subService: ServiceCatalog.forDomain(_domain).first,
-      title: title,
-      description: _text.text.trim(),
-      date: _date,
-      time: _time.format(context),
-      location: _location.text.trim().isEmpty
-          ? 'À préciser'
-          : _location.text.trim(),
-      urgency: _urgency,
-      budget: double.tryParse(_budget.text) ?? 0,
-      securityEscalation: _domain == ServiceDomain.security,
-      escalationNote: _domain == ServiceDomain.security
-          ? 'Transmis à GOREX SECURITY'
-          : null,
-    );
+    try {
+      await s.createRequest(
+        clientId: client.id,
+        domain: _domain,
+        subService: ServiceCatalog.forDomain(_domain).first,
+        title: title,
+        description: _text.text.trim(),
+        date: _date,
+        time: _time.format(context),
+        location: _location.text.trim().isEmpty
+            ? 'À préciser'
+            : _location.text.trim(),
+        urgency: _urgency,
+        budget: double.tryParse(_budget.text) ?? 0,
+        securityEscalation: _domain == ServiceDomain.security,
+        escalationNote: _domain == ServiceDomain.security
+            ? 'Transmis à GOREX SECURITY'
+            : null,
+      );
+    } on CloudWriteException {
+      // Le serveur a refusé l'enregistrement : ne surtout pas annoncer
+      // une transmission qui n'a pas eu lieu.
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Envoi impossible : votre demande n\'a pas pu être enregistrée. '
+            'Vérifiez votre connexion puis réessayez.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     setState(() => _saving = false);
     Navigator.pop(context);

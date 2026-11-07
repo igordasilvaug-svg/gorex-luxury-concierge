@@ -151,6 +151,7 @@ class AppState extends ChangeNotifier {
     // plutôt que des exemples inventés.
     if (AppConfig.isProduction && restIdToken != null) {
       await loadTeamFromCloud();
+      await loadOperationalFromCloud();
     }
 
     _ready = true;
@@ -799,6 +800,7 @@ class AppState extends ChangeNotifier {
     await _persist();
     await _logAudit('Connexion', e, detail: 'firebase');
     await loadTeamFromCloud();
+    await loadOperationalFromCloud();
     notifyListeners();
     return true;
   }
@@ -866,6 +868,7 @@ class AppState extends ChangeNotifier {
     // Le jeton existe maintenant : on charge l'équipe réelle depuis Firestore
     // pour que « Équipe » et « Accès personnel » affichent les vrais comptes.
     await loadTeamFromCloud();
+    await loadOperationalFromCloud();
     notifyListeners();
     return true;
   }
@@ -1278,6 +1281,27 @@ class AppState extends ChangeNotifier {
     log('Création demande', r.reference, detail: title);
     await _persist();
     notifyListeners();
+
+    // Sauvegarde serveur OBLIGATOIRE : une demande est un engagement
+    // contractuel envers le client. Si l'écriture échoue, on retire la demande
+    // de l'état local et on signale l'échec, plutôt que d'afficher une demande
+    // que le serveur ne connaît pas.
+    //
+    // `clientEmail` est ajouté au document : c'est le champ sur lequel les
+    // règles de sécurité autorisent un client à relire SES demandes. Sans lui,
+    // la lecture de collection était refusée (403).
+    final payload = r.toMap();
+    final ownerEmail = client?.email.trim().toLowerCase();
+    if (ownerEmail != null && ownerEmail.isNotEmpty) {
+      payload['clientEmail'] = ownerEmail;
+    }
+    final ok = await _pushToCloud('requests', payload, docId: r.id);
+    if (!ok) {
+      requests.removeWhere((e) => e.id == r.id);
+      await _persist();
+      notifyListeners();
+      throw const CloudWriteException('Demande de service');
+    }
     return r;
   }
 
@@ -1298,11 +1322,21 @@ class AppState extends ChangeNotifier {
         detail: note,
       ),
     ];
-    requests[i] = r.copyWith(
+    final updated = r.copyWith(
       status: status,
       history: history,
       updatedAt: DateTime.now(),
     );
+
+    // Serveur d'abord : en cas de refus, le statut affiché reste l'ancien.
+    final ok = await _pushToCloud('requests', {
+      'status': updated.status.name,
+      'history': updated.history.map((e) => e.toMap()).toList(),
+      'updatedAt': updated.updatedAt.toUtc().toIso8601String(),
+    }, docId: id);
+    if (!ok) throw const CloudWriteException('Statut de la demande');
+
+    requests[i] = updated;
     log('Changement statut', r.reference, detail: status.code);
     await _persist();
     notifyListeners();
@@ -1312,7 +1346,7 @@ class AppState extends ChangeNotifier {
     final i = requests.indexWhere((r) => r.id == id);
     if (i < 0) return;
     final r = requests[i];
-    requests[i] = r.copyWith(
+    final updated = r.copyWith(
       responsibleId: user.id,
       responsibleName: user.fullName,
       history: [
@@ -1325,6 +1359,16 @@ class AppState extends ChangeNotifier {
       ],
       updatedAt: DateTime.now(),
     );
+
+    final ok = await _pushToCloud('requests', {
+      'responsibleId': updated.responsibleId,
+      'responsibleName': updated.responsibleName,
+      'history': updated.history.map((e) => e.toMap()).toList(),
+      'updatedAt': updated.updatedAt.toUtc().toIso8601String(),
+    }, docId: id);
+    if (!ok) throw const CloudWriteException('Assignation de la demande');
+
+    requests[i] = updated;
     log('Assignation', r.reference, detail: user.fullName);
     await _persist();
     notifyListeners();
@@ -1333,7 +1377,10 @@ class AppState extends ChangeNotifier {
   Future<void> updateRequest(ServiceRequest updated) async {
     final i = requests.indexWhere((r) => r.id == updated.id);
     if (i < 0) return;
-    requests[i] = updated.copyWith(updatedAt: DateTime.now());
+    final next = updated.copyWith(updatedAt: DateTime.now());
+    final ok = await _pushToCloud('requests', next.toMap(), docId: next.id);
+    if (!ok) throw const CloudWriteException('Demande de service');
+    requests[i] = next;
     await _persist();
     notifyListeners();
   }
@@ -1342,7 +1389,7 @@ class AppState extends ChangeNotifier {
     final i = requests.indexWhere((r) => r.id == id);
     if (i < 0) return;
     final r = requests[i];
-    requests[i] = r.copyWith(
+    final updated = r.copyWith(
       isSecurityEscalated: true,
       escalationNote:
           'Transmis à GOREX SECURITY le ${DateTime.now().toString().substring(0, 16)}',
@@ -1356,13 +1403,70 @@ class AppState extends ChangeNotifier {
       ],
       updatedAt: DateTime.now(),
     );
+
+    final ok = await _pushToCloud('requests', {
+      'isSecurityEscalated': true,
+      'escalationNote': updated.escalationNote,
+      'history': updated.history.map((e) => e.toMap()).toList(),
+      'updatedAt': updated.updatedAt.toUtc().toIso8601String(),
+    }, docId: id);
+    if (!ok) throw const CloudWriteException('Escalade sécurité');
+
+    requests[i] = updated;
     log('Escalade sécurité', r.reference);
     await _persist();
     notifyListeners();
   }
 
-  // ───────────────────── ESPACE PERSONNEL (MON COMPTE) ─────────────────────
+  // ───────────────────── CHARGEMENT DES DONNÉES OPÉRATIONNELLES ─────────────────────
 
+  /// Charge les demandes et les réservations réelles depuis Firestore.
+  ///
+  /// Sans cela, chaque connexion repartait d'une liste vide : les demandes
+  /// saisies lors d'une session précédente n'étaient jamais réaffichées.
+  /// Les erreurs de lecture sont silencieuses (liste vide) : elles ne doivent
+  /// pas bloquer la connexion.
+  Future<void> loadOperationalFromCloud() async {
+    final token = restIdToken;
+    if (token == null || token.isEmpty) return;
+
+    // ⚠️ Réservé au personnel : la règle Firestore actuellement publiée
+    // n'autorise la LECTURE de la collection `requests` qu'aux comptes staff
+    // (elle s'appuie sur `ownsClientData()`, qui appelle get() et n'est donc
+    // pas évaluable sur une requête de collection). Un client qui tenterait
+    // cette lecture recevrait un 403 à chaque connexion.
+    // Une règle indexable sur `clientEmail` est prête (voir /tmp/rules2.json)
+    // mais n'a pas pu être publiée : l'API Rules refuse la mise à jour de la
+    // release. Tant que ce n'est pas fait, on n'interroge pas pour les clients.
+    if (!isStaff) return;
+
+    var rows = await RestAuthService.fetchCollection('requests', token, limit: 300);
+    if (rows.isEmpty && FirestoreService.available) {
+      try {
+        rows = await FirestoreService.fetchCollection('requests', limit: 300);
+      } catch (_) {}
+    }
+
+    if (rows.isNotEmpty) {
+      final loaded = <ServiceRequest>[];
+      for (final r in rows) {
+        try {
+          loaded.add(ServiceRequest.fromMap(Map<String, dynamic>.from(r)));
+        } catch (_) {
+          // Document incomplet : ignoré plutôt que de faire échouer le lot.
+        }
+      }
+      if (loaded.isNotEmpty) {
+        requests = loaded
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      }
+    }
+
+    await _persist();
+    notifyListeners();
+  }
+
+  // ───────────────────── ESPACE PERSONNEL (MON COMPTE) ─────────────────────
   /// Enregistre les informations personnelles de l'utilisateur connecté,
   /// qu'il soit membre du personnel ou client.
   ///

@@ -343,6 +343,31 @@ class RequestDetailScreen extends StatelessWidget {
     );
   }
 
+  /// Exécute une action staff en annonçant clairement un échec serveur.
+  ///
+  /// Ces actions écrivent dans Firestore : si le serveur refuse, l'interface
+  /// ne doit pas laisser croire que le changement a été enregistré.
+  Future<void> _runStaffAction(
+    BuildContext context,
+    Future<void> Function() action,
+    String label,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await action();
+    } on CloudWriteException {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '$label : la modification n\'a pas été enregistrée sur le serveur. '
+            'Vérifiez votre connexion puis réessayez.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Widget _staffActions(BuildContext context, AppState s, dynamic r) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -353,7 +378,13 @@ class RequestDetailScreen extends StatelessWidget {
           children: RequestStatus.values.map((st) {
             final sel = r.status == st;
             return InkWell(
-              onTap: sel ? null : () => s.updateRequestStatus(r.id, st),
+              onTap: sel
+                  ? null
+                  : () => _runStaffAction(
+                        context,
+                        () => s.updateRequestStatus(r.id, st),
+                        'Statut',
+                      ),
               borderRadius: BorderRadius.circular(3),
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -395,7 +426,11 @@ class RequestDetailScreen extends StatelessWidget {
             ),
             if (!r.isSecurityEscalated)
               OutlinedButton.icon(
-                onPressed: () => s.escalateToSecurity(r.id),
+                onPressed: () => _runStaffAction(
+                  context,
+                  () => s.escalateToSecurity(r.id),
+                  'Escalade sécurité',
+                ),
                 icon: const Icon(Icons.shield_outlined, size: 15),
                 label: const Text('TRANSMETTRE GOREX SECURITY'),
               ),
@@ -435,7 +470,11 @@ class RequestDetailScreen extends StatelessWidget {
                 ),
                 subtitle: Text(u.role.label, style: AppTypography.caption),
                 onTap: () {
-                  s.assignRequest(requestId, u);
+                  _runStaffAction(
+                    context,
+                    () => s.assignRequest(requestId, u),
+                    'Assignation',
+                  );
                   Navigator.pop(context);
                 },
               ),
