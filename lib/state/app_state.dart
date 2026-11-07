@@ -200,12 +200,17 @@ class AppState extends ChangeNotifier {
         (a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()),
       );
 
-    // Ré-aligne la session courante sur la fiche fraîche (rôle à jour).
+    // Ré-aligne la session courante sur la fiche fraîche.
+    // Le NOM et le TÉLÉPHONE doivent aussi être repris : sans cela, une valeur
+    // enregistrée lors d'une session précédente n'était jamais réaffichée
+    // (champ vide à l'écran alors que la base la contenait).
     final email = currentUser?.email.toLowerCase();
     if (email != null) {
       for (final fresh in loaded) {
         if (fresh.email.toLowerCase() == email) {
           currentUser = currentUser!.copyWith(
+            fullName: fresh.fullName,
+            phone: fresh.phone,
             role: fresh.role,
             title: fresh.title,
             active: fresh.active,
@@ -931,13 +936,23 @@ class AppState extends ChangeNotifier {
   AppUser? _profileFromStaff(Map<String, dynamic> r) {
     final email = (r['email'] as String?) ?? '';
     if (email.isEmpty) return null;
+    // `displayName` est le nom officiel côté `staff` ; `fullName` n'existe que
+    // si un enregistrement a été fait depuis le formulaire « Mon compte ».
+    final name = (r['displayName'] as String?) ??
+        (r['fullName'] as String?) ??
+        email;
+    final phone = (r['phone'] as String?) ?? '';
     return AppUser(
       id: (r['uid'] as String?) ?? (r['id'] as String?) ?? email,
-      fullName: (r['displayName'] as String?) ?? email,
+      fullName: name,
       email: email,
       password: '',
       role: UserRole.fromName((r['role'] as String?) ?? 'concierge'),
       title: r['department'] as String?,
+      // Le téléphone doit être relu en base : sans cela, la valeur enregistrée
+      // n'est jamais réaffichée après une reconnexion (champ vide à l'écran
+      // alors que la base la contient).
+      phone: phone.trim().isEmpty ? null : phone.trim(),
       active: (r['active'] as bool?) ?? true,
       mustChangePassword: (r['mustChangePassword'] as bool?) ?? false,
     );
