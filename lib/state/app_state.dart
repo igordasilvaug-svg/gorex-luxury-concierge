@@ -1373,13 +1373,56 @@ class AppState extends ChangeNotifier {
       phone: phone.trim().isEmpty ? null : phone.trim(),
     );
 
+    final clientId = updated.clientId;
+
+    // Champs envoyés à la fiche `clients`. La règle Firestore
+    // `onlyOwnContactFields()` n'autorise QUE ces clés pour une
+    // auto-modification : y ajouter ne serait-ce que `displayName` fait
+    // refuser l'écriture en 403.
+    final Map<String, dynamic> clientPayload = {
+      'fullName': name,
+      'phone': updated.phone ?? '',
+      if (language != null) 'language': language,
+    };
+
+    // Champs envoyés à la fiche `staff` (membre du personnel).
+    final Map<String, dynamic> staffPayload = {
+      'displayName': name,
+      'fullName': name,
+      'phone': updated.phone ?? '',
+    };
+
+    // ── ORDRE VOLONTAIRE : le serveur d'abord, l'état local ensuite ──
+    // Si l'écriture échoue, rien n'est modifié à l'écran : l'utilisateur ne
+    // voit jamais une valeur que la base ne contient pas. C'est la garantie
+    // demandée (pas de modification « simplement affichée temporairement »).
+    final bool ok;
+    if (updated.role == UserRole.vipClient) {
+      final id = clientId ?? '';
+      if (id.isEmpty) throw const CloudWriteException('Profil');
+      ok = await _pushToCloud('clients', clientPayload, docId: id);
+    } else {
+      ok = await _pushToCloud('staff', staffPayload, docId: updated.id);
+    }
+    if (!ok) throw const CloudWriteException('Profil');
+
+    // Le profil d'identité reste synchronisé pour la lecture du rôle
+    // par les règles de sécurité.
+    if (restUid != null) {
+      await _pushToCloud('user_profiles', {
+        'email': updated.email,
+        'displayName': name,
+        if (language != null) 'language': language,
+      }, docId: restUid);
+    }
+
+    // ── Le serveur a accepté : on reflète la valeur localement ──
     users = [
       for (final u in users) u.id == updated.id ? updated : u,
     ];
     currentUser = updated;
 
     // Côté client, le nom et le téléphone vivent aussi dans la fiche `clients`.
-    final clientId = updated.clientId;
     if (updated.role == UserRole.vipClient && clientId != null) {
       final i = clients.indexWhere((e) => e.id == clientId);
       if (i >= 0) {
@@ -1394,30 +1437,6 @@ class AppState extends ChangeNotifier {
     log('Mise à jour profil personnel', updated.email);
     await _persist();
     notifyListeners();
-
-    final Map<String, dynamic> payload = {
-      'displayName': name,
-      'fullName': name,
-      'phone': updated.phone ?? '',
-      if (language != null) 'language': language,
-    };
-
-    final bool ok;
-    if (updated.role == UserRole.vipClient) {
-      final id = clientId ?? '';
-      if (id.isEmpty) throw const CloudWriteException('Profil');
-      ok = await _pushToCloud('clients', payload, docId: id);
-    } else {
-      ok = await _pushToCloud('staff', payload, docId: updated.id);
-    }
-    // Le profil d'identité reste synchronisé pour l'isolation des données.
-    if (restUid != null) {
-      await _pushToCloud('user_profiles', {
-        'email': updated.email,
-        'displayName': name,
-      }, docId: restUid);
-    }
-    if (!ok) throw const CloudWriteException('Profil');
   }
 
   // ─────────────────────────── CLIENTS ───────────────────────────

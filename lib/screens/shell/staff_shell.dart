@@ -31,6 +31,7 @@ import '../legal/privacy_policy_screen.dart';
 import '../legal/user_guide_screen.dart';
 import '../legal/legal_hub_screen.dart';
 import '../about/about_screen.dart';
+import '../account/my_account_edit_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import 'app_shell.dart';
 
@@ -191,6 +192,15 @@ class _StaffShellState extends State<StaffShell> {
         Icons.cloud_sync,
         const BackupScreen(),
         permission: 'user_access',
+      ),
+      // `embedded: true` : l'écran est affiché comme onglet du shell, il n'y a
+      // donc aucune route à refermer après l'enregistrement (sinon
+      // Navigator.pop() sortirait du shell lui-même).
+      _NavItem(
+        'Mon compte',
+        Icons.person_outline,
+        Icons.person,
+        const MyAccountEditScreen(embedded: true),
       ),
       _NavItem(
         s.tr('nav.guide'),
