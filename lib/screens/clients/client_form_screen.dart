@@ -75,8 +75,7 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
     _category = c?.category ?? ClientCategory.individualVip;
     _confidentiality = c?.confidentiality ?? ConfidentialityLevel.elevated;
     _tierId =
-        c?.subscriptionTierId ??
-        (s.tiers.isNotEmpty ? s.tiers.first.id : null);
+        c?.subscriptionTierId ?? (s.tiers.isNotEmpty ? s.tiers.first.id : null);
     _conciergeId = c?.assignedConciergeId;
     _isBusiness = c?.isBusiness ?? false;
     _peppolEnabled = c?.peppolEnabled ?? false;
@@ -121,8 +120,9 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
         language: _language.text.trim(),
         country: _country.text.trim(),
         city: _city.text.trim(),
-        personalAssistant:
-            _assistant.text.trim().isEmpty ? null : _assistant.text.trim(),
+        personalAssistant: _assistant.text.trim().isEmpty
+            ? null
+            : _assistant.text.trim(),
         assistantPhone: _assistantPhone.text.trim().isEmpty
             ? null
             : _assistantPhone.text.trim(),
@@ -178,8 +178,7 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
     final s = context.watch<AppState>();
     final vat = VatService.validateVat(_vatNumber.text);
     final bce = VatService.validateBelgianCompanyNumber(_companyNumber.text);
-    final peppolEligible =
-        _isBusiness && vat.valid && vat.isBelgian;
+    final peppolEligible = _isBusiness && vat.valid && vat.isBelgian;
 
     return Scaffold(
       appBar: AppBar(
@@ -197,7 +196,9 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  _isEdit ? 'MISE À JOUR DU PROFIL' : 'CRÉATION D\'UN PROFIL CLIENT',
+                  _isEdit
+                      ? 'MISE À JOUR DU PROFIL'
+                      : 'CRÉATION D\'UN PROFIL CLIENT',
                   style: AppTypography.eyebrow,
                 ),
                 const SizedBox(height: 8),
@@ -250,7 +251,9 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
                   style: AppTypography.bodyMedium.copyWith(
                     color: AppColors.white,
                   ),
-                  decoration: const InputDecoration(hintText: 'nom@exemple.com'),
+                  decoration: const InputDecoration(
+                    hintText: 'nom@exemple.com',
+                  ),
                   validator: (v) {
                     final t = v?.trim() ?? '';
                     if (t.isEmpty) return 'E-mail requis';
@@ -269,8 +272,9 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
                     color: AppColors.white,
                   ),
                   decoration: const InputDecoration(hintText: '+32 ...'),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Téléphone requis' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Téléphone requis'
+                      : null,
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -309,7 +313,9 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
                             style: AppTypography.bodyMedium.copyWith(
                               color: AppColors.white,
                             ),
-                            decoration: const InputDecoration(hintText: 'Ville'),
+                            decoration: const InputDecoration(
+                              hintText: 'Ville',
+                            ),
                             validator: (v) => (v == null || v.trim().isEmpty)
                                 ? 'Requis'
                                 : null,
@@ -403,9 +409,10 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
                     onChanged: (_) => setState(() {}),
                   ),
                   if (_companyNumber.text.trim().isNotEmpty)
-                    _validationHint(bce.valid, bce.valid
-                        ? 'Numéro BCE valide'
-                        : bce.message),
+                    _validationHint(
+                      bce.valid,
+                      bce.valid ? 'Numéro BCE valide' : bce.message,
+                    ),
                   const SizedBox(height: 14),
                   _label('Numéro de TVA'),
                   TextFormField(
@@ -577,7 +584,10 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(t.toUpperCase(), style: AppTypography.label.copyWith(fontSize: 10)),
+        Text(
+          t.toUpperCase(),
+          style: AppTypography.label.copyWith(fontSize: 10),
+        ),
         const SizedBox(height: 8),
         const GoldDivider(width: 30),
       ],

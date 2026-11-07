@@ -41,7 +41,8 @@ class CloudWriteException implements Exception {
   final String what;
 
   @override
-  String toString() => '$what : la sauvegarde sur le serveur a échoué. '
+  String toString() =>
+      '$what : la sauvegarde sur le serveur a échoué. '
       'La modification n\'a pas été conservée.';
 }
 
@@ -637,23 +638,26 @@ class AppState extends ChangeNotifier {
     if (!FirestoreService.available) return false;
     if (_liveSync) return true;
     _liveSync = true;
-    _cloudSub = FirestoreService.watchState().listen((event) async {
-      if (_applyingRemote) return;
-      if (event.payload.isEmpty) return;
-      _applyingRemote = true;
-      try {
-        final before = lastRemoteUpdate;
-        if (before != null && !event.syncedAt.isAfter(before)) return;
-        await importMap(event.payload, closeSession: false);
-        lastRemoteUpdate = event.syncedAt;
-      } catch (e) {
-        if (kDebugMode) debugPrint('[Cloud] apply remote failed: $e');
-      } finally {
-        _applyingRemote = false;
-      }
-    }, onError: (e) {
-      if (kDebugMode) debugPrint('[Cloud] live stream error: $e');
-    });
+    _cloudSub = FirestoreService.watchState().listen(
+      (event) async {
+        if (_applyingRemote) return;
+        if (event.payload.isEmpty) return;
+        _applyingRemote = true;
+        try {
+          final before = lastRemoteUpdate;
+          if (before != null && !event.syncedAt.isAfter(before)) return;
+          await importMap(event.payload, closeSession: false);
+          lastRemoteUpdate = event.syncedAt;
+        } catch (e) {
+          if (kDebugMode) debugPrint('[Cloud] apply remote failed: $e');
+        } finally {
+          _applyingRemote = false;
+        }
+      },
+      onError: (e) {
+        if (kDebugMode) debugPrint('[Cloud] live stream error: $e');
+      },
+    );
     notifyListeners();
     return true;
   }
@@ -749,7 +753,10 @@ class AppState extends ChangeNotifier {
     final uid = res.uid;
     if (uid != null) {
       try {
-        final rows = await FirestoreService.fetchCollection('staff', limit: 100);
+        final rows = await FirestoreService.fetchCollection(
+          'staff',
+          limit: 100,
+        );
         for (final r in rows) {
           if (r['uid'] == uid || r['id'] == uid) {
             profile = _profileFromStaff(r);
@@ -761,7 +768,10 @@ class AppState extends ChangeNotifier {
     // Pas du personnel → tentative de résolution en tant que client.
     if (profile == null) {
       try {
-        final rows = await FirestoreService.fetchCollection('clients', limit: 300);
+        final rows = await FirestoreService.fetchCollection(
+          'clients',
+          limit: 300,
+        );
         for (final r in rows) {
           final re = (r['email'] as String?)?.toLowerCase();
           if (re != null && re == e) {
@@ -945,9 +955,8 @@ class AppState extends ChangeNotifier {
     if (email.isEmpty) return null;
     // `displayName` est le nom officiel côté `staff` ; `fullName` n'existe que
     // si un enregistrement a été fait depuis le formulaire « Mon compte ».
-    final name = (r['displayName'] as String?) ??
-        (r['fullName'] as String?) ??
-        email;
+    final name =
+        (r['displayName'] as String?) ?? (r['fullName'] as String?) ?? email;
     final phone = (r['phone'] as String?) ?? '';
     return AppUser(
       id: (r['uid'] as String?) ?? (r['id'] as String?) ?? email,
@@ -985,15 +994,20 @@ class AppState extends ChangeNotifier {
   /// En production (session Firebase nominative), le mot de passe est mis à jour
   /// côté Firebase après ré-authentification ; en mode local, il est mis à jour
   /// dans l'état persisté.
-  Future<void> changeOwnPassword(String newPassword,
-      {String? currentPassword}) async {
+  Future<void> changeOwnPassword(
+    String newPassword, {
+    String? currentPassword,
+  }) async {
     final u = currentUser;
     if (u == null) return;
 
     // Session REST (voie principale sur le Web) : mise à jour via l'API
     // officielle avec le jeton obtenu à la connexion.
     if (restIdToken != null && restUid != null) {
-      final ok = await RestAuthService.updatePassword(restIdToken!, newPassword);
+      final ok = await RestAuthService.updatePassword(
+        restIdToken!,
+        newPassword,
+      );
       if (!ok) return; // échec : on ne modifie pas l'état local
       await RestAuthService.clearMustChangePassword(restUid!, restIdToken!);
     } else if (FirebaseAuthService.isNamedUser) {
@@ -1028,11 +1042,9 @@ class AppState extends ChangeNotifier {
       for (final r in rows) {
         final email = (r['email'] as String?)?.toLowerCase();
         if (email != null && email == currentUser?.email.toLowerCase()) {
-          await FirestoreService.updateDocument(
-            'staff',
-            (r['id'] as String),
-            {'mustChangePassword': !clearMustChange},
-          );
+          await FirestoreService.updateDocument('staff', (r['id'] as String), {
+            'mustChangePassword': !clearMustChange,
+          });
           break;
         }
       }
@@ -1051,8 +1063,7 @@ class AppState extends ChangeNotifier {
   }
 
   /// Écrit une entrée dans le journal d'audit (local + Firestore si dispo).
-  Future<void> _logAudit(String action, String target,
-      {String? detail}) async {
+  Future<void> _logAudit(String action, String target, {String? detail}) async {
     log(action, target);
     final payload = {
       'type': 'auth_event',
@@ -1479,15 +1490,15 @@ class AppState extends ChangeNotifier {
           if (rows.isNotEmpty) return rows;
           if (FirestoreService.available) {
             try {
-              return await FirestoreService.fetchCollection(collection,
-                  limit: 300);
+              return await FirestoreService.fetchCollection(
+                collection,
+                limit: 300,
+              );
             } catch (_) {}
           }
           return rows;
         }
-        if (ownerField == null ||
-            ownerValue == null ||
-            ownerValue.isEmpty) {
+        if (ownerField == null || ownerValue == null || ownerValue.isEmpty) {
           return const [];
         }
         return await RestAuthService.queryCollection(
@@ -1549,9 +1560,10 @@ class AppState extends ChangeNotifier {
         }
         if (loadedClients.isNotEmpty) {
           clients = loadedClients
-            ..sort((a, b) => a.fullName.toLowerCase().compareTo(
-                  b.fullName.toLowerCase(),
-                ));
+            ..sort(
+              (a, b) =>
+                  a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()),
+            );
         }
       }
     }
@@ -1564,8 +1576,7 @@ class AppState extends ChangeNotifier {
     );
     final loadedBookings = decode(bookingRows, Booking.fromMap);
     if (loadedBookings.isNotEmpty) {
-      bookings = loadedBookings
-        ..sort((a, b) => b.date.compareTo(a.date));
+      bookings = loadedBookings..sort((a, b) => b.date.compareTo(a.date));
     }
 
     // ── Itinéraires ──
@@ -1675,9 +1686,7 @@ class AppState extends ChangeNotifier {
     }
 
     // ── Le serveur a accepté : on reflète la valeur localement ──
-    users = [
-      for (final u in users) u.id == updated.id ? updated : u,
-    ];
+    users = [for (final u in users) u.id == updated.id ? updated : u];
     currentUser = updated;
 
     // Côté client, le nom et le téléphone vivent aussi dans la fiche `clients`.
@@ -2334,8 +2343,9 @@ class AppState extends ChangeNotifier {
     log('Configuration Peppol', config.enabled ? 'Activée' : 'Désactivée');
     await _persist();
     notifyListeners();
-    final ok = await _pushToCloud('company', {'peppol': config.toMap()},
-        docId: _companyDocId);
+    final ok = await _pushToCloud('company', {
+      'peppol': config.toMap(),
+    }, docId: _companyDocId);
     if (!ok) throw const CloudWriteException('Configuration Peppol');
   }
 
@@ -2357,8 +2367,11 @@ class AppState extends ChangeNotifier {
     log('Mise à jour coordonnées société', profile.legalName);
     await _persist();
     notifyListeners();
-    final ok = await _pushToCloud('company', company.toMap(),
-        docId: _companyDocId);
+    final ok = await _pushToCloud(
+      'company',
+      company.toMap(),
+      docId: _companyDocId,
+    );
     if (!ok) {
       throw const CloudWriteException('Coordonnées de la société');
     }
@@ -2460,10 +2473,7 @@ class AppState extends ChangeNotifier {
     final ti = bankTransactions.indexWhere((t) => t.id == transactionId);
     if (ti < 0) return;
     final previous = bankTransactions[ti];
-    final updated = previous.copyWith(
-      matched: false,
-      matchedDocumentId: null,
-    );
+    final updated = previous.copyWith(matched: false, matchedDocumentId: null);
 
     final ok = await _pushToCloud('bank_transactions', {
       'matched': false,
@@ -2630,8 +2640,9 @@ class AppState extends ChangeNotifier {
     log('Configuration relances', config.enabled ? 'Activée' : 'Désactivée');
     await _persist();
     notifyListeners();
-    final ok = await _pushToCloud('company', {'reminderConfig': config.toMap()},
-        docId: _companyDocId);
+    final ok = await _pushToCloud('company', {
+      'reminderConfig': config.toMap(),
+    }, docId: _companyDocId);
     if (!ok) throw const CloudWriteException('Configuration des relances');
   }
 
@@ -2792,11 +2803,18 @@ class AppState extends ChangeNotifier {
 
     List<Map<String, dynamic>> rows;
     try {
-      rows = await RestAuthService.fetchCollection('providers', token, limit: 500);
+      rows = await RestAuthService.fetchCollection(
+        'providers',
+        token,
+        limit: 500,
+      );
       // Le repli SDK ne sert que si la voie REST n'a rien renvoyé.
       if (rows.isEmpty && FirestoreService.available) {
         try {
-          rows = await FirestoreService.fetchCollection('providers', limit: 500);
+          rows = await FirestoreService.fetchCollection(
+            'providers',
+            limit: 500,
+          );
         } catch (_) {}
       }
     } catch (_) {

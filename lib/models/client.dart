@@ -34,14 +34,19 @@ class Client {
   // ─── Identification & facturation ───
   /// true = client professionnel/indépendant (facturation B2B)
   final bool isBusiness;
+
   /// Numéro d'entreprise BCE belge (ex. 0123.456.789)
   final String? companyNumber;
+
   /// Numéro de TVA (ex. BE0123456789) — Belgique ou étranger
   final String? vatNumber;
+
   /// Adresse de facturation (si différente)
   final String? billingAddress;
+
   /// Adresse e-mail dédiée à la facturation
   final String? billingEmail;
+
   /// Le client accepte la réception des factures via le réseau Peppol
   final bool peppolEnabled;
 

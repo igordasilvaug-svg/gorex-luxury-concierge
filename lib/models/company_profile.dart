@@ -40,18 +40,17 @@ class CompanyProfile {
   });
 
   /// Adresse complète sur une ligne (émetteur).
-  String get fullAddress =>
-      '$addressLine, $postalCode $city, $country';
+  String get fullAddress => '$addressLine, $postalCode $city, $country';
 
   /// Liste des champs encore laissés à leur valeur d'exemple (placeholder).
   /// Sert à alerter la direction tant que les coordonnées réelles de
   /// Gorex Group n'ont pas été saisies.
   List<String> get missingFields {
     final missing = <String>[];
-    if (companyNumber.replaceAll(RegExp(r'[^0-9]'), '').replaceAll(
-          RegExp(r'^0+$'),
-          '',
-        ).isEmpty ||
+    if (companyNumber
+            .replaceAll(RegExp(r'[^0-9]'), '')
+            .replaceAll(RegExp(r'^0+$'), '')
+            .isEmpty ||
         companyNumber == '0000.000.000') {
       missing.add('Numéro d\'entreprise (BCE)');
     }

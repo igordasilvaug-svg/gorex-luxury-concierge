@@ -100,7 +100,8 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
                       if (v == null || v.isEmpty) {
                         return 'Saisissez le mot de passe reçu';
                       }
-                      if (user != null && user.password.isNotEmpty &&
+                      if (user != null &&
+                          user.password.isNotEmpty &&
                           v != user.password) {
                         return 'Mot de passe incorrect';
                       }
@@ -122,8 +123,9 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
                         color: AppColors.grey,
                       ),
                     ),
-                    validator: (v) =>
-                        (v == null || v.length < 8) ? '8 caractères minimum' : null,
+                    validator: (v) => (v == null || v.length < 8)
+                        ? '8 caractères minimum'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -150,8 +152,9 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
-                    validator: (v) =>
-                        v != _next.text ? 'Les mots de passe ne correspondent pas' : null,
+                    validator: (v) => v != _next.text
+                        ? 'Les mots de passe ne correspondent pas'
+                        : null,
                   ),
                   const SizedBox(height: 26),
                   GoldButton(

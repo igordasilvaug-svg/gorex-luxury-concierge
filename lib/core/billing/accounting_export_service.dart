@@ -26,11 +26,12 @@ class AccountingExportService {
     List<FinanceDocument> documents, {
     int? year,
   }) {
-    final docs = documents
-        .where((d) => d.type == FinanceDocType.invoice)
-        .where((d) => year == null || d.date.year == year)
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final docs =
+        documents
+            .where((d) => d.type == FinanceDocType.invoice)
+            .where((d) => year == null || d.date.year == year)
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
 
     String dec(double v) => v.toStringAsFixed(2).replaceAll('.', ',');
     String d(DateTime? v) =>
@@ -57,9 +58,11 @@ class AccountingExportService {
           dec(doc.balance),
           esc(doc.status.label),
           esc(doc.vatMention ?? ''),
-          esc(doc.peppolStatus == PeppolStatus.notApplicable
-              ? 'N/A'
-              : doc.peppolStatus.label),
+          esc(
+            doc.peppolStatus == PeppolStatus.notApplicable
+                ? 'N/A'
+                : doc.peppolStatus.label,
+          ),
           d(doc.dueDate),
         ].join(';'),
       );
@@ -82,11 +85,12 @@ class AccountingExportService {
     String? companyVat,
     int? year,
   }) async {
-    final docs = documents
-        .where((d) => d.type == FinanceDocType.invoice)
-        .where((d) => year == null || d.date.year == year)
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final docs =
+        documents
+            .where((d) => d.type == FinanceDocType.invoice)
+            .where((d) => year == null || d.date.year == year)
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
 
     final gold = PdfColor.fromInt(0xFFC6A15B);
     final dark = PdfColor.fromInt(0xFF111114);
@@ -132,9 +136,15 @@ class AccountingExportService {
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  pw.Text(companyName, style: pw.TextStyle(fontSize: 10, color: dark)),
+                  pw.Text(
+                    companyName,
+                    style: pw.TextStyle(fontSize: 10, color: dark),
+                  ),
                   if (companyVat != null && companyVat.isNotEmpty)
-                    pw.Text('TVA $companyVat', style: pw.TextStyle(fontSize: 8, color: grey)),
+                    pw.Text(
+                      'TVA $companyVat',
+                      style: pw.TextStyle(fontSize: 8, color: grey),
+                    ),
                   pw.Text(
                     'Édité le ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
                     style: pw.TextStyle(fontSize: 8, color: grey),

@@ -96,9 +96,9 @@ class ReconciliationService {
     }
     final method =
         (best.structuredCommunication != null &&
-            _digits(t.communication).contains(
-              _digits(best.structuredCommunication!),
-            ))
+            _digits(
+              t.communication,
+            ).contains(_digits(best.structuredCommunication!)))
         ? PaymentMatchMethod.structuredCommunication
         : PaymentMatchMethod.reference;
     return ReconciliationMatch(

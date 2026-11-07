@@ -302,9 +302,7 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
                         )
                       : const Icon(Icons.wifi_tethering, size: 15),
                   label: Text(
-                    _testing
-                        ? 'TEST EN COURS...'
-                        : 'TESTER LA CONNEXION',
+                    _testing ? 'TEST EN COURS...' : 'TESTER LA CONNEXION',
                   ),
                 ),
 
@@ -333,7 +331,9 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
 
   Widget _statusCard(AppState s) {
     final configured = s.peppol.isConfigured;
-    final color = configured ? AppColors.statusConfirmed : AppColors.statusWaiting;
+    final color = configured
+        ? AppColors.statusConfirmed
+        : AppColors.statusWaiting;
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 6),
       child: LuxuryCard(
@@ -378,7 +378,10 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(t.toUpperCase(), style: AppTypography.label.copyWith(fontSize: 10)),
+        Text(
+          t.toUpperCase(),
+          style: AppTypography.label.copyWith(fontSize: 10),
+        ),
         const SizedBox(height: 8),
         const GoldDivider(width: 30),
       ],

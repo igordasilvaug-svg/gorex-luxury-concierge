@@ -381,10 +381,10 @@ class RequestDetailScreen extends StatelessWidget {
               onTap: sel
                   ? null
                   : () => _runStaffAction(
-                        context,
-                        () => s.updateRequestStatus(r.id, st),
-                        'Statut',
-                      ),
+                      context,
+                      () => s.updateRequestStatus(r.id, st),
+                      'Statut',
+                    ),
               borderRadius: BorderRadius.circular(3),
               child: Container(
                 padding: const EdgeInsets.symmetric(

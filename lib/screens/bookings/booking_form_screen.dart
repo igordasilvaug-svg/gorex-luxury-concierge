@@ -84,7 +84,8 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       _clientId = b.clientId;
       _providerId = b.providerId.isEmpty ? null : b.providerId;
     } else if (s.isStaff) {
-      _clientId = widget.presetClientId ??
+      _clientId =
+          widget.presetClientId ??
           (s.clients.isNotEmpty ? s.clients.first.id : null);
       // Pas de prestataire pré-sélectionné : le carnet peut être vide.
       _providerId = null;
@@ -188,7 +189,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       setState(() => _saving = false);
       showCloudFailure(
         context,
-        _isEdit ? 'Modification de la réservation' : 'Création de la réservation',
+        _isEdit
+            ? 'Modification de la réservation'
+            : 'Création de la réservation',
       );
       return;
     }
@@ -251,17 +254,15 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                   decoration: const InputDecoration(
                     hintText: 'Dîner au restaurant, transfert aéroport…',
                   ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Intitulé requis' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Intitulé requis'
+                      : null,
                 ),
                 const SizedBox(height: 14),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: _dateField('Date'),
-                    ),
+                    Expanded(flex: 3, child: _dateField('Date')),
                     const SizedBox(width: 12),
                     Expanded(
                       flex: 2,
@@ -275,7 +276,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                             style: AppTypography.bodyMedium.copyWith(
                               color: AppColors.white,
                             ),
-                            decoration: const InputDecoration(hintText: '20:00'),
+                            decoration: const InputDecoration(
+                              hintText: '20:00',
+                            ),
                             validator: (v) {
                               final t = (v ?? '').trim();
                               if (t.isEmpty) return 'Heure requise';
@@ -301,9 +304,8 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                   decoration: const InputDecoration(
                     hintText: 'Adresse ou nom du lieu',
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Lieu requis'
-                      : null,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Lieu requis' : null,
                 ),
 
                 // ── Client ──
@@ -325,8 +327,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                         ? 'Aucun client enregistré'
                         : 'Sélectionner un client',
                     onChanged: (v) => setState(() => _clientId = v),
-                    validator: (v) =>
-                        v == null ? 'Client requis' : null,
+                    validator: (v) => v == null ? 'Client requis' : null,
                   ),
                   const SizedBox(height: 8),
                   if (s.clients.isEmpty)
@@ -503,8 +504,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
   /// Aperçu de la marge, calculé en direct pendant la saisie.
   Widget _marginPreview() {
-    final cost = double.tryParse(_providerPrice.text.trim().replaceAll(',', '.')) ?? 0;
-    final sale = double.tryParse(_clientPrice.text.trim().replaceAll(',', '.')) ?? 0;
+    final cost =
+        double.tryParse(_providerPrice.text.trim().replaceAll(',', '.')) ?? 0;
+    final sale =
+        double.tryParse(_clientPrice.text.trim().replaceAll(',', '.')) ?? 0;
     final margin = sale - cost;
     final negative = margin < 0;
     return Container(
@@ -582,7 +585,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(t.toUpperCase(), style: AppTypography.label.copyWith(fontSize: 10)),
+        Text(
+          t.toUpperCase(),
+          style: AppTypography.label.copyWith(fontSize: 10),
+        ),
         const SizedBox(height: 8),
         const GoldDivider(width: 30),
       ],

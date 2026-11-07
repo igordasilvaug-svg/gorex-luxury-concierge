@@ -61,9 +61,15 @@ class LegalHubScreen extends StatelessWidget {
                 children: [
                   Text(s.tr('legal.hub_eyebrow'), style: AppTypography.eyebrow),
                   const SizedBox(height: 10),
-                  Text(s.tr('legal.hub_title'), style: AppTypography.displayMedium),
+                  Text(
+                    s.tr('legal.hub_title'),
+                    style: AppTypography.displayMedium,
+                  ),
                   const SizedBox(height: 6),
-                  Text('Version 1.0 · Dernière mise à jour : 2025', style: AppTypography.caption),
+                  Text(
+                    'Version 1.0 · Dernière mise à jour : 2025',
+                    style: AppTypography.caption,
+                  ),
                   const SizedBox(height: 10),
                   const GoldDivider(width: 60),
                   const SizedBox(height: 22),
@@ -78,9 +84,9 @@ class LegalHubScreen extends StatelessWidget {
                     (d) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: LuxuryCard(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => d.builder()),
-                        ),
+                        onTap: () => Navigator.of(
+                          context,
+                        ).push(MaterialPageRoute(builder: (_) => d.builder())),
                         child: Row(
                           children: [
                             Container(
@@ -88,14 +94,20 @@ class LegalHubScreen extends StatelessWidget {
                               height: 36,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: AppColors.champagne.withValues(alpha: 0.1),
+                                color: AppColors.champagne.withValues(
+                                  alpha: 0.1,
+                                ),
                                 borderRadius: BorderRadius.circular(3),
                                 border: Border.all(
                                   color: AppColors.champagneDark,
                                   width: 0.6,
                                 ),
                               ),
-                              child: Icon(d.icon, size: 17, color: AppColors.champagne),
+                              child: Icon(
+                                d.icon,
+                                size: 17,
+                                color: AppColors.champagne,
+                              ),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
@@ -104,10 +116,15 @@ class LegalHubScreen extends StatelessWidget {
                                 children: [
                                   Text(
                                     d.title,
-                                    style: AppTypography.title.copyWith(fontSize: 13.5),
+                                    style: AppTypography.title.copyWith(
+                                      fontSize: 13.5,
+                                    ),
                                   ),
                                   const SizedBox(height: 3),
-                                  Text(d.subtitle, style: AppTypography.caption),
+                                  Text(
+                                    d.subtitle,
+                                    style: AppTypography.caption,
+                                  ),
                                 ],
                               ),
                             ),

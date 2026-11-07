@@ -125,7 +125,9 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Coordonnées société enregistrées — facturation mise à jour.'),
+            content: Text(
+              'Coordonnées société enregistrées — facturation mise à jour.',
+            ),
           ),
         );
         Navigator.of(context).pop(true);
@@ -174,7 +176,11 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
 
                 _section('Identité'),
                 _field('Raison sociale', _legalName, hint: 'Gorex Group SA'),
-                _field('Nom commercial', _brandName, hint: 'GOREX LUXURY CONCIERGE'),
+                _field(
+                  'Nom commercial',
+                  _brandName,
+                  hint: 'GOREX LUXURY CONCIERGE',
+                ),
                 _field(
                   'Numéro d\'entreprise (BCE)',
                   _companyNumber,
@@ -182,9 +188,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                   keyboard: TextInputType.text,
                   helper: _companyNumber.text.trim().isEmpty
                       ? null
-                      : (bce.valid
-                            ? 'Numéro BCE valide'
-                            : bce.message),
+                      : (bce.valid ? 'Numéro BCE valide' : bce.message),
                   helperOk: bce.valid,
                   onChanged: (_) => setState(() {}),
                 ),
@@ -230,11 +234,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       flex: 2,
-                      child: _field(
-                        'Code pays',
-                        _countryCode,
-                        hint: 'BE',
-                      ),
+                      child: _field('Code pays', _countryCode, hint: 'BE'),
                     ),
                   ],
                 ),
@@ -273,7 +273,11 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                _field('Identifiant Peppol', _peppolId, hint: '0208:0123456789'),
+                _field(
+                  'Identifiant Peppol',
+                  _peppolId,
+                  hint: '0208:0123456789',
+                ),
 
                 const SizedBox(height: 10),
                 _peppolNotice(s.company),
@@ -360,7 +364,9 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
 
   Widget _peppolNotice(CompanyProfile c) {
     final eligible = VatService.validateVat(c.vatNumber).isBelgian;
-    final color = eligible ? AppColors.statusConfirmed : AppColors.statusWaiting;
+    final color = eligible
+        ? AppColors.statusConfirmed
+        : AppColors.statusWaiting;
     return LuxuryCard(
       borderColor: color.withValues(alpha: 0.5),
       child: Row(
@@ -404,7 +410,10 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(t.toUpperCase(), style: AppTypography.label.copyWith(fontSize: 10)),
+        Text(
+          t.toUpperCase(),
+          style: AppTypography.label.copyWith(fontSize: 10),
+        ),
         const SizedBox(height: 8),
         const GoldDivider(width: 30),
       ],
@@ -449,7 +458,9 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                   Icon(
                     helperOk ? Icons.check_circle_outline : Icons.error_outline,
                     size: 12,
-                    color: helperOk ? AppColors.statusConfirmed : AppColors.urgent,
+                    color: helperOk
+                        ? AppColors.statusConfirmed
+                        : AppColors.urgent,
                   ),
                   const SizedBox(width: 5),
                   Expanded(

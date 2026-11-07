@@ -139,10 +139,7 @@ class PeppolService {
             'de l\'Access Point.',
       );
     } catch (e) {
-      return PeppolSendResult(
-        success: false,
-        message: 'Erreur réseau : $e',
-      );
+      return PeppolSendResult(success: false, message: 'Erreur réseau : $e');
     }
   }
 
@@ -236,7 +233,8 @@ class PeppolService {
     if (!config.isConfigured) {
       return const PeppolSendResult(
         success: false,
-        message: 'Configuration incomplète (URL, clé API ou identifiant manquant).',
+        message:
+            'Configuration incomplète (URL, clé API ou identifiant manquant).',
       );
     }
     final uri = Uri.parse(
@@ -266,10 +264,7 @@ class PeppolService {
         message: 'Délai dépassé lors du test de connexion.',
       );
     } catch (e) {
-      return PeppolSendResult(
-        success: false,
-        message: 'Erreur réseau : $e',
-      );
+      return PeppolSendResult(success: false, message: 'Erreur réseau : $e');
     }
   }
 }

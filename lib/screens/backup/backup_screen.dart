@@ -437,7 +437,10 @@ class _BackupScreenState extends State<BackupScreen> {
                               color: AppColors.champagne,
                             ),
                             const SizedBox(width: 10),
-                            Text('Synchronisation Cloud', style: AppTypography.title),
+                            Text(
+                              'Synchronisation Cloud',
+                              style: AppTypography.title,
+                            ),
                             const Spacer(),
                             _cloudPill(s.cloudAvailable),
                           ],
@@ -492,15 +495,17 @@ class _BackupScreenState extends State<BackupScreen> {
                             GoldButton(
                               label: 'Envoyer vers le cloud',
                               icon: Icons.cloud_upload_outlined,
-                              onPressed:
-                                  (_busy || !s.cloudAvailable) ? null : _pushCloud,
+                              onPressed: (_busy || !s.cloudAvailable)
+                                  ? null
+                                  : _pushCloud,
                             ),
                             GoldButton(
                               label: 'Récupérer du cloud',
                               icon: Icons.cloud_download_outlined,
                               outlined: true,
-                              onPressed:
-                                  (_busy || !s.cloudAvailable) ? null : _pullCloud,
+                              onPressed: (_busy || !s.cloudAvailable)
+                                  ? null
+                                  : _pullCloud,
                             ),
                           ],
                         ),

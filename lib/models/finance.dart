@@ -58,26 +58,35 @@ class FinanceDocument {
   // ─── Facturation électronique ───
   /// Statut d'envoi via le réseau Peppol
   final PeppolStatus peppolStatus;
+
   /// Référence client / bon de commande
   final String? clientReference;
+
   /// Mention de TVA (autoliquidation, exonération intracommunautaire…)
   final String? vatMention;
+
   /// Snapshot du numéro de TVA du client au moment de l'émission
   final String? clientVatNumber;
+
   /// Communication structurée (OGM/VCS) pour le virement
   final String? structuredCommunication;
+
   /// Référence renvoyée par l'Access Point Peppol (identifiant de suivi)
   final String? peppolProviderReference;
+
   /// Dernière mise à jour du statut Peppol (polling / webhook)
   final DateTime? peppolLastUpdate;
 
   // ─── Relances & encaissement ───
   /// Niveau de relance envoyé pour une facture impayée
   final ReminderLevel reminderLevel;
+
   /// Date du dernier envoi de relance
   final DateTime? lastReminderAt;
+
   /// Date à laquelle le paiement a été rapproché
   final DateTime? paidAt;
+
   /// Méthode de rapprochement du paiement
   final PaymentMatchMethod? paymentMethod;
 
@@ -242,9 +251,7 @@ class FinanceDocument {
     peppolLastUpdate: m['peppolLastUpdate'] != null
         ? DateTime.tryParse(m['peppolLastUpdate'] as String)
         : null,
-    reminderLevel: ReminderLevel.fromName(
-      m['reminderLevel'] as String? ?? '',
-    ),
+    reminderLevel: ReminderLevel.fromName(m['reminderLevel'] as String? ?? ''),
     lastReminderAt: m['lastReminderAt'] != null
         ? DateTime.tryParse(m['lastReminderAt'] as String)
         : null,
@@ -320,19 +327,17 @@ class BankTransaction {
     this.matchedDocumentId,
   });
 
-  BankTransaction copyWith({
-    bool? matched,
-    String? matchedDocumentId,
-  }) => BankTransaction(
-    id: id,
-    date: date,
-    amount: amount,
-    counterparty: counterparty,
-    communication: communication,
-    iban: iban,
-    matched: matched ?? this.matched,
-    matchedDocumentId: matchedDocumentId ?? this.matchedDocumentId,
-  );
+  BankTransaction copyWith({bool? matched, String? matchedDocumentId}) =>
+      BankTransaction(
+        id: id,
+        date: date,
+        amount: amount,
+        counterparty: counterparty,
+        communication: communication,
+        iban: iban,
+        matched: matched ?? this.matched,
+        matchedDocumentId: matchedDocumentId ?? this.matchedDocumentId,
+      );
 
   Map<String, dynamic> toMap() => {
     'id': id,

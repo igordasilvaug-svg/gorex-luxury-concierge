@@ -216,7 +216,10 @@ class KpiTile extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           valueWidget ??
-              Text(value, style: AppTypography.numberLarge.copyWith(fontSize: 26)),
+              Text(
+                value,
+                style: AppTypography.numberLarge.copyWith(fontSize: 26),
+              ),
           const SizedBox(height: 3),
           Text(
             label.toUpperCase(),

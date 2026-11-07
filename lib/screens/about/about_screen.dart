@@ -144,8 +144,7 @@ class AboutScreen extends StatelessWidget {
                         const Divider(height: 1),
                         InfoRow(
                           label: 'Adresse',
-                          value:
-                              '${c.addressLine}, ${c.postalCode} ${c.city}',
+                          value: '${c.addressLine}, ${c.postalCode} ${c.city}',
                         ),
                       ],
                     ),
@@ -161,9 +160,7 @@ class AboutScreen extends StatelessWidget {
                         ),
                       ),
                       icon: const Icon(Icons.gavel_outlined, size: 15),
-                      label: Text(
-                        s.tr('about.legal_title').toUpperCase(),
-                      ),
+                      label: Text(s.tr('about.legal_title').toUpperCase()),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -202,10 +199,7 @@ class AboutScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.champagne.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(3),
-                border: Border.all(
-                  color: AppColors.champagneDark,
-                  width: 0.6,
-                ),
+                border: Border.all(color: AppColors.champagneDark, width: 0.6),
               ),
               child: Icon(icon, size: 16, color: AppColors.champagne),
             ),

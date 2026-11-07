@@ -42,9 +42,33 @@ class VatService {
   VatService._();
 
   static const _euPrefixes = {
-    'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'EL', 'ES', 'FI', 'FR',
-    'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO',
-    'SE', 'SI', 'SK',
+    'AT',
+    'BE',
+    'BG',
+    'CY',
+    'CZ',
+    'DE',
+    'DK',
+    'EE',
+    'EL',
+    'ES',
+    'FI',
+    'FR',
+    'HR',
+    'HU',
+    'IE',
+    'IT',
+    'LT',
+    'LU',
+    'LV',
+    'MT',
+    'NL',
+    'PL',
+    'PT',
+    'RO',
+    'SE',
+    'SI',
+    'SK',
   };
 
   /// Normalise un numéro de TVA (majuscules, sans espaces/points/tirets).
@@ -74,10 +98,33 @@ class VatService {
 
     // Longueurs attendues par pays UE
     final expected = <String, int>{
-      'AT': 11, 'BE': 12, 'BG': 12, 'CY': 11, 'CZ': 12, 'DE': 11, 'DK': 10,
-      'EE': 11, 'EL': 11, 'ES': 11, 'FI': 12, 'FR': 13, 'HR': 13, 'HU': 10,
-      'IE': 11, 'IT': 13, 'LT': 11, 'LU': 10, 'LV': 13, 'MT': 10, 'NL': 14,
-      'PL': 12, 'PT': 12, 'RO': 10, 'SE': 14, 'SI': 10, 'SK': 12,
+      'AT': 11,
+      'BE': 12,
+      'BG': 12,
+      'CY': 11,
+      'CZ': 12,
+      'DE': 11,
+      'DK': 10,
+      'EE': 11,
+      'EL': 11,
+      'ES': 11,
+      'FI': 12,
+      'FR': 13,
+      'HR': 13,
+      'HU': 10,
+      'IE': 11,
+      'IT': 13,
+      'LT': 11,
+      'LU': 10,
+      'LV': 13,
+      'MT': 10,
+      'NL': 14,
+      'PL': 12,
+      'PT': 12,
+      'RO': 10,
+      'SE': 14,
+      'SI': 10,
+      'SK': 12,
     };
     final len = expected[prefix];
     if (len != null && n.length != len) {
@@ -134,7 +181,10 @@ class VatService {
     final base = int.tryParse(n.substring(0, 8));
     final check = int.tryParse(n.substring(8));
     if (base == null || check == null) {
-      return const VatValidationResult(valid: false, message: 'Format invalide');
+      return const VatValidationResult(
+        valid: false,
+        message: 'Format invalide',
+      );
     }
     final ok = (97 - (base % 97)) == check;
     return VatValidationResult(
@@ -196,7 +246,8 @@ class VatService {
       return const VatComputation(
         rate: 0,
         reverseCharge: false,
-        mention: 'Hors champ de la TVA belge — exportation / prestation hors UE',
+        mention:
+            'Hors champ de la TVA belge — exportation / prestation hors UE',
       );
     }
 

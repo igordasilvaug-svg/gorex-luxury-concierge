@@ -67,7 +67,8 @@ class RestAuthService {
   /// Clé API Web (publique) et identifiant du projet — cf. firebase_options.dart.
   static const String _apiKey = 'AIzaSyBXVeAt2W8tmgThLVN6x7TPAG6j89RAYFE';
   static const String _projectId = 'gorex-concierge';
-  static const String _identityBase = 'https://identitytoolkit.googleapis.com/v1';
+  static const String _identityBase =
+      'https://identitytoolkit.googleapis.com/v1';
   static const String _firestoreBase =
       'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents';
 
@@ -100,7 +101,9 @@ class RestAuthService {
     try {
       resp = await http
           .post(
-            Uri.parse('$_identityBase/accounts:signInWithPassword?key=$_apiKey'),
+            Uri.parse(
+              '$_identityBase/accounts:signInWithPassword?key=$_apiKey',
+            ),
             headers: _plainHeaders,
             body: payload,
           )
@@ -136,7 +139,9 @@ class RestAuthService {
     if (m.contains('INVALID_PASSWORD')) return 'WRONG_PASSWORD';
     if (m.contains('EMAIL_NOT_FOUND')) return 'EMAIL_NOT_FOUND';
     if (m.contains('INVALID_EMAIL')) return 'INVALID_EMAIL';
-    if (m.contains('INVALID_LOGIN_CREDENTIALS')) return 'INVALID_LOGIN_CREDENTIALS';
+    if (m.contains('INVALID_LOGIN_CREDENTIALS')) {
+      return 'INVALID_LOGIN_CREDENTIALS';
+    }
     if (m.contains('INVALID_IDP_RESPONSE')) return 'INVALID_LOGIN_CREDENTIALS';
     if (m.contains('USER_DISABLED')) return 'USER_DISABLED';
     if (m.contains('TOO_MANY_ATTEMPTS_TRY_LATER')) return 'TOO_MANY_REQUESTS';
@@ -167,16 +172,12 @@ class RestAuthService {
   }
 
   /// Recherche une fiche `staff` par e-mail.
-  static Future<RestFetch> findStaffByEmail(
-    String email,
-    String idToken,
-  ) => _queryByEmail('staff', email, idToken);
+  static Future<RestFetch> findStaffByEmail(String email, String idToken) =>
+      _queryByEmail('staff', email, idToken);
 
   /// Recherche une fiche `clients` par e-mail (comptes clients VIP).
-  static Future<RestFetch> findClientByEmail(
-    String email,
-    String idToken,
-  ) => _queryByEmail('clients', email, idToken);
+  static Future<RestFetch> findClientByEmail(String email, String idToken) =>
+      _queryByEmail('clients', email, idToken);
 
   /// Requête Firestore REST `where field == value` (limit 1).
   static Future<RestFetch> _queryByEmail(
@@ -410,7 +411,10 @@ class RestAuthService {
     if (v is List) {
       return {
         'arrayValue': {
-          'values': v.map(_encodeValue).whereType<Map<String, dynamic>>().toList(),
+          'values': v
+              .map(_encodeValue)
+              .whereType<Map<String, dynamic>>()
+              .toList(),
         },
       };
     }
@@ -622,7 +626,10 @@ class RestAuthService {
   ) async {
     try {
       final resp = await http
-          .get(Uri.parse('$_firestoreBase/$path'), headers: _jsonHeaders(idToken))
+          .get(
+            Uri.parse('$_firestoreBase/$path'),
+            headers: _jsonHeaders(idToken),
+          )
           .timeout(_timeout);
       if (resp.statusCode != 200) return null;
       return _flatDocument(resp.body);
@@ -666,7 +673,10 @@ class RestAuthService {
         return const RestSignInResult(ok: false, error: 'UNKNOWN');
       }
     }
-    return RestSignInResult(ok: false, error: _normalize(_errorCode(resp.body)));
+    return RestSignInResult(
+      ok: false,
+      error: _normalize(_errorCode(resp.body)),
+    );
   }
 
   /// Envoie l'e-mail de vérification d'adresse pour le compte courant.

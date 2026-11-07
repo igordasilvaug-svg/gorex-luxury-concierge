@@ -89,20 +89,14 @@ class FirestoreService {
   pullState() async {
     _ensure();
     try {
-      final snap = await _db
-          .collection(_stateCollection)
-          .doc(_stateDoc)
-          .get();
+      final snap = await _db.collection(_stateCollection).doc(_stateDoc).get();
       if (!snap.exists) return null;
       final data = snap.data();
       if (data == null) return null;
       final payload = data['payload'];
       if (payload is! Map) return null;
       final at = DateTime.tryParse('${data['syncedAt']}') ?? DateTime.now();
-      return (
-        payload: Map<String, dynamic>.from(payload),
-        syncedAt: at,
-      );
+      return (payload: Map<String, dynamic>.from(payload), syncedAt: at);
     } catch (e) {
       throw CloudException('Échec de lecture cloud : $e');
     }
@@ -176,10 +170,7 @@ class FirestoreService {
     if (!FirebaseBootstrap.available) {
       return const Stream.empty();
     }
-    return _db
-        .collection(name)
-        .snapshots()
-        .map((snap) => snap.docs.length);
+    return _db.collection(name).snapshots().map((snap) => snap.docs.length);
   }
 
   /// Flux temps réel des documents d'une collection (lecture seule).

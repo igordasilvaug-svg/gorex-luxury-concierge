@@ -32,14 +32,20 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _markScale = Tween(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _c, curve: const Interval(0.0, 0.35, curve: Curves.easeOutCubic)),
+      CurvedAnimation(
+        parent: _c,
+        curve: const Interval(0.0, 0.35, curve: Curves.easeOutCubic),
+      ),
     );
     _markOpacity = CurvedAnimation(
       parent: _c,
       curve: const Interval(0.0, 0.25, curve: Curves.easeOut),
     );
     _lineWidth = Tween(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _c, curve: const Interval(0.15, 0.55, curve: Curves.easeOutCubic)),
+      CurvedAnimation(
+        parent: _c,
+        curve: const Interval(0.15, 0.55, curve: Curves.easeOutCubic),
+      ),
     );
     _sigOpacity = CurvedAnimation(
       parent: _c,

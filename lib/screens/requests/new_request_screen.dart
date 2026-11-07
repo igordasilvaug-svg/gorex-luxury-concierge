@@ -440,7 +440,9 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
         urgency: _urgency,
         budget: double.tryParse(_budget.text) ?? 0,
         securityEscalation: _securityEscalation,
-        escalationNote: _securityEscalation ? 'Transmis à GOREX SECURITY' : null,
+        escalationNote: _securityEscalation
+            ? 'Transmis à GOREX SECURITY'
+            : null,
       );
     } on CloudWriteException {
       if (!mounted) return;

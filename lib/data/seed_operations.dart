@@ -704,7 +704,8 @@ class SeedOperations {
     ),
   ];
 
-  static List<Expense> expenses() => [    Expense(
+  static List<Expense> expenses() => [
+    Expense(
       id: 'e_001',
       label: 'Jet privé (coût fournisseur)',
       providerName: 'Sky Private Jet',
@@ -752,8 +753,7 @@ class SeedOperations {
       date: _d(-1, 9),
       amount: 62700,
       counterparty: 'Délégation Sportive Nationale',
-      communication:
-          '+++000/0000/00002+++ GRX-INV-2025-0002',
+      communication: '+++000/0000/00002+++ GRX-INV-2025-0002',
       iban: 'BE71 0961 2345 6769',
       matched: true,
       matchedDocumentId: 'f_002',

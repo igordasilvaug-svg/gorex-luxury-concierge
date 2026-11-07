@@ -59,9 +59,7 @@ class _ProviderFormScreenState extends State<ProviderFormScreen> {
     _contactName = TextEditingController(text: p?.contactName ?? '');
     _contactEmail = TextEditingController(text: p?.contactEmail ?? '');
     _contactPhone = TextEditingController(text: p?.contactPhone ?? '');
-    _rate = TextEditingController(
-      text: p == null ? '' : _formatAmount(p.rate),
-    );
+    _rate = TextEditingController(text: p == null ? '' : _formatAmount(p.rate));
     _commission = TextEditingController(
       text: p == null ? '10' : _formatAmount(p.commissionPercent),
     );
@@ -219,7 +217,9 @@ class _ProviderFormScreenState extends State<ProviderFormScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  _isEdit ? 'MISE À JOUR DU PARTENAIRE' : 'AJOUT D\'UN PARTENAIRE',
+                  _isEdit
+                      ? 'MISE À JOUR DU PARTENAIRE'
+                      : 'AJOUT D\'UN PARTENAIRE',
                   style: AppTypography.eyebrow,
                 ),
                 const SizedBox(height: 8),
@@ -250,8 +250,9 @@ class _ProviderFormScreenState extends State<ProviderFormScreen> {
                   decoration: const InputDecoration(
                     hintText: 'Hôtel 5★, Restaurant gastronomique, Jet privé…',
                   ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Catégorie requise' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Catégorie requise'
+                      : null,
                 ),
                 const SizedBox(height: 14),
                 _label('Domaine de service'),
@@ -300,7 +301,9 @@ class _ProviderFormScreenState extends State<ProviderFormScreen> {
                             style: AppTypography.bodyMedium.copyWith(
                               color: AppColors.white,
                             ),
-                            decoration: const InputDecoration(hintText: 'Ville'),
+                            decoration: const InputDecoration(
+                              hintText: 'Ville',
+                            ),
                             validator: (v) => (v == null || v.trim().isEmpty)
                                 ? 'Requis'
                                 : null,
@@ -542,7 +545,10 @@ class _ProviderFormScreenState extends State<ProviderFormScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(t.toUpperCase(), style: AppTypography.label.copyWith(fontSize: 10)),
+        Text(
+          t.toUpperCase(),
+          style: AppTypography.label.copyWith(fontSize: 10),
+        ),
         const SizedBox(height: 8),
         const GoldDivider(width: 30),
       ],

@@ -48,7 +48,9 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
     _password = TextEditingController(text: u?.password ?? '');
     _title = TextEditingController(text: u?.title ?? '');
     _phone = TextEditingController(text: u?.phone ?? '');
-    _role = u?.role ?? (widget.clientId != null ? UserRole.vipClient : UserRole.concierge);
+    _role =
+        u?.role ??
+        (widget.clientId != null ? UserRole.vipClient : UserRole.concierge);
     _clientId = u?.clientId ?? widget.clientId;
     if (!_isEdit) _password.text = _generatePassword();
   }
@@ -64,8 +66,7 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
   }
 
   static String _generatePassword() {
-    const chars =
-        'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
     final rnd = Random.secure();
     return List.generate(10, (_) => chars[rnd.nextInt(chars.length)]).join();
   }
@@ -328,8 +329,9 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
-                  validator: (v) =>
-                      (v == null || v.length < 6) ? '6 caractères minimum' : null,
+                  validator: (v) => (v == null || v.length < 6)
+                      ? '6 caractères minimum'
+                      : null,
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -341,9 +343,8 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
                       ),
                     ),
                     TextButton.icon(
-                      onPressed: () => setState(
-                        () => _password.text = _generatePassword(),
-                      ),
+                      onPressed: () =>
+                          setState(() => _password.text = _generatePassword()),
                       icon: const Icon(Icons.autorenew, size: 14),
                       label: const Text('Générer'),
                     ),
@@ -375,6 +376,9 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
 
   Widget _label(String t) => Padding(
     padding: const EdgeInsets.only(bottom: 7, left: 2),
-    child: Text(t.toUpperCase(), style: AppTypography.label.copyWith(fontSize: 10)),
+    child: Text(
+      t.toUpperCase(),
+      style: AppTypography.label.copyWith(fontSize: 10),
+    ),
   );
 }

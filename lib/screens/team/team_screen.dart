@@ -51,9 +51,8 @@ class TeamScreen extends StatelessWidget {
                     icon: Icons.admin_panel_settings_outlined,
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => const Scaffold(
-                          body: StaffAccessScreen(),
-                        ),
+                        builder: (_) =>
+                            const Scaffold(body: StaffAccessScreen()),
                       ),
                     ),
                   ),

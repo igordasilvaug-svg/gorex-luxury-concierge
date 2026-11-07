@@ -74,9 +74,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                   icon: Icons.person_add_alt,
                   fullWidth: true,
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ClientFormScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const ClientFormScreen()),
                   ),
                 ),
               ],
@@ -362,7 +360,9 @@ class _ClientCard extends StatelessWidget {
       s.clientUsers.any((u) => u.clientId == client.id);
 
   void _createClientAccess(BuildContext context, AppState s) {
-    final existing = s.clientUsers.where((u) => u.clientId == client.id).toList();
+    final existing = s.clientUsers
+        .where((u) => u.clientId == client.id)
+        .toList();
     if (existing.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -374,9 +374,7 @@ class _ClientCard extends StatelessWidget {
       return;
     }
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => MemberFormScreen(clientId: client.id),
-      ),
+      MaterialPageRoute(builder: (_) => MemberFormScreen(clientId: client.id)),
     );
   }
 
@@ -415,10 +413,7 @@ class _ClientCard extends StatelessWidget {
               InfoRow(label: 'Régime TVA', value: vat.mention),
               if (client.billingAddress != null) ...[
                 const Divider(height: 1),
-                InfoRow(
-                  label: 'Adresse fact.',
-                  value: client.billingAddress!,
-                ),
+                InfoRow(label: 'Adresse fact.', value: client.billingAddress!),
               ],
               if (client.billingEmail != null) ...[
                 const Divider(height: 1),

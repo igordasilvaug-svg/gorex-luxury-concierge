@@ -202,7 +202,8 @@ class _UserGuideScreenState extends State<UserGuideScreen> {
                     : Icons.list,
                 fullWidth: true,
                 onPressed: () => setState(
-                  () => _chapter = _chapter < chapters.length ? _chapter + 1 : 0,
+                  () =>
+                      _chapter = _chapter < chapters.length ? _chapter + 1 : 0,
                 ),
               ),
             ),
@@ -472,31 +473,26 @@ class _UserGuideScreenState extends State<UserGuideScreen> {
         ),
       ],
     ),
-    _Chapter(
-      'Support',
-      'Nous contacter',
-      Icons.support_agent_outlined,
-      [
-        _bullets(
-          'Votre conseiller',
-          'Pour toute demande, utilisez la messagerie « Concierge » ou la '
-              'rubrique « Demandes » : votre interlocuteur dédié vous répond '
-              'dans les meilleurs délais.',
-        ),
-        _bullets(
-          'Coordonnées',
-          'Les coordonnées officielles de l\'émetteur (adresse, e-mail, '
-              'téléphone, numéro d\'entreprise BCE, numéro de TVA, compte '
-              'bancaire professionnel) sont disponibles dans « Paramètres '
-              'société ». Elles alimentent automatiquement vos documents.',
-        ),
-        _bullets(
-          'Discretion. Access. Excellence.',
-          'Notre engagement : la discrétion absolue, l\'accès aux expériences '
-              'les plus rares, et l\'excellence du service à chaque instant.',
-        ),
-      ],
-    ),
+    _Chapter('Support', 'Nous contacter', Icons.support_agent_outlined, [
+      _bullets(
+        'Votre conseiller',
+        'Pour toute demande, utilisez la messagerie « Concierge » ou la '
+            'rubrique « Demandes » : votre interlocuteur dédié vous répond '
+            'dans les meilleurs délais.',
+      ),
+      _bullets(
+        'Coordonnées',
+        'Les coordonnées officielles de l\'émetteur (adresse, e-mail, '
+            'téléphone, numéro d\'entreprise BCE, numéro de TVA, compte '
+            'bancaire professionnel) sont disponibles dans « Paramètres '
+            'société ». Elles alimentent automatiquement vos documents.',
+      ),
+      _bullets(
+        'Discretion. Access. Excellence.',
+        'Notre engagement : la discrétion absolue, l\'accès aux expériences '
+            'les plus rares, et l\'excellence du service à chaque instant.',
+      ),
+    ]),
   ];
 
   // --- helpers de bloc -------------------------------------------------------

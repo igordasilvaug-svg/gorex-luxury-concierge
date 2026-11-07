@@ -87,7 +87,8 @@ class PeppolConfig {
 
   factory PeppolConfig.fromMap(Map<String, dynamic> m) => PeppolConfig(
     enabled: m['enabled'] as bool? ?? false,
-    apiBaseUrl: m['apiBaseUrl'] as String? ?? 'https://api.storecove.com/api/v2',
+    apiBaseUrl:
+        m['apiBaseUrl'] as String? ?? 'https://api.storecove.com/api/v2',
     apiKey: m['apiKey'] as String? ?? '',
     senderPeppolId: m['senderPeppolId'] as String? ?? '',
     senderLegalEntityId: m['senderLegalEntityId'] as String? ?? '',

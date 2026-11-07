@@ -137,58 +137,58 @@ class ClientHomeScreen extends StatelessWidget {
               PulseGlow(
                 color: AppColors.urgent,
                 child: InkWell(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AskGorexScreen(urgent: true),
-                  ),
-                ),
-                borderRadius: BorderRadius.circular(4),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.urgent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: AppColors.urgent.withValues(alpha: 0.5),
-                      width: 0.8,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AskGorexScreen(urgent: true),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.emergency_outlined,
-                        color: AppColors.urgent,
-                        size: 22,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.urgent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: AppColors.urgent.withValues(alpha: 0.5),
+                        width: 0.8,
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'URGENT / PRIORITY REQUEST',
-                              style: AppTypography.label.copyWith(
-                                color: AppColors.urgent,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Alerte immédiate de votre concierge et de la direction.',
-                              style: AppTypography.caption.copyWith(
-                                fontSize: 10.5,
-                              ),
-                            ),
-                          ],
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.emergency_outlined,
+                          color: AppColors.urgent,
+                          size: 22,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'URGENT / PRIORITY REQUEST',
+                                style: AppTypography.label.copyWith(
+                                  color: AppColors.urgent,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Alerte immédiate de votre concierge et de la direction.',
+                                style: AppTypography.caption.copyWith(
+                                  fontSize: 10.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
               ),
               const SizedBox(height: 24),
 
@@ -217,7 +217,10 @@ class ClientHomeScreen extends StatelessWidget {
                 LuxuryCard(
                   child: Row(
                     children: [
-                      AnimatedRingAvatar(initials: concierge.initials, size: 46),
+                      AnimatedRingAvatar(
+                        initials: concierge.initials,
+                        size: 46,
+                      ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(

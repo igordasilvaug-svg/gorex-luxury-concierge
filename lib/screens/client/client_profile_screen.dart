@@ -235,9 +235,7 @@ class ClientProfileScreen extends StatelessWidget {
             Center(
               child: TextButton.icon(
                 onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const UserGuideScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const UserGuideScreen()),
                 ),
                 icon: const Icon(Icons.menu_book_outlined, size: 15),
                 label: const Text('GUIDE D\'UTILISATION'),
@@ -246,9 +244,7 @@ class ClientProfileScreen extends StatelessWidget {
             Center(
               child: TextButton.icon(
                 onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const LegalHubScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const LegalHubScreen()),
                 ),
                 icon: const Icon(Icons.gavel_outlined, size: 15),
                 label: const Text('INFORMATIONS LÉGALES'),
@@ -267,11 +263,9 @@ class ClientProfileScreen extends StatelessWidget {
             ),
             Center(
               child: TextButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const AboutScreen(),
-                  ),
-                ),
+                onPressed: () => Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const AboutScreen())),
                 icon: const Icon(Icons.info_outline, size: 15),
                 label: const Text('À PROPOS'),
               ),
@@ -326,9 +320,7 @@ class ClientProfileScreen extends StatelessWidget {
   /// Ouvre le formulaire d'édition des informations personnelles.
   Future<void> _editProfile(BuildContext context, AppState s) async {
     final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => const MyAccountEditScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const MyAccountEditScreen()),
     );
     if (saved == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

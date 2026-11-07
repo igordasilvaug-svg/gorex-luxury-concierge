@@ -207,7 +207,8 @@ class PeppolUblGenerator {
     required String city,
     required String postal,
     required String country,
-  }) => '''
+  }) =>
+      '''
         <cbc:StreetName>${_esc(street)}</cbc:StreetName>
         ${postal.isNotEmpty ? '<cbc:PostalZone>${_esc(postal)}</cbc:PostalZone>' : ''}
         <cbc:CityName>${_esc(city)}</cbc:CityName>

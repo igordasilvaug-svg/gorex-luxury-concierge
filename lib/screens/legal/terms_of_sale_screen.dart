@@ -34,7 +34,10 @@ class TermsOfSaleScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('CONDITIONS GÉNÉRALES DE VENTE', style: AppTypography.eyebrow),
+                  Text(
+                    'CONDITIONS GÉNÉRALES DE VENTE',
+                    style: AppTypography.eyebrow,
+                  ),
                   const SizedBox(height: 10),
                   Text(
                     'Prestations de conciergerie',

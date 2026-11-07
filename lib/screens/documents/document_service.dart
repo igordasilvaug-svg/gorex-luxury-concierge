@@ -40,7 +40,11 @@ class DocumentService {
     }
   }
 
-  static pw.Widget _header(String docType, String reference, {pw.MemoryImage? logo}) {
+  static pw.Widget _header(
+    String docType,
+    String reference, {
+    pw.MemoryImage? logo,
+  }) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -448,7 +452,8 @@ class DocumentService {
                     ),
                   if (client != null)
                     pw.Text(
-                      client.billingAddress ?? '${client.city}, ${client.country}',
+                      client.billingAddress ??
+                          '${client.city}, ${client.country}',
                       style: pw.TextStyle(fontSize: 9, color: _dark),
                     ),
                   if (f.clientVatNumber != null &&
@@ -513,10 +518,7 @@ class DocumentService {
                 children: [
                   _totalRow('Sous-total', _eur.format(f.subtotal)),
                   if (vat.reverseCharge || vat.intraEuB2b || vat.rate == 0)
-                    _totalRow(
-                      'TVA (0%)',
-                      _eur.format(0),
-                    )
+                    _totalRow('TVA (0%)', _eur.format(0))
                   else
                     _totalRow(
                       'TVA ${f.taxPercent.toStringAsFixed(0)}%',

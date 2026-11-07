@@ -77,7 +77,8 @@ class ReminderService {
         nextLevel: ReminderLevel.first,
         daysOverdue: days,
         due: false,
-        reason: 'Échéance récente — relance dans '
+        reason:
+            'Échéance récente — relance dans '
             '${thresholds[ReminderLevel.first]! - days} jour(s).',
       );
     }
@@ -101,7 +102,8 @@ class ReminderService {
           nextLevel: d.reminderLevel.next,
           daysOverdue: days,
           due: false,
-          reason: 'Dernière relance il y a $since jour(s) '
+          reason:
+              'Dernière relance il y a $since jour(s) '
               '(délai minimum $minGap jours).',
         );
       }
@@ -120,12 +122,13 @@ class ReminderService {
     List<FinanceDocument> documents, {
     int? minDays,
   }) {
-    final plans = documents
-        .where((d) => d.type == FinanceDocType.invoice)
-        .map((d) => plan(d, minDays: minDays))
-        .where((p) => p.due)
-        .toList()
-      ..sort((a, b) => b.daysOverdue.compareTo(a.daysOverdue));
+    final plans =
+        documents
+            .where((d) => d.type == FinanceDocType.invoice)
+            .map((d) => plan(d, minDays: minDays))
+            .where((p) => p.due)
+            .toList()
+          ..sort((a, b) => b.daysOverdue.compareTo(a.daysOverdue));
     return plans;
   }
 
@@ -145,8 +148,7 @@ class ReminderService {
     final subject = switch (level) {
       ReminderLevel.first => 'Rappel — Facture ${d.reference}',
       ReminderLevel.second => '2ᵉ rappel — Facture ${d.reference}',
-      ReminderLevel.finalNotice =>
-        'Mise en demeure — Facture ${d.reference}',
+      ReminderLevel.finalNotice => 'Mise en demeure — Facture ${d.reference}',
       ReminderLevel.none => 'Facture ${d.reference}',
     };
 
@@ -174,9 +176,7 @@ class ReminderService {
       ..writeln('Date : ${_date.format(d.date)}')
       ..writeln('Échéance : ${_date.format(d.dueDate ?? d.date)}')
       ..writeln('Montant dû : ${eur.format(d.balance)}')
-      ..writeln(
-        'Retard : ${d.daysOverdue} jour(s)',
-      );
+      ..writeln('Retard : ${d.daysOverdue} jour(s)');
     if (d.structuredCommunication != null) {
       b.writeln('Communication structurée : ${d.structuredCommunication}');
     }
@@ -190,8 +190,10 @@ class ReminderService {
         'dans les meilleurs délais.',
       )
       ..writeln()
-      ..writeln('Veuillez agréer, Madame, Monsieur, l\'expression de nos '
-          'salutations distinguées.')
+      ..writeln(
+        'Veuillez agréer, Madame, Monsieur, l\'expression de nos '
+        'salutations distinguées.',
+      )
       ..writeln()
       ..writeln(companyName);
     if (companyVat != null && companyVat.isNotEmpty) {

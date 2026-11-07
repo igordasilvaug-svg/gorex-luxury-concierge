@@ -76,10 +76,7 @@ class GoldCountUp extends StatelessWidget {
       tween: Tween(begin: 0, end: value.toDouble()),
       duration: duration,
       curve: Curves.easeOutCubic,
-      builder: (context, v, _) => Text(
-        formatter(v.round()),
-        style: style,
-      ),
+      builder: (context, v, _) => Text(formatter(v.round()), style: style),
     );
   }
 }
@@ -309,12 +306,7 @@ class ShimmerBox extends StatefulWidget {
   final double height;
   final BorderRadius? radius;
 
-  const ShimmerBox({
-    super.key,
-    this.width,
-    this.height = 14,
-    this.radius,
-  });
+  const ShimmerBox({super.key, this.width, this.height = 14, this.radius});
 
   @override
   State<ShimmerBox> createState() => _ShimmerBoxState();
@@ -388,7 +380,11 @@ class ListSkeleton extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const ShimmerBox(width: 44, height: 44, radius: BorderRadius.all(Radius.circular(22))),
+            const ShimmerBox(
+              width: 44,
+              height: 44,
+              radius: BorderRadius.all(Radius.circular(22)),
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

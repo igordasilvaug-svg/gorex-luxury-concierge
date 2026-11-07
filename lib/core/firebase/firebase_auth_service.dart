@@ -64,7 +64,9 @@ class FirebaseAuthService {
   /// `signInAnonymously()` échouait (cause du blocage d'authentification sur
   /// Safari) et chaque tentative créait un compte orphelin dans Firebase Auth.
   /// La connexion se fait désormais exclusivement en nominatif via l'API REST.
-  @Deprecated('Aucune session anonyme : la connexion est nominative (API REST).')
+  @Deprecated(
+    'Aucune session anonyme : la connexion est nominative (API REST).',
+  )
   static Future<bool> ensureSignedIn() async {
     if (_attempted && _signedIn) return true;
     _attempted = true;

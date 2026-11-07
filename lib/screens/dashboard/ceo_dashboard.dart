@@ -46,40 +46,40 @@ class CeoDashboard extends StatelessWidget {
         FadeSlideIn(
           delay: const Duration(milliseconds: 260),
           child: LayoutBuilder(
-          builder: (context, c) {
-            final wide = c.maxWidth > 780;
-            final left = Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _domainBreakdown(s),
-                const SizedBox(height: 18),
-                _conciergePerformance(s),
-              ],
-            );
-            final right = Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _topClients(context, s, eur),
-                const SizedBox(height: 18),
-                _pipeline(s),
-              ],
-            );
-            if (wide) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            builder: (context, c) {
+              final wide = c.maxWidth > 780;
+              final left = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: left),
-                  const SizedBox(width: 18),
-                  Expanded(child: right),
+                  _domainBreakdown(s),
+                  const SizedBox(height: 18),
+                  _conciergePerformance(s),
                 ],
               );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [left, const SizedBox(height: 18), right],
-            );
-          },
-        ),
+              final right = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _topClients(context, s, eur),
+                  const SizedBox(height: 18),
+                  _pipeline(s),
+                ],
+              );
+              if (wide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: left),
+                    const SizedBox(width: 18),
+                    Expanded(child: right),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [left, const SizedBox(height: 18), right],
+              );
+            },
+          ),
         ),
       ],
     );
@@ -455,9 +455,7 @@ class _DashboardScaffold extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            FadeSlideIn(
-              child: Text(title, style: AppTypography.displayMedium),
-            ),
+            FadeSlideIn(child: Text(title, style: AppTypography.displayMedium)),
             const SizedBox(height: 6),
             FadeSlideIn(
               delay: const Duration(milliseconds: 90),

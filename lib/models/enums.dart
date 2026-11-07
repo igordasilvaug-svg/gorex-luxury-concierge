@@ -22,7 +22,8 @@ enum ClientCategory {
 }
 
 /// Statut d'envoi d'une facture via le réseau Peppol
-enum PeppolStatus {  notApplicable('Non applicable', ''),
+enum PeppolStatus {
+  notApplicable('Non applicable', ''),
   ready('Prêt à envoyer', 'READY'),
   sent('Envoyé', 'SENT'),
   delivered('Distribué', 'DELIVERED'),
@@ -55,7 +56,10 @@ enum ReminderLevel {
   );
 
   ReminderLevel get next =>
-      ReminderLevel.values[(level + 1).clamp(0, ReminderLevel.values.length - 1)];
+      ReminderLevel.values[(level + 1).clamp(
+        0,
+        ReminderLevel.values.length - 1,
+      )];
 }
 
 /// Méthode de rapprochement d'un paiement

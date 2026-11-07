@@ -62,7 +62,9 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
     await context.read<AppState>().updateReminderConfig(_collect());
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Configuration des relances enregistrée.')),
+        const SnackBar(
+          content: Text('Configuration des relances enregistrée.'),
+        ),
       );
     }
   }
@@ -77,9 +79,7 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          n == 0
-              ? 'Aucune relance à envoyer.'
-              : '$n relance(s) traitée(s).',
+          n == 0 ? 'Aucune relance à envoyer.' : '$n relance(s) traitée(s).',
         ),
       ),
     );
@@ -372,9 +372,7 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
               : AppColors.champagne,
         ),
         const SizedBox(width: 10),
-        Expanded(
-          child: Text(level.label, style: AppTypography.bodyMedium),
-        ),
+        Expanded(child: Text(level.label, style: AppTypography.bodyMedium)),
         Text(
           '$days jours de retard',
           style: AppTypography.caption.copyWith(color: AppColors.greyLight),

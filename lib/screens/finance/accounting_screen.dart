@@ -153,7 +153,11 @@ class _AccountingScreenState extends State<AccountingScreen> {
   }
 
   // ═══════════════════════ RAPPROCHEMENT ═══════════════════════
-  Widget _reconciliationTab(BuildContext context, AppState s, NumberFormat eur) {
+  Widget _reconciliationTab(
+    BuildContext context,
+    AppState s,
+    NumberFormat eur,
+  ) {
     final txs = [...s.bankTransactions]
       ..sort((a, b) => b.date.compareTo(a.date));
     final unmatched = txs.where((t) => !t.matched).length;
@@ -209,9 +213,7 @@ class _AccountingScreenState extends State<AccountingScreen> {
       s.financeDocs,
       threshold: 0.4,
     );
-    final linked = t.matched
-        ? s.financeById(t.matchedDocumentId ?? '')
-        : null;
+    final linked = t.matched ? s.financeById(t.matchedDocumentId ?? '') : null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -225,16 +227,15 @@ class _AccountingScreenState extends State<AccountingScreen> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: (t.matched
-                            ? AppColors.statusConfirmed
-                            : AppColors.champagne)
-                        .withValues(alpha: 0.12),
+                    color:
+                        (t.matched
+                                ? AppColors.statusConfirmed
+                                : AppColors.champagne)
+                            .withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Icon(
-                    t.matched
-                        ? Icons.check_circle_outline
-                        : Icons.south_west,
+                    t.matched ? Icons.check_circle_outline : Icons.south_west,
                     size: 17,
                     color: t.matched
                         ? AppColors.statusConfirmed
@@ -756,7 +757,9 @@ class _AccountingScreenState extends State<AccountingScreen> {
                         if (ctx.mounted) {
                           ScaffoldMessenger.of(ctx).showSnackBar(
                             const SnackBar(
-                              content: Text('Relance copiée dans le presse-papier.'),
+                              content: Text(
+                                'Relance copiée dans le presse-papier.',
+                              ),
                             ),
                           );
                         }
@@ -821,7 +824,8 @@ class _AccountingScreenState extends State<AccountingScreen> {
             children: [
               InfoRow(
                 label: 'Factures',
-                value: '${journal.length} (exercice $year : ${yearJournal.length})',
+                value:
+                    '${journal.length} (exercice $year : ${yearJournal.length})',
               ),
               const Divider(height: 1),
               InfoRow(label: 'Total HT', value: eur.format(ht)),

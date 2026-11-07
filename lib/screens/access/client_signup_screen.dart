@@ -47,9 +47,19 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
   @override
   void dispose() {
     for (final c in [
-      _fullName, _email, _phone, _address, _country, _company, _position,
-      _companyNumber, _vatNumber, _companyCountry, _billingAddress,
-      _password, _confirm,
+      _fullName,
+      _email,
+      _phone,
+      _address,
+      _country,
+      _company,
+      _position,
+      _companyNumber,
+      _vatNumber,
+      _companyCountry,
+      _billingAddress,
+      _password,
+      _confirm,
     ]) {
       c.dispose();
     }
@@ -105,7 +115,9 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
       companyName: _isBusiness && _company.text.trim().isNotEmpty
           ? _company.text.trim()
           : null,
-      category: _isBusiness ? ClientCategory.corporate : ClientCategory.individualVip,
+      category: _isBusiness
+          ? ClientCategory.corporate
+          : ClientCategory.individualVip,
       email: email,
       phone: _phone.text.trim(),
       language: _languageLabel(_language),
@@ -116,8 +128,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
       companyNumber: _companyNumber.text.trim().isEmpty
           ? null
           : _companyNumber.text.trim(),
-      vatNumber:
-          _vatNumber.text.trim().isEmpty ? null : _vatNumber.text.trim(),
+      vatNumber: _vatNumber.text.trim().isEmpty ? null : _vatNumber.text.trim(),
       billingAddress: _billingAddress.text.trim().isEmpty
           ? null
           : _billingAddress.text.trim(),
@@ -180,7 +191,8 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'Le compte a été créé, mais l\'enregistrement de votre '
+        _error =
+            'Le compte a été créé, mais l\'enregistrement de votre '
             'dossier a échoué. Contactez concierge@gorex.com en indiquant '
             'votre adresse e-mail : votre accès sera complété manuellement.';
       });
@@ -252,17 +264,28 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
                 children: [
                   const Center(child: GorexBrand()),
                   const SizedBox(height: 18),
-                  Text('ACCÈS CLIENT', style: AppTypography.eyebrow,
-                      textAlign: TextAlign.center),
+                  Text(
+                    'ACCÈS CLIENT',
+                    style: AppTypography.eyebrow,
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 18),
 
                   // ── Données personnelles ──
                   const SectionLabel('DONNÉES PERSONNELLES'),
                   _field(_fullName, 'Nom et prénom', required: true),
-                  _field(_email, 'Adresse e-mail',
-                      required: true, keyboard: TextInputType.emailAddress),
-                  _field(_phone, 'Téléphone', required: true,
-                      keyboard: TextInputType.phone),
+                  _field(
+                    _email,
+                    'Adresse e-mail',
+                    required: true,
+                    keyboard: TextInputType.emailAddress,
+                  ),
+                  _field(
+                    _phone,
+                    'Téléphone',
+                    required: true,
+                    keyboard: TextInputType.phone,
+                  ),
                   _field(_address, 'Adresse', required: true),
                   _field(_country, 'Pays', required: true),
                   const SizedBox(height: 8),
@@ -272,8 +295,10 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
                   // ── Données professionnelles ──
                   Row(
                     children: [
-                      Text('Données professionnelles',
-                          style: AppTypography.bodyMedium),
+                      Text(
+                        'Données professionnelles',
+                        style: AppTypography.bodyMedium,
+                      ),
                       const Spacer(),
                       Switch(
                         value: _isBusiness,
@@ -294,10 +319,18 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
 
                   // ── Mot de passe ──
                   const SectionLabel('SÉCURITÉ'),
-                  _field(_password, 'Mot de passe (8 caractères min.)',
-                      required: true, obscure: true),
-                  _field(_confirm, 'Confirmer le mot de passe',
-                      required: true, obscure: true),
+                  _field(
+                    _password,
+                    'Mot de passe (8 caractères min.)',
+                    required: true,
+                    obscure: true,
+                  ),
+                  _field(
+                    _confirm,
+                    'Confirmer le mot de passe',
+                    required: true,
+                    obscure: true,
+                  ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
                     ErrorBanner(message: _error!),
@@ -348,7 +381,9 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
           if (label == 'Confirmer le mot de passe' && v != _password.text) {
             return 'Les mots de passe ne correspondent pas';
           }
-          if (label == 'Adresse e-mail' && v != null && v.isNotEmpty &&
+          if (label == 'Adresse e-mail' &&
+              v != null &&
+              v.isNotEmpty &&
               !v.contains('@')) {
             return 'Adresse e-mail invalide';
           }

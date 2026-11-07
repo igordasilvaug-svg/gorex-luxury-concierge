@@ -104,9 +104,9 @@ class L10n {
     'about.title': 'L\'excellence discrète',
     'about.intro':
         'GOREX LUXURY CONCIERGE est la signature de Gorex Group, maison belge '
-            'dédiée à la conciergerie d\'exception et à l\'assistance exécutive. '
-            'Nous accompagnons une clientèle privée et des dirigeants exigeants '
-            'en Belgique et à l\'international.',
+        'dédiée à la conciergerie d\'exception et à l\'assistance exécutive. '
+        'Nous accompagnons une clientèle privée et des dirigeants exigeants '
+        'en Belgique et à l\'international.',
     'about.pillars_title': 'Nos cinq piliers',
     'about.pillar.concierge': 'Conciergerie de luxe',
     'about.pillar.executive': 'Assistance exécutive',
@@ -117,15 +117,15 @@ class L10n {
     'about.value.discretion': 'Discrétion',
     'about.value.discretion_body':
         'La confidentialité est absolue. Chaque demande est traitée avec la '
-            'plus stricte réserve.',
+        'plus stricte réserve.',
     'about.value.access': 'Accès',
     'about.value.access_body':
         'Un réseau privilégié d\'adresses, de partenaires et de privilèges '
-            'normalement inaccessibles.',
+        'normalement inaccessibles.',
     'about.value.excellence': 'Excellence',
     'about.value.excellence_body':
         'Un service sur mesure, réactif et irréprochable, du premier contact '
-            'à l\'exécution.',
+        'à l\'exécution.',
     'about.contact_title': 'Nous contacter',
     'about.legal_title': 'Informations légales',
     'about.version': 'Version',
@@ -135,15 +135,15 @@ class L10n {
     'legal.privacy': 'Politique de confidentialité',
     'legal.privacy_sub':
         'Traitement des données personnelles (RGPD), finalités, durées de '
-            'conservation et vos droits.',
+        'conservation et vos droits.',
     'legal.terms': 'Conditions Générales de Vente',
     'legal.terms_sub':
         'Prestations, prix et TVA, paiement, annulation, responsabilité et '
-            'règlement des litiges.',
+        'règlement des litiges.',
     'legal.notice': 'Mentions légales',
     'legal.notice_sub':
         'Éditeur, hébergeur, propriété intellectuelle, responsabilité et '
-            'juridiction compétente.',
+        'juridiction compétente.',
     'legal.cookies': 'Politique cookies',
     'legal.cookies_sub':
         'Cookies et stockage local utilisés. Aucun traceur publicitaire tiers.',
@@ -194,9 +194,9 @@ class L10n {
     'about.title': 'Discrete excellentie',
     'about.intro':
         'GOREX LUXURY CONCIERGE is de signatuur van Gorex Group, een Belgisch '
-            'huis gewijd aan uitzonderlijke conciërge en executive assistance. '
-            'Wij begeleiden een privécliënteel en veeleisende leiders in België '
-            'en internationaal.',
+        'huis gewijd aan uitzonderlijke conciërge en executive assistance. '
+        'Wij begeleiden een privécliënteel en veeleisende leiders in België '
+        'en internationaal.',
     'about.pillars_title': 'Onze vijf pijlers',
     'about.pillar.concierge': 'Luxe conciërge',
     'about.pillar.executive': 'Executive assistance',
@@ -207,15 +207,15 @@ class L10n {
     'about.value.discretion': 'Discretie',
     'about.value.discretion_body':
         'Vertrouwelijkheid is absoluut. Elke aanvraag wordt met de grootste '
-            'terughoudendheid behandeld.',
+        'terughoudendheid behandeld.',
     'about.value.access': 'Toegang',
     'about.value.access_body':
         'Een bevoorrecht netwerk van adressen, partners en privileges die '
-            'normaal ontoegankelijk zijn.',
+        'normaal ontoegankelijk zijn.',
     'about.value.excellence': 'Excellentie',
     'about.value.excellence_body':
         'Een dienst op maat, responsief en onberispelijk, van het eerste '
-            'contact tot de uitvoering.',
+        'contact tot de uitvoering.',
     'about.contact_title': 'Contacteer ons',
     'about.legal_title': 'Juridische informatie',
     'about.version': 'Versie',
@@ -224,15 +224,15 @@ class L10n {
     'legal.privacy': 'Privacybeleid',
     'legal.privacy_sub':
         'Verwerking van persoonsgegevens (AVG), doeleinden, bewaartermijnen '
-            'en uw rechten.',
+        'en uw rechten.',
     'legal.terms': 'Algemene Verkoopvoorwaarden',
     'legal.terms_sub':
         'Diensten, prijzen en btw, betaling, annulering, aansprakelijkheid en '
-            'geschillenbeslechting.',
+        'geschillenbeslechting.',
     'legal.notice': 'Juridische informatie',
     'legal.notice_sub':
         'Uitgever, hosting, intellectuele eigendom, aansprakelijkheid en '
-            'bevoegde rechtbank.',
+        'bevoegde rechtbank.',
     'legal.cookies': 'Cookiebeleid',
     'legal.cookies_sub':
         'Gebruikte cookies en lokale opslag. Geen tracking door derden.',
@@ -283,9 +283,9 @@ class L10n {
     'about.title': 'Discreet excellence',
     'about.intro':
         'GOREX LUXURY CONCIERGE is the signature of Gorex Group, a Belgian '
-            'house devoted to exceptional concierge and executive assistance. '
-            'We serve a private clientele and demanding executives in Belgium '
-            'and internationally.',
+        'house devoted to exceptional concierge and executive assistance. '
+        'We serve a private clientele and demanding executives in Belgium '
+        'and internationally.',
     'about.pillars_title': 'Our five pillars',
     'about.pillar.concierge': 'Luxury concierge',
     'about.pillar.executive': 'Executive assistance',
@@ -296,15 +296,15 @@ class L10n {
     'about.value.discretion': 'Discretion',
     'about.value.discretion_body':
         'Confidentiality is absolute. Every request is handled with the '
-            'strictest reserve.',
+        'strictest reserve.',
     'about.value.access': 'Access',
     'about.value.access_body':
         'A privileged network of addresses, partners and privileges normally '
-            'out of reach.',
+        'out of reach.',
     'about.value.excellence': 'Excellence',
     'about.value.excellence_body':
         'A tailor-made, responsive and flawless service, from first contact '
-            'to delivery.',
+        'to delivery.',
     'about.contact_title': 'Contact us',
     'about.legal_title': 'Legal information',
     'about.version': 'Version',
@@ -313,15 +313,15 @@ class L10n {
     'legal.privacy': 'Privacy policy',
     'legal.privacy_sub':
         'Processing of personal data (GDPR), purposes, retention periods and '
-            'your rights.',
+        'your rights.',
     'legal.terms': 'General Terms of Sale',
     'legal.terms_sub':
         'Services, prices and VAT, payment, cancellation, liability and '
-            'dispute resolution.',
+        'dispute resolution.',
     'legal.notice': 'Legal notice',
     'legal.notice_sub':
         'Publisher, hosting, intellectual property, liability and competent '
-            'jurisdiction.',
+        'jurisdiction.',
     'legal.cookies': 'Cookie policy',
     'legal.cookies_sub':
         'Cookies and local storage used. No third-party advertising trackers.',

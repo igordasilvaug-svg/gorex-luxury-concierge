@@ -149,9 +149,7 @@ class _StaffAccessScreenState extends State<StaffAccessScreen> {
 
   Future<void> _openForm(BuildContext context, {AppUser? existing}) async {
     final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => MemberFormScreen(existing: existing),
-      ),
+      MaterialPageRoute(builder: (_) => MemberFormScreen(existing: existing)),
     );
     if (ok == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -256,15 +254,14 @@ class _AccessCard extends StatelessWidget {
             children: [
               _meta(Icons.apartment_outlined, user.role.department),
               if (user.phone != null) _meta(Icons.phone_outlined, user.phone!),
-              if (client != null)
-                _meta(Icons.link, 'Client · ${client.code}'),
+              if (client != null) _meta(Icons.link, 'Client · ${client.code}'),
               if (user.mustChangePassword)
-                _meta(
-                  Icons.key_outlined,
-                  'Mot de passe à changer',
-                ),
+                _meta(Icons.key_outlined, 'Mot de passe à changer'),
               if (user.lastLogin != null)
-                _meta(Icons.login, 'Dernière connexion : ${_fmt(user.lastLogin!)}'),
+                _meta(
+                  Icons.login,
+                  'Dernière connexion : ${_fmt(user.lastLogin!)}',
+                ),
             ],
           ),
         ],
@@ -392,9 +389,7 @@ class _AccessCard extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: isMe ? null : () => _toggleActive(context, s),
                 icon: Icon(
-                  user.active
-                      ? Icons.block
-                      : Icons.check_circle_outline,
+                  user.active ? Icons.block : Icons.check_circle_outline,
                   size: 15,
                 ),
                 label: Text(
@@ -457,10 +452,10 @@ class _AccessCard extends StatelessWidget {
             const SizedBox(height: 14),
             TextField(
               controller: controller,
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.white,
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+              decoration: const InputDecoration(
+                labelText: 'Nouveau mot de passe',
               ),
-              decoration: const InputDecoration(labelText: 'Nouveau mot de passe'),
             ),
           ],
         ),
