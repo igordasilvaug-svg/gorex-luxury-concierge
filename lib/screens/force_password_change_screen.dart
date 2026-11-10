@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/security/password_policy.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../state/app_state.dart';
@@ -123,9 +124,7 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
                         color: AppColors.grey,
                       ),
                     ),
-                    validator: (v) => (v == null || v.length < 8)
-                        ? '8 caractères minimum'
-                        : null,
+                    validator: (v) => PasswordPolicy.errorText(v),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/firebase/firebase_auth_service.dart';
 import '../../core/firebase/rest_auth_service.dart';
 import '../../core/firebase/firestore_service.dart';
+import '../../core/security/password_policy.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/client.dart';
@@ -228,7 +229,8 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
       case 'INVALID_EMAIL':
         return 'Adresse e-mail invalide.';
       case 'WEAK_PASSWORD':
-        return 'Mot de passe trop faible (8 caractères minimum).';
+        return 'Mot de passe trop faible : ${PasswordPolicy.minLength} '
+            'caractères minimum, avec majuscule, minuscule, chiffre et symbole.';
       case 'OPERATION_NOT_ALLOWED':
         return 'L\'inscription est momentanément indisponible.';
       default:
@@ -321,7 +323,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
                   const SectionLabel('SÉCURITÉ'),
                   _field(
                     _password,
-                    'Mot de passe (8 caractères min.)',
+                    'Mot de passe (12 caractères min.)',
                     required: true,
                     obscure: true,
                   ),
@@ -375,8 +377,11 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
           if (required && (v == null || v.trim().isEmpty)) {
             return 'Champ obligatoire';
           }
-          if (obscure && v != null && v.isNotEmpty && v.length < 8) {
-            return '8 caractères minimum';
+          if (obscure &&
+              v != null &&
+              v.isNotEmpty &&
+              label.startsWith('Mot de passe')) {
+            return PasswordPolicy.errorText(v);
           }
           if (label == 'Confirmer le mot de passe' && v != _password.text) {
             return 'Les mots de passe ne correspondent pas';

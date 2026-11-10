@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/security/password_policy.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/app_user.dart';
@@ -329,9 +330,7 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
-                  validator: (v) => (v == null || v.length < 6)
-                      ? '6 caractères minimum'
-                      : null,
+                  validator: (v) => PasswordPolicy.errorText(v),
                 ),
                 const SizedBox(height: 8),
                 Row(

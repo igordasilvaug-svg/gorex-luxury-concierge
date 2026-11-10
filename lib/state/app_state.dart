@@ -796,14 +796,20 @@ class AppState extends ChangeNotifier {
       return false;
     }
 
-    // Écrit le profil d'identité (uid → clientId/rôle) pour l'isolation Firestore.
-    if (uid != null) {
+    // Le profil d'identité (`user_profiles/{uid}`) est créé UNE FOIS, au
+    // moment de l'inscription, avec son rôle et son `clientId`. Il ne doit
+    // JAMAIS être réécrit par le navigateur : le rôle est une donnée
+    // d'autorisation, et si le client pouvait la modifier il pourrait
+    // s'attribuer les droits du CEO.
+    //
+    // On ne maintient donc que les clés inoffensives (uid, e-mail), et
+    // uniquement pour un compte client : les fiches du personnel sont gérées
+    // par la direction.
+    if (uid != null && profile.role == UserRole.vipClient) {
       try {
         await FirestoreService.updateDocument('user_profiles', uid, {
           'uid': uid,
           'email': e,
-          'role': profile.role.name,
-          if (profile.clientId != null) 'clientId': profile.clientId,
         });
       } catch (_) {}
     }
@@ -1676,8 +1682,9 @@ class AppState extends ChangeNotifier {
     if (!ok) throw const CloudWriteException('Profil');
 
     // Le profil d'identité reste synchronisé pour la lecture du rôle
-    // par les règles de sécurité.
-    if (restUid != null) {
+    // par les règles de sécurité. Réservé aux comptes clients : la fiche
+    // d'identité du personnel est administrée par la direction.
+    if (restUid != null && updated.role == UserRole.vipClient) {
       await _pushToCloud('user_profiles', {
         'email': updated.email,
         'displayName': name,
@@ -1843,25 +1850,55 @@ class AppState extends ChangeNotifier {
 
     // Le compte du personnel est stocké dans `staff/{uid}`, la fiche client
     // dans `clients/{clientId}` : on route selon la nature du compte.
-    final Map<String, dynamic> payload = {
-      'email': updated.email,
-      'displayName': updated.fullName,
-      'fullName': updated.fullName,
-      'role': updated.role.name,
-      'department': updated.title ?? updated.role.department,
-      'phone': updated.phone ?? '',
-      'active': updated.active,
-    };
+    //
+    // Les règles Firestore sont volontairement strictes : le niveau de droit
+    // (`role`) et l'adresse e-mail ne sont réécrits QUE par un CEO. Un manager
+    // qui enregistre une fiche sans changer le rôle n'envoie donc pas ces
+    // clés — sinon l'écriture entière serait refusée en 403.
+    final bool roleChanged = currentUser?.role != updated.role;
 
-    final bool ok;
     if (updated.role == UserRole.vipClient) {
       final clientId = updated.clientId;
       if (clientId == null || clientId.isEmpty) return;
-      ok = await _pushToCloud('clients', payload, docId: clientId);
-    } else {
-      ok = await _pushToCloud('staff', payload, docId: updated.id);
+      final clientPayload = <String, dynamic>{
+        'displayName': updated.fullName,
+        'fullName': updated.fullName,
+        'department': updated.title ?? updated.role.department,
+        'phone': updated.phone ?? '',
+        'active': updated.active,
+        if (isCeo) 'email': updated.email,
+        if (isCeo) 'role': updated.role.name,
+      };
+      final ok = await _pushToCloud(
+        'clients',
+        clientPayload,
+        docId: clientId,
+      );
+      if (!ok) throw const CloudWriteException('Compte utilisateur');
+      return;
     }
+
+    final staffPayload = <String, dynamic>{
+      'displayName': updated.fullName,
+      'fullName': updated.fullName,
+      'department': updated.title ?? updated.role.department,
+      'phone': updated.phone ?? '',
+      'active': updated.active,
+      // Réservé au CEO : le rôle est une donnée d'autorisation.
+      if (isCeo) 'role': updated.role.name,
+      if (isCeo) 'email': updated.email,
+    };
+    final ok = await _pushToCloud('staff', staffPayload, docId: updated.id);
     if (!ok) throw const CloudWriteException('Compte utilisateur');
+
+    // Un manager qui tente de changer un rôle doit être averti clairement :
+    // l'écriture des coordonnées a réussi, mais le rôle n'a pas bougé.
+    if (roleChanged && !isCeo) {
+      throw const CloudWriteException(
+        'Seul le CEO peut modifier le rôle d\'un compte. '
+        'Les coordonnées ont été enregistrées',
+      );
+    }
   }
 
   /// Active / désactive un accès

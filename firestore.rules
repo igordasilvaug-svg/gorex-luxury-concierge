@@ -1,0 +1,298 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  GOREX LUXURY CONCIERGE — règles Firestore durcies
+    //
+    //  PRINCIPE DIRECTEUR : REFUS PAR DÉFAUT.
+    //  Aucune règle générique n'accorde l'accès à « une collection
+    //  quelconque ». Chaque collection est nommée et son droit est explicite.
+    //  Toute collection non listée est inaccessible (voir le match final).
+    //
+    //  Failles corrigées par rapport à la version précédente :
+    //   1. `user_profiles` : le rôle ne peut plus être écrit par l'utilisateur
+    //      (un client pouvait s'écrire role = 'ceo' → administration totale).
+    //   2. Le fourre-tout `match /{document=**} { if isStaff() }` est supprimé
+    //      (il ouvrait TOUTES les collections en lecture ET en écriture).
+    //   3. `audit_log` : lecture réservée au CEO (le journal fuyait vers tous
+    //      les comptes : RGPD + renseignement interne).
+    //   4. `staff` : auto-modification limitée aux champs de contact, plus
+    //      aucun moyen de s'élever à un autre rôle.
+    //   5. Le rôle fait foi EN BASE : une claim obsolète ne maintient plus des
+    //      droits révoqués jusqu'à l'expiration du jeton.
+    //   6. Données bancaires et financières réservées aux rôles finance/CEO.
+    //   7. `gorex_cloud` (sauvegarde de l'ÉTAT COMPLET) réservé à la direction.
+    // ═══════════════════════════════════════════════════════════════════
+
+    // ─────────────────────────── IDENTITÉ ───────────────────────────
+
+    function isSignedIn() { return request.auth != null; }
+
+    // Interdit les sessions anonymes : sans identité nominative, aucun droit.
+    function isRealUser() {
+      return isSignedIn()
+             && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Profil d'identité (uid → rôle métier + clientId).
+    function myProfile() {
+      return exists(/databases/$(database)/documents/user_profiles/$(request.auth.uid))
+             ? get(/databases/$(database)/documents/user_profiles/$(request.auth.uid)).data
+             : null;
+    }
+
+    // Le rôle affiché par la base PRIME sur la claim du jeton.
+    // Conséquence voulue : révoquer un rôle en base le révoque immédiatement,
+    // sans attendre l'expiration du jeton (1 h).
+    function claimRole() { return request.auth.token.role; }
+    function myRole() {
+      return myProfile() != null && myProfile().role is string
+             ? myProfile().role
+             : claimRole();
+    }
+
+    function isCeo() { return isRealUser() && myRole() == 'ceo'; }
+
+    function isConciergeManager() {
+      return isRealUser() && myRole() == 'conciergeManager';
+    }
+
+    // Rôles métier valides. 'ceo' en est volontairement EXCLU : il sert à
+    // vérifier qu'une promotion vers la direction ne peut pas être écrite par
+    // un simple manager.
+    function staffRoles() {
+      return [
+        'conciergeManager', 'seniorConcierge', 'concierge',
+        'lifestyleManager', 'travelManager', 'securityCoordinator', 'finance'
+      ];
+    }
+
+    function isFinanceRole() {
+      return isRealUser() && (myRole() == 'finance' || myRole() == 'ceo');
+    }
+
+    // Personnel = tout rôle métier sauf le client VIP.
+    function isStaff() {
+      return isRealUser() && myRole() is string && myRole() != 'vipClient';
+    }
+
+    function isClient() { return isRealUser() && myRole() == 'vipClient'; }
+
+    // Identifiant de dossier du client connecté, lu en base (jamais dans le
+    // jeton, qu'un utilisateur ne peut pas modifier mais qui peut être ancien).
+    function myClientId() {
+      return myProfile() != null && myProfile().clientId is string
+             ? myProfile().clientId
+             : '';
+    }
+
+    // Un document « appartient » au client connecté si son clientId correspond.
+    function ownsClientData(d) {
+      return isClient() && myClientId() != '' && d.clientId == myClientId();
+    }
+
+    // ─────────────── Helpers de contrôle de champs ───────────────
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function only(list) { return changedKeys().hasOnly(list); }
+
+    // Un client ne peut modifier que ses coordonnées sur sa fiche `clients`.
+    function onlyOwnContactFields() {
+      return only(['fullName', 'phone', 'language', 'updatedAt']);
+    }
+
+    // ══════════════════════ PROFILS D'IDENTITÉ ══════════════════════
+    //
+    // FAILLE #1 CORRIGÉE. Avant : `allow create, update: if uid == request.auth.uid`
+    // → un client s'écrivait `role: 'ceo'` et devenait administrateur.
+    // Désormais : à la CRÉATION le rôle est imposé à 'vipClient' ; en MISE À
+    // JOUR les clés d'autorisation sont interdites.
+    match /user_profiles/{uid} {
+      allow read: if isRealUser() && (request.auth.uid == uid || isStaff());
+
+      allow create: if isRealUser()
+                    && request.auth.uid == uid
+                    && request.resource.data.role == 'vipClient'
+                    && request.resource.data.clientId is string
+                    && !(request.resource.data.keys().hasAny(
+                          ['permissions', 'isStaff', 'isAdmin']));
+
+      // Le titulaire maintient son identité, jamais son niveau de droit.
+      allow update: if isRealUser()
+                    && request.auth.uid == uid
+                    && !changedKeys().hasAny(['role', 'clientId', 'permissions', 'isStaff']);
+
+      // Réalignement administratif (création d'un compte, correction de rôle).
+      allow update, delete: if isCeo();
+    }
+
+    // ══════════════════════════ COMPTES DU PERSONNEL ══════════════════════════
+    //
+    // FAILLE #4 CORRIGÉE. Avant : `allow update: if uid == request.auth.uid`
+    // → n'importe quel concierge se promouvait 'ceo'.
+    // Désormais l'auto-modification est bornée aux coordonnées, et le rôle
+    // reste hors de portée du titulaire.
+    match /staff/{uid} {
+      allow read: if isRealUser() && (request.auth.uid == uid || isStaff());
+
+      // Le CEO peut tout créer ou supprimer.
+      allow create, delete: if isCeo();
+
+      // Un manager peut créer un compte métier, mais jamais un CEO, et jamais
+      // avec un champ d'autorisation inventé.
+      allow create: if isConciergeManager()
+                    && request.resource.data.role in staffRoles();
+
+      // Le titulaire : coordonnées et drapeau de changement de mot de passe.
+      allow update: if isRealUser()
+                    && request.auth.uid == uid
+                    && only(['displayName', 'fullName', 'phone',
+                             'mustChangePassword', 'language', 'lastLogin']);
+
+      // Le manager : gestion des accès, mais SANS pouvoir élever un compte
+      // vers la direction ni vers un rôle hors périmètre.
+      allow update: if isConciergeManager()
+                    && !changedKeys().hasAny(['role'])
+                    && only(['displayName', 'fullName', 'phone', 'department',
+                             'active', 'mustChangePassword', 'language']);
+
+      // Le CEO : tout, y compris le rôle.
+      allow update: if isCeo();
+    }
+
+    // ══════════════════════ ANNUAIRE APPLICATIF ══════════════════════
+    match /users/{uid} {
+      allow read: if isRealUser() && (request.auth.uid == uid || isStaff());
+      allow write: if isCeo();
+    }
+
+    // ══════════════════════════ JOURNAL D'AUDIT ══════════════════════════
+    //
+    // FAILLE #3 CORRIGÉE. Avant : `allow read: if isRealUser()` → tout compte
+    // lisait l'intégralité du journal (qui a fait quoi, quand, sur qui).
+    // Le journal est APPEND-ONLY : aucune modification, aucune suppression,
+    // par personne — pas même le CEO.
+    match /audit_log/{entry} {
+      allow read: if isCeo();
+      allow create: if isRealUser();
+      allow update, delete: if false;
+    }
+
+    // ══════════════════════════ FICHES CLIENTS ══════════════════════════
+    //
+    // L'e-mail du document doit correspondre à celui du jeton : un client ne
+    // peut ni lire ni créer la fiche de quelqu'un d'autre. La mise à jour est
+    // bornée aux coordonnées (ni tarif, ni statut, ni note interne).
+    match /clients/{doc} {
+      allow read: if isStaff()
+                  || (isRealUser() && resource.data.email == request.auth.token.email);
+
+      allow create: if isStaff()
+                    || (isRealUser()
+                        && request.resource.data.email == request.auth.token.email);
+
+      allow update: if isStaff()
+                    || (isRealUser()
+                        && resource.data.email == request.auth.token.email
+                        && onlyOwnContactFields());
+
+      allow delete: if isCeo() || isConciergeManager();
+    }
+
+    // ══════════════════════════ DEMANDES DE SERVICE ══════════════════════════
+    //
+    // Le contrôle porte sur `clientEmail` (champ scalaire indexable) et non sur
+    // un get() : une règle fondée sur `resource.data` impose au client de
+    // filtrer sa requête, ce que l'application fait déjà.
+    match /requests/{doc} {
+      allow read: if isStaff()
+                  || (isRealUser()
+                      && resource.data.clientEmail == request.auth.token.email);
+
+      allow create: if isStaff()
+                    || (isRealUser()
+                        && request.resource.data.clientEmail == request.auth.token.email);
+
+      allow update, delete: if isStaff();
+    }
+
+    // ══════════════════════ DOSSIERS MÉTIER ══════════════════════
+
+    match /bookings/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow create: if isStaff() || ownsClientData(request.resource.data);
+      allow update, delete: if isStaff();
+    }
+
+    // Les pièces financières sont lisibles par le client concerné, mais seul
+    // le personnel habilité les émet : un client ne peut pas s'auto-facturer
+    // ni modifier un montant.
+    match /finance_docs/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow write: if isStaff();
+    }
+
+    match /itineraries/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow write: if isStaff();
+    }
+
+    match /appointments/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow write: if isStaff();
+    }
+
+    match /conversations/{doc} {
+      allow read: if isStaff() || ownsClientData(resource.data);
+      allow create: if isStaff() || ownsClientData(request.resource.data);
+      allow update: if isStaff() || ownsClientData(resource.data);
+      allow delete: if isStaff();
+    }
+
+    // ══════════════════════ RÉFÉRENTIELS ══════════════════════
+
+    match /providers/{doc}       { allow read, write: if isStaff(); }
+    match /prospects/{doc}       { allow read, write: if isStaff(); }
+
+    // Données strictement financières : ni un concierge ni un manager n'y ont
+    // accès, seuls les rôles finance et le CEO.
+    match /expenses/{doc}        { allow read, write: if isFinanceRole(); }
+    match /bank_transactions/{doc} { allow read, write: if isFinanceRole(); }
+
+    // Paramètres de facturation (identité légale, TVA, Peppol).
+    match /company/{doc} {
+      allow read: if isRealUser();
+      allow write: if isFinanceRole();
+    }
+
+    match /subscription_tiers/{doc} {
+      allow read: if isRealUser();
+      allow write: if isFinanceRole();
+    }
+
+    // ══════════════════════ SAUVEGARDE D'ÉTAT ══════════════════════
+    //
+    // Ce document contient une copie de l'ÉTAT APPLICATIF COMPLET. En lecture
+    // il exposerait toutes les données ; en écriture il permettrait de
+    // réinjecter un état falsifié (rôles, soldes, tarifs). Réservé à la
+    // direction : CEO et concierge manager.
+    match /gorex_cloud/{doc} {
+      allow read, write: if isCeo() || isConciergeManager();
+    }
+
+    // ══════════════════════ REFUS PAR DÉFAUT ══════════════════════
+    //
+    // FAILLE #2 CORRIGÉE. La version précédente terminait par
+    //   match /{document=**} { allow read, write: if isStaff(); }
+    // qui ouvrait en lecture ET en écriture toute collection existante ou
+    // future. Une collection ajoutée demain était donc publique de fait.
+    // Désormais : tout ce qui n'est pas nommé ci-dessus est inaccessible.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

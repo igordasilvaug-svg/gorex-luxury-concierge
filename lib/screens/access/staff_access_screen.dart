@@ -1,6 +1,9 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/security/password_policy.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/app_user.dart';
@@ -471,7 +474,18 @@ class _AccessCard extends StatelessWidget {
         ],
       ),
     );
-    if (newPass == null || newPass.length < 6) return;
+    if (newPass == null) return;
+    final issues = PasswordPolicy.validate(newPass);
+    if (issues.isNotEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Mot de passe refusé : ${issues.join(" · ")}'),
+          ),
+        );
+      }
+      return;
+    }
     await s.resetUserPassword(user.id, newPass);
     if (context.mounted) {
       Navigator.of(context).pop();
@@ -518,15 +532,31 @@ class _AccessCard extends StatelessWidget {
     }
   }
 
+  /// Génère un mot de passe temporaire conforme à [PasswordPolicy].
+  ///
+  /// L'ancienne version produisait 10 caractères alphanumériques à partir de
+  /// l'horloge : ni symbole, ni majuscule garantie, et une entropie faible
+  /// (suite déterministe). On utilise ici `Random.secure()` et on impose au
+  /// moins un caractère de chaque catégorie.
   static String _genPassword() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-    final rnd = DateTime.now().microsecondsSinceEpoch;
-    final sb = StringBuffer();
-    var x = rnd;
-    for (var i = 0; i < 10; i++) {
-      sb.write(chars[x % chars.length]);
-      x = x ~/ 3 + 7 * (i + 1);
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = '!#%&*+-=?@';
+    const all = '$upper$lower$digits$symbols';
+    final rnd = Random.secure();
+
+    final chars = <String>[
+      upper[rnd.nextInt(upper.length)],
+      lower[rnd.nextInt(lower.length)],
+      digits[rnd.nextInt(digits.length)],
+      symbols[rnd.nextInt(symbols.length)],
+    ];
+    // 16 caractères au total : confortablement au-delà du minimum de 12.
+    while (chars.length < 16) {
+      chars.add(all[rnd.nextInt(all.length)]);
     }
-    return sb.toString();
+    chars.shuffle(rnd);
+    return chars.join();
   }
 }
