@@ -7,6 +7,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
+import '../security/app_check.dart';
 import 'firebase_options.dart';
 
 class FirebaseBootstrap {
@@ -42,6 +43,11 @@ class FirebaseBootstrap {
         );
       }
       _available = true;
+
+      // Attestation d'application. Sans clé reCAPTCHA configurée au build,
+      // cette fonction ne fait rien : le comportement reste identique.
+      await WebAppCheck.activate();
+
       if (kDebugMode) {
         debugPrint('[Firebase] initialisé — projet gorex-concierge');
       }
