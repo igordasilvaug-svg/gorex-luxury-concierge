@@ -93,12 +93,18 @@ class WebAppCheck {
   /// jamais le rafraîchissement : cela créerait une évaluation reCAPTCHA
   /// supplémentaire à chaque appel, facturée au-delà du quota gratuit.
   static Future<String?> token() async {
+    // ignore: avoid_print
+    print('[DIAG2] token() appelé, activated=' + _activated.toString());
     if (!_activated) return null;
     try {
-      return await FirebaseAppCheck.instance.getToken();
+      final _t = await FirebaseAppCheck.instance.getToken();
+      // ignore: avoid_print
+      print('[DIAG2] getToken -> ' + (_t == null ? 'NULL' : _t.length.toString() + ' chars'));
+      return _t;
     } catch (e) {
       _lastError = e.toString();
-      if (kDebugMode) debugPrint('[AppCheck] jeton indisponible : $e');
+      // ignore: avoid_print
+      print('[DIAG2] getToken ECHEC: ' + e.toString());
       return null;
     }
   }
