@@ -114,19 +114,44 @@ class _SepaDirectDebitScreenState extends State<SepaDirectDebitScreen> {
             ),
 
             const SizedBox(height: 24),
-            Row(
-              children: [
-                const Expanded(
-                  child: SectionLabel('Mandats de domiciliation'),
-                ),
-                if (s.can('finance'))
-                  GoldButton(
-                    label: 'Enregistrer un mandat',
-                    icon: Icons.add_circle_outline,
-                    outlined: true,
-                    onPressed: () => _addMandateDialog(s),
-                  ),
-              ],
+            // En-tête responsive : sur téléphone, le titre et le bouton ne
+            // tiennent pas côte à côte — le libellé du bouton écrasait le
+            // titre jusqu'à le couper au milieu d'un mot. On empile donc sous
+            // 520 px de largeur disponible.
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final titre = const SectionLabel('Mandats de domiciliation');
+                final action = s.can('finance')
+                    ? GoldButton(
+                        label: 'Enregistrer un mandat',
+                        icon: Icons.add_circle_outline,
+                        outlined: true,
+                        onPressed: () => _addMandateDialog(s),
+                      )
+                    : null;
+                if (action == null) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: titre,
+                  );
+                }
+                if (constraints.maxWidth < 520) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      titre,
+                      const SizedBox(height: 10),
+                      SizedBox(width: double.infinity, child: action),
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: titre),
+                    action,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 10),
             _mandatesSection(s),

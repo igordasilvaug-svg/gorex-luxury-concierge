@@ -196,5 +196,34 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets('sur un écran de téléphone, aucun débordement', (tester) async {
+      // Régression : à 430 px, le titre « Mandats de domiciliation » et le
+      // bouton « Enregistrer un mandat » étaient sur la même ligne ; le
+      // bouton écrasait le titre jusqu'à le couper au milieu d'un mot
+      // (« DOMICILIATI / ON »). L'en-tête doit s'empiler sous 520 px.
+      tester.view.physicalSize = const Size(430, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final state = AppState();
+      state.company = _gorexCompany();
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AppState>.value(
+          value: state,
+          child: const MaterialApp(
+            home: Scaffold(
+              backgroundColor: AppColors.black,
+              body: SingleChildScrollView(child: SepaDirectDebitScreen()),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Un débordement de layout se manifeste par une exception Flutter.
+      expect(tester.takeException(), isNull);
+    });
   });
 }
