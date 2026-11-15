@@ -62,10 +62,17 @@ class WebAppCheck {
         // Il correspond aux clés « score-based » créées dans la console
         // Cloud, invisibles pour l'utilisateur.
         webProvider: ReCaptchaEnterpriseProvider(_recaptchaSiteKey),
-        // Attestation désactivée sur les autres plateformes : l'application
-        // cible le web. Android/iOS utiliseraient Play Integrity / App Attest.
-        androidProvider: AndroidProvider.debug,
-        appleProvider: AppleProvider.debug,
+        // Attestation Android/iOS : JAMAIS `debug` en production. Le provider
+        // `debug` accepte n'importe quel client (jeton secret partagé), ce qui
+        // annulerait tout le bénéfice de l'attestation sur mobile. En release on
+        // exige Play Integrity (Android) / App Attest (Apple) ; en développement
+        // seulement, `debug` évite d'avoir à enregistrer un appareil.
+        androidProvider: kDebugMode
+            ? AndroidProvider.debug
+            : AndroidProvider.playIntegrity,
+        appleProvider: kDebugMode
+            ? AppleProvider.debug
+            : AppleProvider.appAttest,
       );
       _activated = true;
       if (kDebugMode) {
