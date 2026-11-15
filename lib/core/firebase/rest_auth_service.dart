@@ -21,8 +21,6 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '../security/app_check.dart';
-
 /// Résultat d'une connexion REST.
 class RestSignInResult {
   const RestSignInResult({
@@ -89,18 +87,6 @@ class RestAuthService {
     'Content-Type': 'application/json',
   };
 
-  /// En-têtes JSON + jeton App Check (si l'attestation est active).
-  ///
-  /// App Check n'ajoute son en-tête QUE pour les appels passant par le SDK.
-  /// Cette application utilisant l'API REST directement, le jeton doit être
-  /// injecté ici — sinon l'activation du mode « Appliqué » couperait tout.
-  static Future<Map<String, String>> _json(String idToken) =>
-      FirebaseAppCheckHeaders.withToken(_jsonHeaders(idToken));
-
-  /// En-têtes « simple request » + jeton App Check.
-  static Future<Map<String, String>> _plain() =>
-      FirebaseAppCheckHeaders.withToken(_plainHeaders);
-
   // ─────────────────────── CONNEXION ───────────────────────
 
   /// Connexion e-mail / mot de passe via Identity Toolkit.
@@ -118,7 +104,7 @@ class RestAuthService {
             Uri.parse(
               '$_identityBase/accounts:signInWithPassword?key=$_apiKey',
             ),
-            headers: await _plain(),
+            headers: _plainHeaders,
             body: payload,
           )
           .timeout(_timeout);
@@ -175,7 +161,7 @@ class RestAuthService {
       resp = await http
           .get(
             Uri.parse('$_firestoreBase/staff/$uid'),
-            headers: await _json(idToken),
+            headers: _jsonHeaders(idToken),
           )
           .timeout(_timeout);
     } catch (_) {
@@ -220,7 +206,7 @@ class RestAuthService {
       resp = await http
           .post(
             Uri.parse('$_firestoreBase:runQuery'),
-            headers: await _json(idToken),
+            headers: _jsonHeaders(idToken),
             body: query,
           )
           .timeout(_timeout);
@@ -313,7 +299,7 @@ class RestAuthService {
       final resp = await http
           .post(
             Uri.parse('$_identityBase/accounts:update?key=$_apiKey'),
-            headers: await _plain(),
+            headers: _plainHeaders,
             body: jsonEncode({
               'idToken': idToken,
               'password': newPassword,
@@ -333,7 +319,7 @@ class RestAuthService {
       final resp = await http
           .post(
             Uri.parse('$_identityBase/accounts:sendOobCode?key=$_apiKey'),
-            headers: await _plain(),
+            headers: _plainHeaders,
             body: jsonEncode({
               'requestType': 'PASSWORD_RESET',
               'email': email.trim().toLowerCase(),
@@ -358,7 +344,7 @@ class RestAuthService {
               '$_firestoreBase/staff/$uid'
               '?updateMask.fieldPaths=mustChangePassword',
             ),
-            headers: await _json(idToken),
+            headers: _jsonHeaders(idToken),
             body: jsonEncode({
               'fields': {
                 'mustChangePassword': {'booleanValue': false},
@@ -387,7 +373,7 @@ class RestAuthService {
       final resp = await http
           .post(
             Uri.parse('$_firestoreBase/audit_log'),
-            headers: await _json(idToken),
+            headers: _jsonHeaders(idToken),
             body: jsonEncode({'fields': _encodeFields(data)}),
           )
           .timeout(_timeout);
@@ -463,7 +449,7 @@ class RestAuthService {
       resp = await http
           .get(
             Uri.parse('$_firestoreBase/$collection?pageSize=$limit'),
-            headers: await _json(idToken),
+            headers: _jsonHeaders(idToken),
           )
           .timeout(_timeout);
     } catch (_) {
@@ -518,7 +504,7 @@ class RestAuthService {
       resp = await http
           .post(
             Uri.parse('$_firestoreBase:runQuery'),
-            headers: await _json(idToken),
+            headers: _jsonHeaders(idToken),
             body: query,
           )
           .timeout(_timeout);
@@ -578,7 +564,7 @@ class RestAuthService {
       final resp = await http
           .patch(
             Uri.parse('$_firestoreBase/$path'),
-            headers: await _json(idToken),
+            headers: _jsonHeaders(idToken),
             body: jsonEncode({'fields': _encodeFields(data)}),
           )
           .timeout(_timeout);
@@ -605,7 +591,7 @@ class RestAuthService {
       final resp = await http
           .patch(
             Uri.parse('$_firestoreBase/$path?$mask'),
-            headers: await _json(idToken),
+            headers: _jsonHeaders(idToken),
             body: jsonEncode({'fields': _encodeFields(data)}),
           )
           .timeout(_timeout);
@@ -624,7 +610,7 @@ class RestAuthService {
       final resp = await http
           .delete(
             Uri.parse('$_firestoreBase/$path'),
-            headers: await _json(idToken),
+            headers: _jsonHeaders(idToken),
           )
           .timeout(_timeout);
       return resp.statusCode;
@@ -642,7 +628,7 @@ class RestAuthService {
       final resp = await http
           .get(
             Uri.parse('$_firestoreBase/$path'),
-            headers: await _json(idToken),
+            headers: _jsonHeaders(idToken),
           )
           .timeout(_timeout);
       if (resp.statusCode != 200) return null;
@@ -662,7 +648,7 @@ class RestAuthService {
       resp = await http
           .post(
             Uri.parse('$_identityBase/accounts:signUp?key=$_apiKey'),
-            headers: await _plain(),
+            headers: _plainHeaders,
             body: jsonEncode({
               'email': email.trim().toLowerCase(),
               'password': password,
@@ -699,7 +685,7 @@ class RestAuthService {
       final resp = await http
           .post(
             Uri.parse('$_identityBase/accounts:sendOobCode?key=$_apiKey'),
-            headers: await _plain(),
+            headers: _plainHeaders,
             body: jsonEncode({
               'requestType': 'VERIFY_EMAIL',
               'idToken': idToken,
