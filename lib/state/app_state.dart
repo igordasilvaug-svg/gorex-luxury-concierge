@@ -13,12 +13,15 @@ import '../core/billing/peppol_service.dart';
 import '../core/billing/peppol_ubl_generator.dart';
 import '../core/billing/reconciliation_service.dart';
 import '../core/billing/reminder_service.dart';
+import '../core/billing/sepa_pain008_generator.dart';
+import '../core/billing/sepa_validator.dart';
 import '../core/billing/vat_service.dart';
 import '../data/seed_data.dart';
 import '../data/seed_operations.dart';
 import '../models/app_user.dart';
 import '../models/client.dart';
 import '../models/company_profile.dart';
+import '../models/sepa_mandate.dart';
 import '../models/communication.dart';
 import '../models/crm_agenda.dart';
 import '../models/enums.dart';
@@ -156,6 +159,11 @@ class AppState extends ChangeNotifier {
       await loadOperationalFromCloud();
       await loadProvidersFromCloud();
     }
+
+    // Mandats et prélèvements SEPA : stockage séparé de l'état principal
+    // (les coordonnées bancaires ne doivent pas figurer dans le document
+    // d'état partagé).
+    await loadSepa();
 
     _ready = true;
     notifyListeners();
@@ -1944,6 +1952,382 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     final ok = await _pushToCloud('subscription_tiers', t.toMap(), docId: t.id);
     if (!ok) throw const CloudWriteException('Formule d\'abonnement');
+  }
+
+  // ═══════════════════════ DOMICILIATION SEPA ═══════════════════════
+  //
+  // ── POURQUOI CES DONNÉES SONT HORS DE `_persist()` ──────────────────
+  // L'état complet de l'application est sérialisé dans UN SEUL document
+  // Firestore (« gorex_state » par utilisateur). Y placer les coordonnées
+  // bancaires exposerait l'IBAN de chaque client à quiconque lit ce document.
+  // Les mandats et prélèvements sont donc persistés séparément :
+  //   • localement, sous une clé de préférences dédiée ;
+  //   • dans Firestore, dans les collections `sepa_mandates` / `sepa_debits`
+  //     (règles restreintes au CEO, cf. firestore.rules).
+  // Les montants d'abonnement, eux, ne sont pas des données bancaires et
+  // restent dans l'état normal.
+
+  /// Mandats de domiciliation connus.
+  List<SepaMandate> sepaMandates = [];
+
+  /// Ordres de prélèvement (brouillons, pré-notifiés, transmis…).
+  List<SepaDebit> sepaDebits = [];
+
+  static const _sepaStorageKey = 'gorex_sepa_v1';
+
+  /// Mandat actif d'un client, s'il existe.
+  SepaMandate? mandateForClient(String clientId) {
+    for (final m in sepaMandates) {
+      if (m.clientId == clientId && m.status == SepaMandateStatus.active) {
+        return m;
+      }
+    }
+    return null;
+  }
+
+  /// Vrai si le client a une domiciliation utilisable pour un prélèvement.
+  bool canDebitClient(String clientId) => mandateForClient(clientId)?.usable ?? false;
+
+  /// Charge les mandats et prélèvements depuis le stockage local.
+  Future<void> loadSepa() async {
+    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+    _cachedPrefs = prefs;
+    final raw = prefs.getString(_sepaStorageKey);
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      sepaMandates = [
+        for (final e in (m['mandates'] as List? ?? const []))
+          SepaMandate.fromMap(Map<String, dynamic>.from(e as Map)),
+      ];
+      sepaDebits = [
+        for (final e in (m['debits'] as List? ?? const []))
+          SepaDebit.fromMap(Map<String, dynamic>.from(e as Map)),
+      ];
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[SEPA] chargement impossible : $e');
+    }
+  }
+
+  Future<void> _persistSepa() async {
+    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+    _cachedPrefs = prefs;
+    await prefs.setString(
+      _sepaStorageKey,
+      jsonEncode({
+        'mandates': sepaMandates.map((e) => e.toMap()).toList(),
+        'debits': sepaDebits.map((e) => e.toMap()).toList(),
+      }),
+    );
+  }
+
+  /// Génère une référence de mandat unique (≤ 35 caractères, jeu SEPA).
+  String nextMandateReference() {
+    var max = 0;
+    final re = RegExp(r'GRX-ABO-\d{4}-(\d+)$');
+    for (final m in sepaMandates) {
+      final match = re.firstMatch(m.mandateReference);
+      if (match != null) {
+        final n = int.tryParse(match.group(1)!) ?? 0;
+        if (n > max) max = n;
+      }
+    }
+    final year = DateTime.now().year;
+    return 'GRX-ABO-$year-${(max + 1).toString().padLeft(4, '0')}';
+  }
+
+  /// Identifiant de bout en bout unique pour un ordre de prélèvement.
+  String _nextEndToEndId() =>
+      'GRX-${DateTime.now().microsecondsSinceEpoch}';
+
+  /// Enregistre un mandat de domiciliation.
+  ///
+  /// Refuse un mandat incohérent (IBAN invalide, référence manquante…) : un
+  /// mandat invalide produirait des rejets bancaires facturés.
+  Future<SepaMandate> registerMandate({
+    required String clientId,
+    required String clientName,
+    required String accountHolder,
+    required String iban,
+    String? bic,
+    required DateTime signatureDate,
+    SepaMandateType type = SepaMandateType.core,
+    String? notes,
+  }) async {
+    if (!can('finance')) {
+      throw const CloudWriteException(
+        'Seul le CEO ou le service financier peut enregistrer un mandat de '
+        'domiciliation',
+      );
+    }
+
+    final mandate = SepaMandate(
+      id: 'mand_${DateTime.now().microsecondsSinceEpoch}',
+      clientId: clientId,
+      clientName: clientName,
+      mandateReference: nextMandateReference(),
+      iban: SepaValidator.normalizeIban(iban),
+      bic: (bic == null || bic.trim().isEmpty)
+          ? null
+          : SepaValidator.normalizeBic(bic),
+      accountHolder: accountHolder.trim(),
+      type: type,
+      status: SepaMandateStatus.active,
+      signatureDate: signatureDate,
+      createdAt: DateTime.now(),
+      notes: notes,
+    );
+
+    final issues = mandate.validate();
+    if (issues.isNotEmpty) {
+      throw CloudWriteException('Mandat refusé : ${issues.join(' · ')}');
+    }
+
+    // Un seul mandat actif par client : l'ancien est révoqué, jamais supprimé
+    // (la trace du mandat précédent reste consultable).
+    final previous = mandateForClient(clientId);
+    if (previous != null) {
+      final i = sepaMandates.indexWhere((e) => e.id == previous.id);
+      if (i >= 0) {
+        sepaMandates[i] = previous.copyWith(
+          status: SepaMandateStatus.cancelled,
+          cancelledAt: DateTime.now(),
+        );
+        await _pushToCloud(
+          'sepa_mandates',
+          sepaMandates[i].toMap(),
+          docId: sepaMandates[i].id,
+        );
+      }
+    }
+
+    sepaMandates.add(mandate);
+    await _persistSepa();
+    await _logAudit(
+      'Mandat SEPA enregistré',
+      mandate.clientName,
+      detail: '${mandate.mandateReference} (${mandate.maskedIban})',
+    );
+    final ok = await _pushToCloud(
+      'sepa_mandates',
+      mandate.toMap(),
+      docId: mandate.id,
+    );
+    notifyListeners();
+    if (!ok) {
+      throw const CloudWriteException(
+        'Mandat enregistré localement mais non synchronisé',
+      );
+    }
+    return mandate;
+  }
+
+  /// Révoque un mandat : il ne pourra plus être prélevé, mais reste
+  /// consultable (obligation de traçabilité).
+  Future<void> revokeMandate(String mandateId, {String? reason}) async {
+    if (!can('finance')) {
+      throw const CloudWriteException('Révocation réservée au CEO ou à la finance');
+    }
+    final i = sepaMandates.indexWhere((e) => e.id == mandateId);
+    if (i < 0) return;
+    final updated = sepaMandates[i].copyWith(
+      status: SepaMandateStatus.cancelled,
+      cancelledAt: DateTime.now(),
+      notes: reason,
+    );
+    sepaMandates[i] = updated;
+    await _persistSepa();
+    await _logAudit(
+      'Mandat SEPA révoqué',
+      updated.clientName,
+      detail: '${updated.mandateReference}${reason != null ? ' — $reason' : ''}',
+    );
+    await _pushToCloud('sepa_mandates', updated.toMap(), docId: updated.id);
+    notifyListeners();
+  }
+
+  /// Crée un ordre de prélèvement pour l'abonnement d'un client.
+  ///
+  /// Le montant provient de la formule souscrite (`Client.subscriptionTierId`)
+  /// et n'est pas librement saisi : cela évite tout écart entre l'abonnement
+  /// contracté et le montant prélevé.
+  Future<SepaDebit> createSubscriptionDebit({
+    required String clientId,
+    required DateTime collectionDate,
+    bool annual = false,
+    String? remittance,
+    String? periodLabel,
+  }) async {
+    final client = clients.firstWhere(
+      (c) => c.id == clientId,
+      orElse: () => throw const CloudWriteException('Client introuvable'),
+    );
+    final mandate = mandateForClient(clientId);
+    if (mandate == null) {
+      throw const CloudWriteException(
+        'Aucun mandat de domiciliation actif pour ce client',
+      );
+    }
+    if (!mandate.usable) {
+      throw const CloudWriteException('Le mandat de domiciliation est inutilisable');
+    }
+
+    final tier = tierById(client.subscriptionTierId);
+    if (tier == null) {
+      throw const CloudWriteException('Formule d\'abonnement introuvable');
+    }
+    final amount = annual ? tier.annualPrice : tier.monthlyPrice;
+    if (amount <= 0) {
+      throw const CloudWriteException('Montant de la formule invalide');
+    }
+
+    final period = periodLabel ?? (annual ? 'annuel' : 'mensuel');
+    final debit = SepaDebit(
+      id: 'debit_${DateTime.now().microsecondsSinceEpoch}',
+      mandateId: mandate.id,
+      mandateReference: mandate.mandateReference,
+      clientId: clientId,
+      clientName: client.fullName,
+      iban: mandate.iban,
+      amount: amount,
+      endToEndId: _nextEndToEndId(),
+      remittanceInformation:
+          remittance ?? 'Abonnement ${tier.name} - $period',
+      requestedCollectionDate: collectionDate,
+      sequenceType: mandate.nextSequence,
+      status: SepaDebitStatus.draft,
+      createdAt: DateTime.now(),
+    );
+
+    sepaDebits.add(debit);
+    await _persistSepa();
+    await _pushToCloud('sepa_debits', debit.toMap(), docId: debit.id);
+    notifyListeners();
+    return debit;
+  }
+
+  /// Marque un ordre comme pré-notifié au client.
+  ///
+  /// La date de pré-notification conditionne la date de prélèvement : le
+  /// règlement SEPA impose 14 jours calendrier. Tant qu'elle n'est pas
+  /// renseignée, l'ordre est exclu du fichier `pain.008`.
+  Future<void> markDebitPreNotified(String debitId) async {
+    final i = sepaDebits.indexWhere((e) => e.id == debitId);
+    if (i < 0) return;
+    sepaDebits[i] = sepaDebits[i].copyWith(
+      status: SepaDebitStatus.preNotified,
+      preNotifiedAt: DateTime.now(),
+    );
+    await _persistSepa();
+    await _logAudit(
+      'Pré-notification SEPA',
+      sepaDebits[i].clientName,
+      detail:
+          '${sepaDebits[i].endToEndId} — ${sepaDebits[i].amount.toStringAsFixed(2)} EUR',
+    );
+    await _pushToCloud(
+      'sepa_debits',
+      sepaDebits[i].toMap(),
+      docId: sepaDebits[i].id,
+    );
+    notifyListeners();
+  }
+
+  /// Supprime un ordre de prélèvement encore en brouillon.
+  Future<void> deleteDebitDraft(String debitId) async {
+    final i = sepaDebits.indexWhere((e) => e.id == debitId);
+    if (i < 0) return;
+    if (sepaDebits[i].status != SepaDebitStatus.draft) {
+      throw const CloudWriteException(
+        'Seul un brouillon peut être supprimé (un ordre pré-notifié est engageant)',
+      );
+    }
+    sepaDebits.removeAt(i);
+    await _persistSepa();
+    notifyListeners();
+  }
+
+  /// Génère le fichier de prélèvement `pain.008.001.02` pour les ordres
+  /// sélectionnés (ou tous les ordres pré-notifiés si [debitIds] est vide).
+  ///
+  /// Ne transmet rien à la banque : produit le XML à déposer.
+  SepaBatchResult exportSepaBatch({List<String>? debitIds, DateTime? now}) {
+    final selected = debitIds == null || debitIds.isEmpty
+        ? sepaDebits
+              .where(
+                (d) =>
+                    d.status == SepaDebitStatus.preNotified ||
+                    d.status == SepaDebitStatus.draft,
+              )
+              .toList()
+        : sepaDebits.where((d) => debitIds.contains(d.id)).toList();
+
+    return SepaPain008Generator.generate(
+      debits: selected,
+      mandates: {for (final m in sepaMandates) m.id: m},
+      company: company,
+      createdAt: now ?? DateTime.now(),
+    );
+  }
+
+  /// Marque les ordres d'un lot comme transmis et met à jour la date de
+  /// dernier usage des mandats (détermine FRST → RCUR pour le mois suivant).
+  Future<void> markBatchSubmitted(List<String> debitIds, {String? batchId}) async {
+    if (!can('finance')) {
+      throw const CloudWriteException('Transmission réservée au CEO ou à la finance');
+    }
+    final now = DateTime.now();
+    final touchedMandates = <String>{};
+    for (var i = 0; i < sepaDebits.length; i++) {
+      if (!debitIds.contains(sepaDebits[i].id)) continue;
+      sepaDebits[i] = sepaDebits[i].copyWith(
+        status: SepaDebitStatus.submitted,
+        batchId: batchId,
+      );
+      touchedMandates.add(sepaDebits[i].mandateId);
+      await _pushToCloud(
+        'sepa_debits',
+        sepaDebits[i].toMap(),
+        docId: sepaDebits[i].id,
+      );
+    }
+    for (var i = 0; i < sepaMandates.length; i++) {
+      if (!touchedMandates.contains(sepaMandates[i].id)) continue;
+      sepaMandates[i] = sepaMandates[i].copyWith(lastUsedAt: now);
+      await _pushToCloud(
+        'sepa_mandates',
+        sepaMandates[i].toMap(),
+        docId: sepaMandates[i].id,
+      );
+    }
+    await _persistSepa();
+    await _logAudit(
+      'Lot de prélèvements transmis',
+      'Finance',
+      detail: '${debitIds.length} ordre(s) — lot ${batchId ?? 'sans identifiant'}',
+    );
+    notifyListeners();
+  }
+
+  /// Indicateurs de synthèse pour l'écran de domiciliation.
+  Map<String, num> sepaSummary() {
+    final active = sepaMandates
+        .where((m) => m.status == SepaMandateStatus.active)
+        .length;
+    final eligible = clients.where((c) => canDebitClient(c.id)).length;
+    final pending = sepaDebits
+        .where((d) => d.status == SepaDebitStatus.preNotified)
+        .fold<double>(0, (s, d) => s + d.amount);
+    final missingMandate = clients
+        .where((c) => c.active && mandateForClient(c.id) == null)
+        .length;
+    return {
+      'mandatsActifs': active,
+      'clientsEligibles': eligible,
+      'clientsSansMandat': missingMandate,
+      'montantEnAttente': pending,
+    };
   }
 
   // ─────────────────────────── BOOKINGS ───────────────────────────

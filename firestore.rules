@@ -284,6 +284,28 @@ service cloud.firestore {
       allow read, write: if isCeo() || isConciergeManager();
     }
 
+    // ══════════════════════ DOMICILIATION SEPA ══════════════════════
+    //
+    // Ces documents contiennent des IBAN : données financières à caractère
+    // personnel. Règles volontairement strictes :
+    //   • lecture  : finance/CEO, ou le client PROPRIÉTAIRE du mandat ;
+    //   • écriture : finance/CEO uniquement.
+    //
+    // Un client ne doit jamais pouvoir écrire son propre IBAN : il pourrait
+    // le remplacer par celui d'un tiers et détourner un prélèvement.
+    match /sepa_mandates/{doc} {
+      allow read: if isFinanceRole() || ownsClientData(resource.data);
+      allow create, update: if isFinanceRole();
+      // Un mandat n'est jamais supprimé : il est révoqué (traçabilité).
+      allow delete: if false;
+    }
+
+    match /sepa_debits/{doc} {
+      allow read: if isFinanceRole() || ownsClientData(resource.data);
+      allow create, update: if isFinanceRole();
+      allow delete: if isFinanceRole();
+    }
+
     // ══════════════════════ REFUS PAR DÉFAUT ══════════════════════
     //
     // FAILLE #2 CORRIGÉE. La version précédente terminait par

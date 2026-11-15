@@ -37,6 +37,8 @@ dependencies:
 
   # Utilities
   intl: ^0.20.2
+  # Export de fichiers côté navigateur (Blob / téléchargement)
+  web: ^1.1.1
   url_launcher: ^6.3.1
 
 dev_dependencies:

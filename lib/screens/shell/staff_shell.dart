@@ -15,6 +15,7 @@ import '../bookings/bookings_screen.dart';
 import '../providers/providers_screen.dart';
 import '../finance/finance_screen.dart';
 import '../finance/accounting_screen.dart';
+import '../finance/sepa_direct_debit_screen.dart';
 import '../crm/crm_screen.dart';
 import '../agenda/agenda_screen.dart';
 import '../communication/communication_screen.dart';
@@ -107,6 +108,13 @@ class _StaffShellState extends State<StaffShell> {
         Icons.receipt_long_outlined,
         Icons.receipt_long,
         const AccountingScreen(),
+        permission: 'finance',
+      ),
+      _NavItem(
+        s.tr('nav.sepa'),
+        Icons.sync_alt_outlined,
+        Icons.sync_alt,
+        const SepaDirectDebitScreen(),
         permission: 'finance',
       ),
       _NavItem(
