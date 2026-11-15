@@ -107,8 +107,9 @@ class SepaPain008Generator {
         included: 0,
         excluded: [
           'Identifiant créancier SEPA (ICS) absent ou invalide. '
-              'Renseignez-le dans les paramètres de la société : sans lui, '
-              'aucun prélèvement ne peut être déposé.',
+              'Vérifiez le numéro d\'entreprise de la société : il doit '
+              'comporter 10 chiffres et satisfaire la clé de contrôle BCE. '
+              'Sans ICS valide, aucun prélèvement ne peut être déposé.',
         ],
         total: 0,
       );

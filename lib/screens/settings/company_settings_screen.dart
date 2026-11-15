@@ -100,6 +100,30 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // ── BLOCAGE À LA SAISIE, PAS SEULEMENT À LA GÉNÉRATION ──────────────
+    // Un numéro d'entreprise syntaxiquement correct mais dont la clé de
+    // contrôle BCE est fausse produit un ICS SEPA qui a l'air valide mais ne
+    // correspond à aucune entité réelle. Le fichier de prélèvement serait
+    // rejeté par la banque — après avoir été préparé, ce qui est pire que
+    // d'être refusé tout de suite. On empêche donc l'enregistrement.
+    final bceCheck = VatService.validateBelgianCompanyNumber(
+      _companyNumber.text,
+    );
+    if (_companyNumber.text.trim().isNotEmpty && !bceCheck.valid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Numéro d\'entreprise invalide : ${bceCheck.message}. '
+            'Il conditionne l\'identifiant créancier SEPA (ICS) et donc les '
+            'prélèvements d\'abonnement.',
+          ),
+          backgroundColor: AppColors.urgent,
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     final s = context.read<AppState>();
     try {

@@ -158,12 +158,16 @@ class AppState extends ChangeNotifier {
       await loadTeamFromCloud();
       await loadOperationalFromCloud();
       await loadProvidersFromCloud();
+      await loadCompanyFromCloud();
     }
 
     // Mandats et prélèvements SEPA : stockage séparé de l'état principal
     // (les coordonnées bancaires ne doivent pas figurer dans le document
     // d'état partagé).
     await loadSepa();
+    // Les mandats vivent aussi dans Firestore : on récupère ceux saisis
+    // depuis un autre appareil.
+    await syncSepaFromCloud();
 
     _ready = true;
     notifyListeners();
@@ -828,6 +832,8 @@ class AppState extends ChangeNotifier {
     await loadTeamFromCloud();
     await loadOperationalFromCloud();
     await loadProvidersFromCloud();
+    await loadCompanyFromCloud();
+    await syncSepaFromCloud();
     notifyListeners();
     return true;
   }
@@ -897,6 +903,8 @@ class AppState extends ChangeNotifier {
     await loadTeamFromCloud();
     await loadOperationalFromCloud();
     await loadProvidersFromCloud();
+    await loadCompanyFromCloud();
+    await syncSepaFromCloud();
     notifyListeners();
     return true;
   }
@@ -1987,6 +1995,104 @@ class AppState extends ChangeNotifier {
 
   /// Vrai si le client a une domiciliation utilisable pour un prélèvement.
   bool canDebitClient(String clientId) => mandateForClient(clientId)?.usable ?? false;
+
+  /// Charge les coordonnées officielles de la société depuis Firestore.
+  ///
+  /// ── POURQUOI CE CHARGEMENT EXISTE ────────────────────────────────────
+  /// `updateCompany()` écrit bien `company/gorex-group` dans Firestore, mais
+  /// aucune lecture n'existait : les coordonnées ne vivaient donc que dans le
+  /// `localStorage` du navigateur où elles avaient été saisies. Sur un autre
+  /// appareil (exigence §1 du cahier des charges), l'application retombait sur
+  /// les valeurs par défaut du modèle — IBAN `BE00 0000 0000 0000`, numéro
+  /// d'entreprise `0000.000.000` — et la génération du fichier SEPA échouait.
+  ///
+  /// La base fait foi : dès qu'une session authentifiée existe, ce sont les
+  /// valeurs Firestore qui remplacent l'état local. Si la lecture échoue
+  /// (hors ligne, droits, réseau), on conserve l'état local au lieu de
+  /// l'écraser par des valeurs vides.
+  Future<void> loadCompanyFromCloud() async {
+    final token = restIdToken;
+    if (token == null || token.isEmpty) return;
+    try {
+      final row = await RestAuthService.fetchDocument(
+        'company/$_companyDocId',
+        token,
+      );
+      if (row == null || row.isEmpty) return;
+      // Le décodeur REST ajoute `id` / `uid` : ces clés ne font pas partie du
+      // modèle et sont ignorées par `CompanyProfile.fromMap`.
+      company = CompanyProfile.fromMap(row);
+      await _persist();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[State] société (REST) : $e');
+    }
+  }
+
+  /// Synchronise mandats et prélèvements depuis Firestore.
+  ///
+  /// ── POURQUOI CETTE MÉTHODE EXISTE ────────────────────────────────────
+  /// `registerMandate()` / `createSubscriptionDebit()` écrivaient bien dans
+  /// Firestore, mais `loadSepa()` ne relisait QUE le stockage local du
+  /// navigateur. Un mandat saisi sur l'ordinateur du bureau était donc
+  /// invisible sur un téléphone — exactement ce que l'exigence §1 du cahier
+  /// des charges interdit.
+  ///
+  /// Stratégie : l'union par identifiant. Firestore fait foi pour un mandat
+  /// connu des deux côtés (c'est la version que la banque a vue) ; un
+  /// mandat/ordre présent uniquement en local a été créé hors ligne et est
+  /// renvoyé vers Firestore au lieu d'être perdu.
+  ///
+  /// Sans jeton (non connecté), ou si Firestore refuse la lecture, l'état
+  /// local est conservé tel quel : jamais d'écrasement par du vide.
+  Future<void> syncSepaFromCloud() async {
+    final token = restIdToken;
+    if (token == null || token.isEmpty) return;
+
+    Future<List<Map<String, dynamic>>> rows(String c) =>
+        RestAuthService.fetchCollection(c, token, limit: 500);
+
+    try {
+      final cloudMandates = <String, SepaMandate>{};
+      for (final r in await rows('sepa_mandates')) {
+        final m = SepaMandate.fromMap(r);
+        cloudMandates[m.id] = m;
+      }
+      final cloudDebits = <String, SepaDebit>{};
+      for (final r in await rows('sepa_debits')) {
+        final d = SepaDebit.fromMap(r);
+        cloudDebits[d.id] = d;
+      }
+
+      // Rien en base : on ne touche pas à l'état local (première utilisation,
+      // ou lecture refusée). Les enregistrements locaux seront renvoyés plus
+      // bas s'il y en a.
+      if (cloudMandates.isEmpty && cloudDebits.isEmpty) return;
+
+      final localOnlyMandates = sepaMandates
+          .where((m) => !cloudMandates.containsKey(m.id))
+          .toList();
+      final localOnlyDebits = sepaDebits
+          .where((d) => !cloudDebits.containsKey(d.id))
+          .toList();
+
+      sepaMandates = [...cloudMandates.values, ...localOnlyMandates];
+      sepaDebits = [...cloudDebits.values, ...localOnlyDebits];
+
+      await _persistSepa();
+      notifyListeners();
+
+      // Remontée des créations faites hors ligne.
+      for (final m in localOnlyMandates) {
+        await _pushToCloud('sepa_mandates', m.toMap(), docId: m.id);
+      }
+      for (final d in localOnlyDebits) {
+        await _pushToCloud('sepa_debits', d.toMap(), docId: d.id);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[SEPA] synchronisation cloud : $e');
+    }
+  }
 
   /// Charge les mandats et prélèvements depuis le stockage local.
   Future<void> loadSepa() async {

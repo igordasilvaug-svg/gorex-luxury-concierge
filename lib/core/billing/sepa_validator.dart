@@ -146,6 +146,30 @@ class SepaValidator {
   static String normalizeBic(String raw) =>
       raw.replaceAll(RegExp(r'\s'), '').toUpperCase();
 
+  /// Vérifie la clé de contrôle d'un numéro d'entreprise belge (BCE/KBO).
+  ///
+  /// ── POURQUOI CE CONTRÔLE EST INDISPENSABLE ───────────────────────────
+  /// Un numéro à 10 chiffres produit TOUJOURS un ICS syntaxiquement valide —
+  /// y compris `0000.000.000`, qui donne `BE71ZZZ0000000000` et passe le
+  /// modulo-97. Sans ce contrôle, l'application émettrait un fichier de
+  /// prélèvement portant l'identifiant créancier d'aucune entité réelle :
+  /// la banque le rejetterait, ou pire, l'argent serait dû par un tiers.
+  ///
+  /// Règle BCE : les 8 premiers chiffres modulo 97, complétés à 97, doivent
+  /// redonner les 2 derniers. Ex. 10096790 % 97 = 60 → 97 - 60 = 37, et le
+  /// numéro complet est bien 1009679037.
+  static bool isValidBelgianEnterpriseNumber(String? raw) {
+    if (raw == null) return false;
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length != 10) return false;
+    // Un numéro composé uniquement de zéros n'existe pas.
+    if (RegExp(r'^0+$').hasMatch(digits)) return false;
+    final base = int.tryParse(digits.substring(0, 8));
+    if (base == null) return false;
+    final check = 97 - (base % 97);
+    return check.toString().padLeft(2, '0') == digits.substring(8);
+  }
+
   /// Calcule l'identifiant créancier SEPA (ICS) belge à partir du numéro
   /// d'entreprise BCE.
   ///
@@ -153,10 +177,13 @@ class SepaValidator {
   /// (10 chiffres, sans points). Ex. pour 0123.456.789 → `BE??ZZZ0123456789`.
   ///
   /// Les 2 chiffres de contrôle suivent le même algorithme que l'IBAN.
+  ///
+  /// Retourne `null` si le numéro ne comporte pas 10 chiffres OU s'il échoue
+  /// au contrôle BCE : un ICS dérivé d'un numéro inexistant serait accepté
+  /// par le format mais refusé par la banque.
   static String? creditorIdFromEnterpriseNumber(String? enterpriseNumber) {
-    if (enterpriseNumber == null) return null;
-    final digits = enterpriseNumber.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.length != 10) return null;
+    if (!isValidBelgianEnterpriseNumber(enterpriseNumber)) return null;
+    final digits = enterpriseNumber!.replaceAll(RegExp(r'[^0-9]'), '');
 
     final base = 'ZZZ$digits';
     // On ajoute BE00 pour le calcul, puis on déplace en fin de chaîne.
