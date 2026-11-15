@@ -34,6 +34,24 @@ const String _recaptchaSiteKey = String.fromEnvironment(
   defaultValue: '',
 );
 
+/// Type de clé reCAPTCHA fournie via [RECAPTCHA_SITE_KEY].
+///
+///  • `enterprise` (défaut) : clé créée dans Google Cloud Fraud Defense
+///    (anciennement « reCAPTCHA Enterprise »). Charge `enterprise.js`.
+///  • `v3` : clé créée dans la console reCAPTCHA v3 « classique ». Charge
+///    `api.js`.
+///
+/// Les deux familles de clés ne sont pas interchangeables : utiliser le
+/// mauvais provider produit un échec `app-check/recaptcha-error` à chaque
+/// demande de jeton, sans aucune requête réseau vers App Check.
+const String _recaptchaProvider = String.fromEnvironment(
+  'RECAPTCHA_PROVIDER',
+  defaultValue: 'enterprise',
+);
+
+/// Vrai si la clé configurée est une clé reCAPTCHA v3 « classique ».
+bool get _isV3 => _recaptchaProvider.toLowerCase() == 'v3';
+
 class WebAppCheck {
   WebAppCheck._();
 
@@ -58,10 +76,18 @@ class WebAppCheck {
     if (_activated || !configured) return;
     try {
       await FirebaseAppCheck.instance.activate(
-        // Fournisseur Enterprise (nom actuel : Google Cloud Fraud Defense).
-        // Il correspond aux clés « score-based » créées dans la console
-        // Cloud, invisibles pour l'utilisateur.
-        webProvider: ReCaptchaEnterpriseProvider(_recaptchaSiteKey),
+        // Fournisseur reCAPTCHA. Deux clés différentes existent chez Google :
+        //  • clé « score-based » créée dans l'ancienne console reCAPTCHA v3
+        //    → ReCaptchaV3Provider (charge api.js, widget rendu via grecaptcha)
+        //  • clé « Enterprise » créée dans Google Cloud Fraud Defense
+        //    → ReCaptchaEnterpriseProvider (charge enterprise.js)
+        // Se tromper de provider produit « AppCheck: ReCAPTCHA error ».
+        // Le type est choisi au build : --dart-define=RECAPTCHA_PROVIDER=v3|enterprise
+        // `WebProvider` n'est pas exporté par le paquet : on construit donc
+        // l'expression directement (les deux classes héritent de WebProvider).
+        webProvider: _isV3
+            ? ReCaptchaV3Provider(_recaptchaSiteKey)
+            : ReCaptchaEnterpriseProvider(_recaptchaSiteKey),
         // Attestation Android/iOS : JAMAIS `debug` en production. Le provider
         // `debug` accepte n'importe quel client (jeton secret partagé), ce qui
         // annulerait tout le bénéfice de l'attestation sur mobile. En release on
@@ -93,18 +119,12 @@ class WebAppCheck {
   /// jamais le rafraîchissement : cela créerait une évaluation reCAPTCHA
   /// supplémentaire à chaque appel, facturée au-delà du quota gratuit.
   static Future<String?> token() async {
-    // ignore: avoid_print
-    print('[DIAG2] token() appelé, activated=' + _activated.toString());
     if (!_activated) return null;
     try {
-      final _t = await FirebaseAppCheck.instance.getToken();
-      // ignore: avoid_print
-      print('[DIAG2] getToken -> ' + (_t == null ? 'NULL' : _t.length.toString() + ' chars'));
-      return _t;
+      return await FirebaseAppCheck.instance.getToken();
     } catch (e) {
       _lastError = e.toString();
-      // ignore: avoid_print
-      print('[DIAG2] getToken ECHEC: ' + e.toString());
+      if (kDebugMode) debugPrint('[AppCheck] jeton indisponible : $e');
       return null;
     }
   }
