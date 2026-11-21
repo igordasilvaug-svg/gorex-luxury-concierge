@@ -198,7 +198,12 @@ class Client {
     code: m['code'] as String,
     fullName: m['fullName'] as String,
     companyName: m['companyName'] as String?,
-    category: ClientCategory.fromName(m['category'] as String),
+    // `as String? ?? ''` : `fromName` accepte un `String` NON NULLABLE. Une
+    // fiche dont `category` vaut null levait donc une TypeError AVANT
+    // d'atteindre le `orElse` prévu pour les valeurs inconnues. La chaîne vide
+    // ne correspond à aucun nom d'énumération : on retombe alors proprement
+    // sur la valeur par défaut, au lieu de perdre la fiche entière.
+    category: ClientCategory.fromName((m['category'] as String?) ?? ''),
     email: m['email'] as String,
     phone: m['phone'] as String,
     secondaryContact: m['secondaryContact'] as String?,
@@ -208,7 +213,7 @@ class Client {
     personalAssistant: m['personalAssistant'] as String?,
     assistantPhone: m['assistantPhone'] as String?,
     confidentiality: ConfidentialityLevel.fromName(
-      m['confidentiality'] as String,
+      (m['confidentiality'] as String?) ?? '',
     ),
     // `?? ''` : une fiche peut désormais n'avoir AUCUNE formule de référence
     // (le candidat a répondu « à définir avec mon concierge »). Un cast direct
@@ -227,7 +232,18 @@ class Client {
     approvalStatus: ClientApprovalStatus.fromName(
       m['approvalStatus'] as String?,
     ),
-    createdAt: DateTime.parse(m['createdAt'] as String),
+    // ── DATE DE CRÉATION TOLÉRANTE ───────────────────────────────────────
+    //
+    // DÉFAUT CORRIGÉ. `createdAt` était lu par `DateTime.parse(m['createdAt']
+    // as String)`. Une fiche dépourvue de ce champ — import, migration, ajout
+    // manuel dans la console Firestore — levait une exception. Comme l'appelant
+    // avalait l'erreur, la fiche DISPARAISSAIT sans le moindre message : le
+    // client se connectait et ne voyait aucune de ses données.
+    //
+    // Le champ est donc facultatif. Une fiche sans date reçoit l'époque Unix
+    // comme sentinelle explicitement documentée : mieux vaut un dossier
+    // consultable avec une date « inconnue » qu'un dossier invisible.
+    createdAt: _date(m['createdAt']),
     isBusiness: m['isBusiness'] as bool? ?? false,
     companyNumber: m['companyNumber'] as String?,
     vatNumber: m['vatNumber'] as String?,
@@ -235,6 +251,18 @@ class Client {
     billingEmail: m['billingEmail'] as String?,
     peppolEnabled: m['peppolEnabled'] as bool? ?? false,
   );
+
+  /// Date de création tolérante : ne fait jamais échouer le décodage.
+  ///
+  /// Renvoie l'époque Unix (1970-01-01) pour une valeur absente ou illisible.
+  /// Cette sentinelle est reconnaissable et n'invente pas une date plausible.
+  static DateTime _date(dynamic v) {
+    if (v is String) {
+      final parsed = DateTime.tryParse(v);
+      if (parsed != null) return parsed;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
 
   static List<String> _list(dynamic v) =>
       v == null ? <String>[] : (v as List).map((e) => e.toString()).toList();

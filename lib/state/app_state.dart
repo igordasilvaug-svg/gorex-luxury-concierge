@@ -1016,6 +1016,13 @@ class AppState extends ChangeNotifier {
   }) async {
     if (uid == null || token == null || token.isEmpty) return null;
 
+    // Nouvelle session = nouveau bilan. Sans ce nettoyage, une fiche signalée
+    // lors d'une connexion précédente resterait affichée indéfiniment. Le
+    // nettoyage est ici, et non dans `loadOperationalFromCloud`, parce que
+    // `_upsertClientFromRow` s'exécute AVANT cette synchronisation : effacer
+    // plus tard détruirait justement l'erreur de connexion qu'on veut garder.
+    _clientDecodeErrors.clear();
+
     // Résolution du profil métier : personnel (`staff`) puis client (`clients`).
     AppUser? profile;
 
@@ -1143,8 +1150,34 @@ class AppState extends ChangeNotifier {
       } else {
         clients.insert(0, c);
       }
-    } catch (_) {}
+    } catch (e) {
+      // Un décodage qui échoue ne doit JAMAIS être silencieux.
+      //
+      // DÉFAUT CORRIGÉ. Ce bloc faisait `catch (_) {}` : une fiche client
+      // légèrement incomplète (champ `createdAt` absent, `category` à null)
+      // levait une exception, la fiche était jetée, et l'utilisateur se
+      // retrouvait devant un espace vide — sans message, sans trace, sans
+      // moyen de comprendre. J'ai moi-même cherché un « bug majeur » qui
+      // n'était qu'un jeu de données incomplet, précisément parce que
+      // l'erreur était muette.
+      //
+      // On ne fait pas échouer la connexion pour autant (le client doit
+      // pouvoir entrer), mais on conserve la trace.
+      _clientDecodeErrors.add(
+        'Fiche ${r['id'] ?? '?'} illisible : ${e.runtimeType} — $e',
+      );
+      if (kDebugMode) {
+        debugPrint('Fiche client illisible : $e');
+      }
+    }
   }
+
+  /// Dernières fiches client dont le décodage a échoué.
+  ///
+  /// Exposé pour que l'interface puisse signaler le problème au personnel au
+  /// lieu de laisser un dossier invisible sans explication.
+  final List<String> _clientDecodeErrors = <String>[];
+  List<String> get clientDecodeErrors => List.unmodifiable(_clientDecodeErrors);
 
   /// Construit un [AppUser] depuis une fiche Firestore `staff/{uid}`.
   AppUser? _profileFromStaff(Map<String, dynamic> r) {
@@ -1806,8 +1839,16 @@ class AppState extends ChangeNotifier {
         for (final r in clientRows) {
           try {
             loadedClients.add(Client.fromMap(Map<String, dynamic>.from(r)));
-          } catch (_) {
-            // Fiche ancienne ou incomplète : ignorée sans faire échouer le lot.
+          } catch (e) {
+            // Fiche ancienne ou incomplète : on n'interrompt pas le lot, mais
+            // on NE PERD PAS la trace. Une fiche silencieusement écartée se
+            // traduit, pour le personnel, par un dossier qui « n'existe pas ».
+            _clientDecodeErrors.add(
+              'Fiche ${r['id'] ?? '?'} illisible : ${e.runtimeType} — $e',
+            );
+            if (kDebugMode) {
+              debugPrint('Fiche client illisible dans le lot : $e');
+            }
           }
         }
         if (loadedClients.isNotEmpty) {
