@@ -751,6 +751,114 @@ const check = async (label, fn, expect) => {
     'DENY',
   );
 
+  // ══════════════════════════════════════════════════════════════════════
+  // 55-60. CRÉATION DU PROFIL D'IDENTITÉ : le dossier revendiqué doit être
+  //        CELUI DU TITULAIRE.
+  //
+  // FAILLE CORRIGÉE. La règle de création n'exigeait que `clientId is
+  // string`, sans vérifier à qui ce dossier appartenait. Un compte
+  // fraîchement créé — donc authentifié, jeton valide — pouvait se rattacher
+  // au dossier d'un AUTRE client, puis lire ses contrats, ses mandats SEPA et
+  // ses demandes : toutes les règles d'appartenance reposent sur ce
+  // `clientId`. Un compte gratuit suffisait à viser n'importe qui.
+  //
+  // Le rattachement est désormais prouvé par l'e-mail du jeton. On ne
+  // s'appuie PAS sur `email_verified` : au moment de l'inscription, il est
+  // FAUX (le lien est envoyé, non exigé) — s'y fier aurait bloqué toute
+  // inscription réelle. Le test 58 le vérifie explicitement.
+  // ══════════════════════════════════════════════════════════════════════
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'clients', 'gx-claim-mine-' + RUN), {
+      id: 'gx-claim-mine-' + RUN, code: 'GRX-CLAIM-' + RUN,
+      fullName: 'Titulaire Legitime',
+      email: 'titulaire@example.com', phone: '+32470003333',
+      language: 'fr', approvalStatus: 'pending', active: true,
+    });
+    await setDoc(doc(db, 'clients', 'gx-claim-victim-' + RUN), {
+      id: 'gx-claim-victim-' + RUN, code: 'GRX-VICTIM-' + RUN,
+      fullName: 'Client Vise',
+      email: 'vise@example.com', phone: '+32470004444',
+      language: 'fr', approvalStatus: 'approved', active: true,
+    });
+  });
+
+  // Les identifiants sont préfixés par RUN : l'état de l'émulateur persiste
+  // entre deux exécutions, et un profil déjà créé ferait échouer un `create`
+  // (qui exigerait alors une mise à jour).
+  const MY_SHEET = 'gx-claim-mine-' + RUN;
+  const VICTIM_SHEET = 'gx-claim-victim-' + RUN;
+
+  // Nouveau compte : aucun profil n'existe encore. On renvoie une instance
+  // Firestore, comme pour les autres contextes du fichier.
+  const newbie = (uidEnd, email, verified) => testEnv
+    .authenticatedContext(
+      'newbie' + uidEnd + RUN,
+      { email, email_verified: verified, firebase: { sign_in_provider: 'password' } },
+    )
+    .firestore();
+
+  await check(
+    '55. creation du profil sur SON propre dossier -> autorisee',
+    () => setDoc(doc(newbie('mine', 'titulaire@example.com', true), 'user_profiles', 'newbiemine' + RUN), {
+      uid: 'newbiemine' + RUN, email: 'titulaire@example.com',
+      role: 'vipClient', clientId: MY_SHEET,
+    }),
+    'ALLOW',
+  );
+
+  await check(
+    '56. creation du profil sur le dossier D\'AUTRUI -> refusee',
+    () => setDoc(doc(newbie('victim', 'vise@example.com', true), 'user_profiles', 'newbievictim' + RUN), {
+      uid: 'newbievictim' + RUN, email: 'vise@example.com',
+      role: 'vipClient', clientId: MY_SHEET,
+    }),
+    'DENY',
+  );
+
+  await check(
+    '57. dossier inexistant -> refusee (get() echoue, refus par defaut)',
+    () => setDoc(doc(newbie('ghost', 'fantome@example.com', true), 'user_profiles', 'newbieghost' + RUN), {
+      uid: 'newbieghost' + RUN, email: 'fantome@example.com',
+      role: 'vipClient', clientId: 'gx-dossier-inexistant',
+    }),
+    'DENY',
+  );
+
+  // LE TEST QUI PROTÈGE L'INSCRIPTION RÉELLE : le jeton d'un compte qui vient
+  // de s'inscrire porte email_verified = false. La règle ne doit pas en
+  // dépendre, sinon plus personne ne peut créer de compte.
+  await check(
+    '58. email_verified=false n\'empeche pas l\'inscription legitime',
+    () => setDoc(doc(newbie('unverified', 'titulaire@example.com', false), 'user_profiles', 'newbieunverified' + RUN), {
+      uid: 'newbieunverified' + RUN, email: 'titulaire@example.com',
+      role: 'vipClient', clientId: MY_SHEET,
+    }),
+    'ALLOW',
+  );
+
+  // L'attaquant le plus crédible : il possède DÉJÀ un dossier légitime
+  // (titulaire@example.com), et tente de se rattacher au dossier APPROUVÉ
+  // d'autrui (vise@example.com) pour en lire les contrats et mandats.
+  // Son e-mail ne correspond pas à la fiche visée : refus.
+  await check(
+    '59. titulaire legitime s\'appropriant un dossier approuve d\'autrui -> refuse',
+    () => setDoc(doc(newbie('grab', 'titulaire@example.com', true), 'user_profiles', 'newbiegrab' + RUN), {
+      uid: 'newbiegrab' + RUN, email: 'titulaire@example.com',
+      role: 'vipClient', clientId: VICTIM_SHEET,
+    }),
+    'DENY',
+  );
+
+  await check(
+    '60. clientId vide -> refusee',
+    () => setDoc(doc(newbie('empty', 'titulaire@example.com', true), 'user_profiles', 'newbieempty' + RUN), {
+      uid: 'newbieempty' + RUN, email: 'titulaire@example.com',
+      role: 'vipClient', clientId: '',
+    }),
+    'DENY',
+  );
+
   await testEnv.cleanup();
 
   const ko = results.filter((r) => !r.ok);

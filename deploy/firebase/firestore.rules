@@ -134,6 +134,36 @@ service cloud.firestore {
       return isClient() && myClientId() != '' && d.clientId == myClientId();
     }
 
+    // Le dossier revendiqué à la création du profil est-il bien CELUI DU
+    // TITULAIRE ?
+    //
+    // FAILLE CORRIGÉE. La règle de création de `user_profiles` exigeait
+    // seulement que `clientId` soit une CHAÎNE, sans vérifier à qui ce dossier
+    // appartenait. Un compte fraîchement créé — donc déjà authentifié, avec un
+    // jeton valide — pouvait donc écrire :
+    //     user_profiles/{son propre uid} = { role:'vipClient',
+    //                                        clientId:'<dossier d'autrui>' }
+    // puis lire les contrats, mandats SEPA et demandes de ce dossier : toutes
+    // les règles d'appartenance (`ownsClientData`) s'appuient sur ce
+    // `clientId`. Un compte gratuit suffisait à viser n'importe quel client.
+    //
+    // Le rattachement est désormais PROUVÉ : l'e-mail du jeton doit être
+    // l'e-mail porté par la fiche client visée. On obtient ainsi une
+    // correspondance d'e-mail sans dépendre de `email_verified` — qui est FAUX
+    // au moment de l'inscription (le lien de vérification est envoyé mais non
+    // exigé). S'y fier aurait bloqué toute inscription réelle.
+    //
+    // `get()` n'est pas soumis aux règles de lecture de `clients` : il évalue
+    // le document cible directement. Si la fiche n'existe pas, l'évaluation
+    // échoue et la règle rend false : refus, comportement voulu.
+    function claimsOwnClientSheet(cid) {
+      return cid is string
+             && cid != ''
+             && request.auth.token.email is string
+             && get(/databases/$(database)/documents/clients/$(cid)).data.email
+                  .lower() == request.auth.token.email.lower();
+    }
+
     // ─────────────── Helpers de contrôle de champs ───────────────
 
     // NB : les règles Firestore n'ont PAS d'opérateur ternaire. La version
@@ -159,10 +189,14 @@ service cloud.firestore {
     match /user_profiles/{uid} {
       allow read: if isRealUser() && (request.auth.uid == uid || isStaff());
 
+      // Le `clientId` déclaré doit correspondre au dossier dont l'e-mail est
+      // celui du compte (voir claimsOwnClientSheet). Sans cette vérification,
+      // n'importe quel compte pouvait se rattacher au dossier d'un autre.
       allow create: if isRealUser()
                     && request.auth.uid == uid
                     && request.resource.data.role == 'vipClient'
                     && request.resource.data.clientId is string
+                    && claimsOwnClientSheet(request.resource.data.clientId)
                     && !(request.resource.data.keys().hasAny(
                           ['permissions', 'isStaff', 'isAdmin']));
 
