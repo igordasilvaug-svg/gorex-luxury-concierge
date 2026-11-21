@@ -70,6 +70,53 @@
     }
   }
 
+
+  // ── Réservation d'espace ──────────────────────────────────────────────
+  //
+  // DÉFAUT CORRIGÉ. La bannière était un calque `position:fixed` posé sur le
+  // bas de la page, sans réserver d'espace : elle recouvrait donc les
+  // derniers éléments de CHAQUE écran (le bouton « COMPLÉTER MES
+  // INFORMATIONS » devenait inatteignable sur un téléphone).
+  //
+  // On réduit la hauteur de la vue Flutter de la hauteur réelle de la
+  // bannière : le contenu se réorganise au-dessus, rien n'est masqué. La
+  // hauteur est mesurée après insertion (elle dépend du texte et du retour à
+  // la ligne) et réappliquée au redimensionnement, car Flutter réécrit ses
+  // styles en ligne à chaque changement de taille de la fenêtre.
+  var reserved = null;
+
+  function flutterView() {
+    return document.querySelector('flutter-view');
+  }
+
+  function applyReservation() {
+    var view = flutterView();
+    if (!view || !reserved) return;
+    view.style.setProperty('bottom', 'auto', 'important');
+    view.style.setProperty('height', reserved.height, 'important');
+  }
+
+  function reserveSpace(bar) {
+    var view = flutterView();
+    if (!view) return;
+    var h = Math.ceil(bar.getBoundingClientRect().height);
+    if (!h) return;
+    reserved = { height: 'calc(100vh - ' + h + 'px)' };
+    applyReservation();
+  }
+
+  function releaseSpace() {
+    var view = flutterView();
+    reserved = null;
+    if (!view) return;
+    view.style.removeProperty('bottom');
+    view.style.removeProperty('height');
+  }
+
+  window.addEventListener('resize', function () {
+    if (reserved) applyReservation();
+  });
+
   function build() {
     var lang = detectLang();
     var t = STRINGS[lang];
@@ -128,6 +175,7 @@
 
     function close(value) {
       save(value);
+      releaseSpace();
       bar.style.transition = 'opacity .25s ease';
       bar.style.opacity = '0';
       setTimeout(function () {
@@ -150,7 +198,11 @@
 
   function init() {
     if (alreadyChosen()) return;
-    document.body.appendChild(build());
+    var bar = build();
+    document.body.appendChild(bar);
+    // Mesure APRÈS insertion : la hauteur dépend du texte et du retour à la
+    // ligne, elle n'est pas connue avant.
+    reserveSpace(bar);
   }
 
   if (document.readyState === 'loading') {
