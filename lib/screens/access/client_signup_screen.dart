@@ -217,21 +217,41 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
       clientId: client.id,
     );
 
+    // 4. Ouverture IMMÉDIATE de la session.
+    //
+    // DÉFAUT CORRIGÉ, constaté en production. L'écran se contentait d'afficher
+    // un message puis de se fermer : le client était renvoyé au formulaire de
+    // connexion, sans aucune explication sur la validation en cours. Il venait
+    // pourtant de créer son compte, et sa fiche existait bien en base. Rien ne
+    // lui indiquait que son dossier était en cours d'examen.
+    //
+    // On ouvre donc la session dans la foulée : la racine de l'application
+    // détecte un dossier non validé et affiche l'écran d'attente, qui explique
+    // la suite. Le client n'a plus rien à faire.
+    final opened = await state.signInWithFirebase(email, _password.text);
+
     if (!mounted) return;
     setState(() => _busy = false);
+
     // Signale au navigateur que la création de compte est aboutie : c'est ce
     // signal qui fait proposer l'enregistrement du couple e-mail / mot de
     // passe par le gestionnaire du navigateur (Safari, Chrome, Android).
     // Sans lui, le client devait mémoriser puis ressaisir son mot de passe.
     TextInput.finishAutofillContext(shouldSave: true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Compte créé. Un e-mail de vérification a été envoyé à $email.',
-        ),
-      ),
-    );
-    Navigator.of(context).pop();
+
+    if (opened) {
+      // Ferme le formulaire : la racine affiche l'écran d'attente.
+      Navigator.of(context).pop();
+      return;
+    }
+
+    // La session ne s'est pas ouverte : on ne laisse pas le client devant un
+    // formulaire vide, on lui dit quoi faire.
+    setState(() {
+      _error = 'Votre compte est créé, mais la connexion automatique a '
+          'échoué. Connectez-vous avec votre adresse e-mail et votre mot de '
+          'passe : votre dossier apparaîtra comme « en cours d\'examen ».';
+    });
   }
 
   String _signupError(String? code) {

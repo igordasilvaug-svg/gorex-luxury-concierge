@@ -2087,8 +2087,31 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  String _nextClientCode() =>
-      'GRX-VIP-${(clients.length + 1).toString().padLeft(4, '0')}';
+  /// Numéro de dossier suivant, au format `GRX-VIP-0001`.
+  ///
+  /// BUG CORRIGÉ : la version précédente utilisait `clients.length + 1`, ce
+  /// qui produit un doublon dès que la liste locale n'est pas complète
+  /// (suppression, import partiel, ou — cas réel constaté — inscription
+  /// publique : un visiteur non connecté n'a AUCUNE fiche en mémoire, donc
+  /// tout nouvel inscrit recevait « GRX-VIP-0001 »). On se fonde désormais
+  /// sur le plus grand numéro déjà attribué localement.
+  ///
+  /// LIMITE CONNUE : la numérotation reste locale à l'appareil. Deux
+  /// inscriptions simultanées depuis deux navigateurs peuvent donc encore
+  /// produire le même numéro. Le champ `id` reste unique, mais deux dossiers
+  /// porteraient la même référence imprimée. Voir le rapport : une
+  /// renumérotation à la validation est la correction propre.
+  String _nextClientCode() {
+    var max = 0;
+    for (final c in clients) {
+      final m = RegExp(r'(\d+)\s*$').firstMatch(c.code);
+      if (m != null) {
+        final n = int.tryParse(m.group(1)!) ?? 0;
+        if (n > max) max = n;
+      }
+    }
+    return 'GRX-VIP-${(max + 1).toString().padLeft(4, '0')}';
+  }
 
   Future<Client> createClient(Client draft) async {
     final c = Client(
