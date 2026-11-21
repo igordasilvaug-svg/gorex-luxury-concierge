@@ -230,6 +230,12 @@ class AppState extends ChangeNotifier {
   ///      (cas constaté sur Safari) ;
   ///   2. SDK Firestore — secours.
   Future<void> loadTeamFromCloud() async {
+    // 403 CORRIGÉ. `staff` est réservé au personnel par les règles Firestore.
+    // Un client connecté qui appelait cette méthode recevait un 403 à chaque
+    // connexion (erreur visible en console). L'équipe ne le concerne pas :
+    // on ne demande plus rien.
+    if (!isStaff) return;
+
     final token = restIdToken;
     var rows = <Map<String, dynamic>>[];
 
@@ -1026,21 +1032,75 @@ class AppState extends ChangeNotifier {
     // Résolution du profil métier : personnel (`staff`) puis client (`clients`).
     AppUser? profile;
 
-    final staffFetch = await RestAuthService.fetchStaffProfile(uid, token);
-    var row = staffFetch.data;
-    if (row == null) {
-      final byEmail = await RestAuthService.findStaffByEmail(email, token);
-      row = byEmail.data;
+    // ── ÉTAPE PRÉALABLE : le profil d'identité (404/403 CORRIGÉS) ────────
+    //
+    // DÉFAUT CORRIGÉ. La résolution commençait par sonder `staff/{uid}`, puis
+    // `staff` par e-mail. Pour un CLIENT — c'est-à-dire l'immense majorité des
+    // comptes — ces deux appels échouaient : 404 sur un document inexistant,
+    // 403 sur une collection réservée au personnel. Deux erreurs rouges dans
+    // la console à chaque connexion, pour un cas parfaitement normal.
+    //
+    // `user_profiles/{uid}` est lisible par son propre titulaire (règle :
+    // `request.auth.uid == uid || isStaff()`). Une seule lecture, autorisée,
+    // donne le rôle ET le dossier. On ne sonde plus au hasard.
+    //
+    // Repli conservé : les comptes plus anciens peuvent ne pas avoir de
+    // `user_profiles`. Dans ce cas seulement, l'ancienne résolution s'applique.
+    String? roleFromProfile;
+    String? clientIdFromProfile;
+    try {
+      final own = await RestAuthService.fetchDocument(
+        'user_profiles/$uid',
+        token,
+      );
+      if (own != null) {
+        roleFromProfile = own['role'] as String?;
+        clientIdFromProfile = own['clientId'] as String?;
+      }
+    } catch (_) {
+      // Lecture impossible : on retombera sur la résolution historique.
     }
-    if (row != null) profile = _profileFromStaff(row);
 
-    if (profile == null) {
+    // Client : le profil d'identité suffit, on lit directement sa fiche.
+    if (roleFromProfile == UserRole.vipClient.name) {
       final clientFetch = await RestAuthService.findClientByEmail(email, token);
       final clientRow = clientFetch.data;
       if (clientRow != null) {
         profile = _profileFromClientRow(clientRow);
         _upsertClientFromRow(clientRow);
       }
+      if (profile == null && clientIdFromProfile != null &&
+          clientIdFromProfile.isNotEmpty) {
+        // Repli : la fiche est peut-être indexée sous un autre e-mail.
+        final direct = await RestAuthService.fetchDocument(
+          'clients/$clientIdFromProfile',
+          token,
+        );
+        if (direct != null) {
+          profile = _profileFromClientRow(direct);
+          _upsertClientFromRow(direct);
+        }
+      }
+    }
+
+    if (profile == null && roleFromProfile == null) {
+      // Compte sans profil d'identité : résolution historique (personnel).
+      final staffFetch = await RestAuthService.fetchStaffProfile(uid, token);
+      var row = staffFetch.data;
+      if (row == null) {
+        final byEmail = await RestAuthService.findStaffByEmail(email, token);
+        row = byEmail.data;
+      }
+      if (row != null) profile = _profileFromStaff(row);
+    } else if (profile == null && roleFromProfile != UserRole.vipClient.name) {
+      // Profil d'identité indiquant un rôle de personnel : on charge sa fiche.
+      final staffFetch = await RestAuthService.fetchStaffProfile(uid, token);
+      var row = staffFetch.data;
+      if (row == null) {
+        final byEmail = await RestAuthService.findStaffByEmail(email, token);
+        row = byEmail.data;
+      }
+      if (row != null) profile = _profileFromStaff(row);
     }
 
     // Repli local : UNIQUEMENT hors production (comptes de démonstration).
@@ -2743,14 +2803,24 @@ class AppState extends ChangeNotifier {
       // abonnements : une lecture de collection non filtrée se ferait refuser
       // (403). On filtre donc explicitement, pour le client uniquement — le
       // personnel reçoit la collection entière.
-      final email = currentUser?.email;
+      //
+      // ⚠️ LE CHAMP FILTRÉ DOIT ÊTRE CELUI QUE LA RÈGLE CONTRÔLE.
+      // La règle de lecture est `ownsClientData(resource.data)`, qui compare
+      // `data.clientId` à l'identifiant du dossier. Filtrer sur `clientEmail`
+      // — ce que faisait le code — produisait un 403 : Firestore ne peut pas
+      // prouver, à partir d'une requête sur `clientEmail`, que le résultat
+      // satisfait une condition portant sur `clientId`. La requête elle-même
+      // est donc refusée, quel que soit son contenu.
+      final clientId = currentUser?.clientId;
       final isClientOnly = currentUser?.role == UserRole.vipClient;
-      final rows = (isClientOnly && email != null && email.isNotEmpty)
+      final rows = (isClientOnly &&
+              clientId != null &&
+              clientId.isNotEmpty)
           ? await RestAuthService.queryCollection(
               'subscriptions',
               token,
-              field: 'clientEmail',
-              value: email,
+              field: 'clientId',
+              value: clientId,
               limit: 50,
             )
           : await RestAuthService.fetchCollection(
@@ -2871,8 +2941,35 @@ class AppState extends ChangeNotifier {
     final token = restIdToken;
     if (token == null || token.isEmpty) return;
 
-    Future<List<Map<String, dynamic>>> rows(String c) =>
-        RestAuthService.fetchCollection(c, token, limit: 500);
+    // ── LECTURE FILTRÉE POUR UN CLIENT (403 CORRIGÉ) ────────────────────
+    //
+    // DÉFAUT CORRIGÉ. Cette méthode lisait `sepa_mandates` et `sepa_debits`
+    // en COLLECTION ENTIÈRE, quel que soit le profil. Or les règles Firestore
+    // réservent ces collections au rôle finance (`isFinanceRole()`) et au
+    // débiteur pour ses propres documents (`ownsClientData`). Un client
+    // connecté recevait donc un 403 à chaque synchronisation — visible dans
+    // la console du navigateur comme « Failed to load resource: 403 ».
+    //
+    // Ce n'était pas qu'une pollution de console : le `try/catch` englobant
+    // avalait l'erreur, donc le client ne chargeait JAMAIS ses propres mandats
+    // depuis la base. Sur un second appareil, son mandat SEPA était invisible.
+    //
+    // Un client interroge désormais par le champ `clientId`, exactement comme
+    // le prévoient les règles (queryCollection, pas fetchCollection).
+    final staff = isStaff;
+    final clientId = currentUser?.clientId ?? '';
+
+    Future<List<Map<String, dynamic>>> rows(String c) async {
+      if (staff) return RestAuthService.fetchCollection(c, token, limit: 500);
+      if (clientId.isEmpty) return const [];
+      return RestAuthService.queryCollection(
+        c,
+        token,
+        field: 'clientId',
+        value: clientId,
+        limit: 500,
+      );
+    }
 
     try {
       final cloudMandates = <String, SepaMandate>{};
@@ -4256,6 +4353,12 @@ class AppState extends ChangeNotifier {
   /// Sans cela, un prestataire saisi sur un poste restait invisible partout
   /// ailleurs, et le formulaire de réservation proposait une liste vide.
   Future<void> loadProvidersFromCloud() async {
+    // 403 CORRIGÉ. Le carnet de prestataires est réservé au personnel
+    // (`match /providers/{doc} { allow read, write: if isStaff(); }`).
+    // Un client connecté provoquait un 403 à chaque connexion. Il n'a pas à
+    // connaître les prestataires : on ne demande plus rien.
+    if (!isStaff) return;
+
     final token = restIdToken;
     if (token == null || token.isEmpty) return;
 

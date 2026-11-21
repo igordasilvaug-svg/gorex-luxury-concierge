@@ -24,7 +24,10 @@ import 'package:gorex_concierge/models/subscription.dart';
 import 'package:gorex_concierge/screens/client/client_profile_screen.dart';
 import 'package:gorex_concierge/state/app_state.dart';
 
-Client _client({String tierId = ''}) => Client(
+Client _client({
+  String tierId = '',
+  ClientApprovalStatus approval = ClientApprovalStatus.approved,
+}) => Client(
   id: 'c1',
   code: 'GRX-VIP-0001',
   fullName: 'Camille Dupont',
@@ -36,7 +39,7 @@ Client _client({String tierId = ''}) => Client(
   confidentiality: ConfidentialityLevel.elevated,
   category: ClientCategory.individualVip,
   createdAt: DateTime.now(),
-  approvalStatus: ClientApprovalStatus.approved,
+  approvalStatus: approval,
   active: true,
 );
 
@@ -50,9 +53,12 @@ AppUser _clientUser() => const AppUser(
 );
 
 /// Prépare un état avec un client validé et une session cliente ouverte.
-AppState _stateWithClient({String tierId = ''}) {
+AppState _stateWithClient({
+  String tierId = '',
+  ClientApprovalStatus approval = ClientApprovalStatus.approved,
+}) {
   final s = AppState();
-  s.clients = [_client(tierId: tierId)];
+  s.clients = [_client(tierId: tierId, approval: approval)];
   s.currentUser = _clientUser();
   return s;
 }
@@ -73,17 +79,24 @@ void main() {
   });
 
   group("Interrupteur d'ouverture commerciale", () {
-    test("l'interrupteur est FERMÉ par défaut", () {
-      // Vérification volontairement directe : si quelqu'un passe la constante
-      // à true, ce test tombe, et c'est le seul endroit où la décision
-      // d'ouvrir la commercialisation doit être prise consciemment.
-      expect(SubscriptionPolicy.subscriptionsOpen, isFalse);
-      expect(SubscriptionPolicy.canActivateBilling, isFalse);
+    // NOTE : l'interrupteur est désormais OUVERT (décision de direction du
+    // 21/11/2026). Les tests ne verrouillent donc plus la valeur `false` —
+    // ce serait tester une décision commerciale, pas du code. Ils vérifient
+    // les GARANTIES, qui doivent tenir dans les deux états : c'est cela qui
+    // empêche un client de s'attribuer un abonnement facturable.
+    test("l'interrupteur et le verrou de facturation ne divergent pas", () {
+      // Deux verrous existent (souscription ouverte / activation possible).
+      // S'ils divergeaient, un abonnement pourrait être déposé sans jamais
+      // pouvoir être activé — ou l'inverse, ce qui serait pire.
+      expect(
+        SubscriptionPolicy.canActivateBilling,
+        SubscriptionPolicy.subscriptionsOpen,
+      );
     });
 
-    test('le message affiché ne promet pas de souscription possible', () {
+    test('le message de fermeture ne promet pas ce que le code interdit', () {
       // La première rédaction annonçait « vous pouvez déjà déposer vos
-      // demandes » alors que requestSubscription() refuse. Une phrase qui
+      // demandes » alors que requestSubscription() refusait. Une phrase qui
       // annonce ce que le code interdit est un mensonge.
       expect(
         SubscriptionPolicy.closedNotice.toLowerCase(),
@@ -95,8 +108,42 @@ void main() {
       );
     });
 
-    test("aucune demande d'abonnement n'est enregistrable", () async {
+    test('une demande non approuvée ne devient JAMAIS facturable', () async {
+      // Invariante indépendante de l'interrupteur : seul un abonnement
+      // explicitement approuvé par Gorex peut être activé. Une demande
+      // `requested` déposée par le client ne peut pas se transformer seule
+      // en contrat prélevable.
       final s = _stateWithClient(tierId: 'tier_essential');
+      s.subscriptions = [
+        Subscription(
+          id: 'sub-req',
+          clientId: 'c1',
+          clientEmail: 'camille@example.com',
+          tierId: 'tier_essential',
+          tierName: 'GOREX ESSENTIAL',
+          cycle: BillingCycle.annual,
+          amount: 4800,
+          status: SubscriptionStatus.requested,
+          requestedAt: DateTime.now(),
+        ),
+      ];
+      final activated = await s.activateSubscriptionIfReady('c1');
+      expect(activated, isFalse);
+      expect(
+        s.subscriptionForClient('c1')!.status,
+        SubscriptionStatus.requested,
+      );
+      expect(s.subscriptionForClient('c1')!.isBillable, isFalse);
+    });
+
+    test('une demande déposée sans accès aux services est refusée', () async {
+      // Invariante : même interrupteur ouvert, un dossier non validé ne peut
+      // pas souscrire. Un refus qui laisserait une trace locale ferait croire
+      // à l'utilisateur que sa demande est partie.
+      final s = _stateWithClient(
+        tierId: 'tier_essential',
+        approval: ClientApprovalStatus.pending,
+      );
       await expectLater(
         s.requestSubscription(
           clientId: 'c1',
@@ -105,32 +152,7 @@ void main() {
         ),
         throwsA(isA<Exception>()),
       );
-      // La liste doit rester VIDE : un refus qui laisserait une trace locale
-      // ferait croire à l'utilisateur que sa demande est partie.
       expect(s.subscriptions, isEmpty);
-    });
-
-    test('aucun abonnement ne peut devenir facturable', () async {
-      final s = _stateWithClient(tierId: 'tier_essential');
-      // Même avec un abonnement accepté et un mandat en place, l'activation
-      // doit être refusée : c'est le second verrou, indépendant du premier.
-      s.subscriptions = [
-        Subscription(
-          id: 'sub1',
-          clientId: 'c1',
-          clientEmail: 'camille@example.com',
-          tierId: 'tier_essential',
-          tierName: 'GOREX ESSENTIAL',
-          cycle: BillingCycle.annual,
-          amount: 4800,
-          status: SubscriptionStatus.approved,
-          requestedAt: DateTime.now(),
-        ),
-      ];
-      final activated = await s.activateSubscriptionIfReady('c1');
-      expect(activated, isFalse);
-      expect(s.subscriptionForClient('c1')!.status, SubscriptionStatus.approved);
-      expect(s.subscriptionForClient('c1')!.isBillable, isFalse);
     });
   });
 

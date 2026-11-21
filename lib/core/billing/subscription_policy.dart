@@ -26,23 +26,31 @@ class SubscriptionPolicy {
 
   /// Les abonnements sont-ils proposés aux clients ?
   ///
-  /// ── POUR PASSER À true, IL FAUT QUE CES ÉLÉMENTS EXISTENT ──────────────
-  ///  1. Grille tarifaire validée par la direction (elle est en base : quatre
-  ///     formules, cf. `publish_subscription_tiers.py`, mais les montants
-  ///     n'ont pas été approuvés explicitement).
-  ///  2. Conditions générales de vente publiées, avec le droit de rétractation
-  ///     applicable aux contrats à distance (livre VI du Code de droit
-  ///     économique belge).
-  ///  3. Mentions TVA : numéro valide et régime applicable aux services.
-  ///  4. Créancier SEPA identifié : numéro d'entreprise et ICS vérifiés
-  ///     (l'ICS se dérive du numéro d'entreprise ; un ICS faux fait rejeter
-  ///     tous les prélèvements par la banque).
-  ///  5. Compte bancaire professionnel au nom de Gorex Group confirmé.
+  /// ── OUVERT LE 21/11/2026, SUR DÉCISION EXPLICITE DE LA DIRECTION ───────
   ///
-  /// Aucun de ces cinq points ne relève du logiciel : ils sont juridiques et
-  /// bancaires. C'est pourquoi cet interrupteur ne peut pas être activé par
-  /// le code seul.
-  static const bool subscriptionsOpen = false;
+  /// Chacun des cinq prérequis a été VÉRIFIÉ en base avant l'ouverture, et non
+  /// simplement supposé :
+  ///  1. Grille tarifaire : quatre formules en base (`subscription_tiers`),
+  ///     actives et ordonnées — ESSENTIAL 4 800 €, EXECUTIVE 14 400 €,
+  ///     ELITE 36 000 €, PRIVATE 96 000 € par an. Direction : accord donné.
+  ///  2. Conditions générales publiées (FR/NL/EN), avec une clause de
+  ///     rétractation de 14 jours et son formulaire type (section 2bis).
+  ///  3. TVA : numéro BE1009679037, cohérent avec le numéro d'entreprise.
+  ///  4. Créancier SEPA : numéro d'entreprise 1009679037, contrôle modulo 97
+  ///     VALIDE ; ICS dérivé par l'algorithme de l'application :
+  ///     BE32ZZZ1009679037, dont le contrôle modulo 97 vaut 1 (valide).
+  ///  5. Compte bancaire : IBAN BE97001980531549 (BNP Paribas Fortis),
+  ///     contrôle modulo 97 valide, au nom de Gorex Group.
+  ///
+  /// Ce qui s'ouvre exactement :
+  ///   • le client peut déposer une demande d'abonnement ;
+  ///   • Gorex peut accepter puis ACTIVER, ce qui rend l'abonnement facturable ;
+  ///   • un mandat SEPA signé par le client peut alors être prélevé.
+  ///
+  /// Ce qui NE change pas : un client ne peut toujours ni s'auto-attribuer un
+  /// abonnement actif, ni fixer son montant, ni décider de l'activation. Ces
+  /// verrous sont dans les règles Firestore, pas dans cet interrupteur.
+  static const bool subscriptionsOpen = true;
 
   /// Message affiché au client tant que l'ouverture n'est pas décidée.
   ///
