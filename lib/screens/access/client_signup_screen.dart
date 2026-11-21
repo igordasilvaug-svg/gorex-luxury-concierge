@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_config.dart';
 import '../../core/firebase/firebase_auth_service.dart';
 import '../../core/firebase/rest_auth_service.dart';
 import '../../core/firebase/firestore_service.dart';
@@ -194,7 +196,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
         _busy = false;
         _error =
             'Le compte a été créé, mais l\'enregistrement de votre '
-            'dossier a échoué. Contactez concierge@gorex.com en indiquant '
+                'dossier a échoué. Contactez ${AppConfig.supportEmail} en indiquant '
             'votre adresse e-mail : votre accès sera complété manuellement.';
       });
       return;
@@ -212,6 +214,11 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
 
     if (!mounted) return;
     setState(() => _busy = false);
+    // Signale au navigateur que la création de compte est aboutie : c'est ce
+    // signal qui fait proposer l'enregistrement du couple e-mail / mot de
+    // passe par le gestionnaire du navigateur (Safari, Chrome, Android).
+    // Sans lui, le client devait mémoriser puis ressaisir son mot de passe.
+    TextInput.finishAutofillContext(shouldSave: true);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -326,12 +333,14 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
                     'Mot de passe (12 caractères min.)',
                     required: true,
                     obscure: true,
+                    autofillHints: const [AutofillHints.newPassword],
                   ),
                   _field(
                     _confirm,
                     'Confirmer le mot de passe',
                     required: true,
                     obscure: true,
+                    autofillHints: const [AutofillHints.newPassword],
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
@@ -364,6 +373,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
     bool required = false,
     bool obscure = false,
     TextInputType? keyboard,
+    Iterable<String>? autofillHints,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -371,6 +381,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
         controller: c,
         obscureText: obscure,
         keyboardType: keyboard,
+        autofillHints: autofillHints,
         style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
         decoration: InputDecoration(labelText: label),
         validator: (v) {

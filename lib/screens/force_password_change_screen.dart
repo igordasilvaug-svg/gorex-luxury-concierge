@@ -37,10 +37,10 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
     if (!_formKey.currentState!.validate()) return;
     final s = context.read<AppState>();
     setState(() => _saving = true);
-    await s.changeOwnPassword(_next.text, currentPassword: _current.text);
+    final ok = await s.changeOwnPassword(_next.text, currentPassword: _current.text);
     if (!mounted) return;
     setState(() => _saving = false);
-    if (s.currentUser?.mustChangePassword == false) {
+    if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Mot de passe mis à jour avec succès.')),
       );

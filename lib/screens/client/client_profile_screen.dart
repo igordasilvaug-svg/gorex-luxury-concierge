@@ -12,6 +12,7 @@ import '../legal/privacy_policy_screen.dart';
 import '../legal/user_guide_screen.dart';
 import '../legal/legal_hub_screen.dart';
 import '../about/about_screen.dart';
+import '../access/change_password_dialog.dart';
 import '../account/my_account_edit_screen.dart';
 import '../../widgets/language_selector.dart';
 
@@ -213,6 +214,16 @@ class ClientProfileScreen extends StatelessWidget {
               icon: Icons.edit_outlined,
               fullWidth: true,
               onPressed: () => _editProfile(context, s),
+            ),
+            const SizedBox(height: 12),
+            // Changement de mot de passe depuis l'espace personnel.
+            // Auparavant, un client connecté n'avait AUCUN moyen de changer
+            // son mot de passe : il devait se déconnecter et passer par
+            // « mot de passe oublié », donc recevoir un e-mail.
+            OutlinedButton.icon(
+              onPressed: () => changeMyPassword(context),
+              icon: const Icon(Icons.lock_reset_outlined, size: 15),
+              label: const Text('CHANGER MON MOT DE PASSE'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(

@@ -434,8 +434,27 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
-  Future<void> _persist() async {
-    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+  /// Sérialise un utilisateur pour le stockage local SANS son mot de passe.
+  ///
+  /// ── POURQUOI CE RETRAIT EST NÉCESSAIRE ────────────────────────────────
+  /// L'état applicatif complet est écrit dans le stockage local du navigateur
+  /// (`localStorage`) via `shared_preferences`. En y laissant le champ
+  /// `password`, le mot de passe du compte — y compris celui d'un vrai
+  /// utilisateur après un changement — se retrouvait EN CLAIR dans un
+  /// espace lisible par tout script de la page et par quiconque accède à la
+  /// machine. C'est exactement ce que proscrit la règle « aucun mot de passe
+  /// en clair ».
+  ///
+  /// En production, l'authentification passe par Firebase : le mot de passe
+  /// n'est jamais nécessaire côté application. Il ne reste donc en mémoire
+  /// que pour les comptes de démonstration hors production.
+  Map<String, dynamic> _userMapForStorage(AppUser u) {
+    final m = u.toMap();
+    m['password'] = '';
+    return m;
+  }
+
+  Future<void> _persist() async {    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
     _cachedPrefs = prefs;
     await prefs.setString(
       _storageKey,
@@ -444,7 +463,7 @@ class AppState extends ChangeNotifier {
         'peppol': peppol.toMap(),
         'reminderConfig': reminderConfig.toMap(),
         'language': language,
-        'users': users.map((e) => e.toMap()).toList(),
+        'users': users.map(_userMapForStorage).toList(),
         'clients': clients.map((e) => e.toMap()).toList(),
         'tiers': tiers.map((e) => e.toMap()).toList(),
         'requests': requests.map((e) => e.toMap()).toList(),
@@ -716,6 +735,10 @@ class AppState extends ChangeNotifier {
     final e = email.trim().toLowerCase();
     for (var i = 0; i < users.length; i++) {
       final u = users[i];
+      // Refus explicite si aucun mot de passe n'est connu localement : sans
+      // cette garde, un enregistrement dont le mot de passe a été vidé (car
+      // il n'est plus persisté) pourrait être ouvert avec une saisie vide.
+      if (u.password.isEmpty) continue;
       if (u.email.toLowerCase() == e && u.password == password && u.active) {
         final updated = u.copyWith(lastLogin: DateTime.now());
         users[i] = updated;
@@ -1139,12 +1162,15 @@ class AppState extends ChangeNotifier {
   /// En production (session Firebase nominative), le mot de passe est mis à jour
   /// côté Firebase après ré-authentification ; en mode local, il est mis à jour
   /// dans l'état persisté.
-  Future<void> changeOwnPassword(
+  /// Retourne `true` si Firebase a réellement accepté le nouveau mot de passe.
+  /// L'appelant doit vérifier ce résultat : un `false` signifie que le mot de
+  /// passe est INCHANGÉ (jeton expiré, refus du service).
+  Future<bool> changeOwnPassword(
     String newPassword, {
     String? currentPassword,
   }) async {
     final u = currentUser;
-    if (u == null) return;
+    if (u == null) return false;
 
     // Session REST (voie principale sur le Web) : mise à jour via l'API
     // officielle avec le jeton obtenu à la connexion.
@@ -1160,15 +1186,24 @@ class AppState extends ChangeNotifier {
             'La modification a été refusée par le service '
             'd\'authentification : la session a probablement expiré. '
             'Déconnectez-vous puis reconnectez-vous pour réessayer.';
-        return;
+        return false;
       }
       await RestAuthService.clearMustChangePassword(restUid!, restIdToken!);
     } else if (FirebaseAuthService.isNamedUser) {
       if (currentPassword != null) {
         final ok = await FirebaseAuthService.reauthenticate(currentPassword);
-        if (!ok) return;
+        if (!ok) {
+          lastAuthError = 'Mot de passe actuel incorrect.';
+          return false;
+        }
       }
-      await FirebaseAuthService.updatePassword(newPassword);
+      final ok = await FirebaseAuthService.updatePassword(newPassword);
+      if (!ok) {
+        lastAuthError =
+            'La modification a été refusée par le service '
+            'd\'authentification. Reconnectez-vous puis réessayez.';
+        return false;
+      }
       await _persistStaffFlag(clearMustChange: true);
     }
 
@@ -1187,6 +1222,7 @@ class AppState extends ChangeNotifier {
     mustChangeReason = null;
     await _persist();
     notifyListeners();
+    return true;
   }
 
   /// Met à jour le drapeau `mustChangePassword` dans la fiche Firestore `staff`.
