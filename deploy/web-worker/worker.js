@@ -25,20 +25,55 @@ const SECURITY_HEADERS = {
   // Note Firebase/Firestore : le SDK Web ouvre des connexions HTTPS vers
   // firestore.googleapis.com et un canal WebSocket (long-polling) vers
   // *.googleapis.com / *.firebaseio.com → autorisés en connect-src.
+  //
+  // Note Cloudflare Web Analytics — RÉGLÉ À LA SOURCE, LA CSP RESTE EN GARDE :
+  // Cloudflare injectait automatiquement https://static.cloudflareinsights.com/
+  // beacon.min.js dans les réponses HTML. Notre CSP le bloquait, ce qui
+  // produisait un message d'erreur dans la console :
+  //   Loading the script '…beacon.min.js' violates … "script-src …"
+  //
+  // ── CE QUI A CHANGÉ ─────────────────────────────────────────────────────
+  // Le blocage par la CSP était un pansement : le script continuait d'être
+  // SERVI puis rejeté, donc le message persistait. La cause réelle est le
+  // réglage « Web Analytics » de la zone Cloudflare, et c'est lui qui a été
+  // désactivé :
+  //   PATCH /client/v4/zones/<zone>/settings/rum  { "value": "off" }
+  // Vérification : `curl -s https://gorex-luxury-concierge.eu/ | grep -c
+  // cloudflareinsights` doit répondre 0. Mesuré : 0, plus aucun message.
+  //
+  // Le script n'est donc plus injecté du tout. La liste `script-src`
+  // ci-dessous reste néanmoins FERMÉE : si quelqu'un réactive l'analytique
+  // Cloudflare depuis le tableau de bord, le traceur sera bloqué au lieu
+  // d'être déposé silencieusement. C'est une protection, pas un oubli.
+  //
+  // Pourquoi garder cette fermeture : notre bandeau de consentement affirme
+  // « aucune publicité, aucune analytique tierce ». Autoriser ce script
+  // rendrait cette phrase fausse et déposerait un traceur avant tout
+  // consentement. Pour le réactiver un jour, il faudrait modifier la bannière
+  // ET la politique cookies de façon cohérente — pas seulement cette liste.
   'Content-Security-Policy': [
     "default-src 'self'",
     // FlutterFire (SDK Firebase Web) injecte un court script inline qui charge le
     // SDK modulaire depuis gstatic (firebase-app / firebase-auth / firebase-firestore).
     // Ces 3 scripts sont autorisés par EMPREINTE SHA-256 (aucun 'unsafe-inline').
     // ⚠️ Si la version du SDK Firebase JS change, recalculer ces empreintes.
-    "script-src 'self' 'wasm-unsafe-eval' 'sha256-lxybZtu/9pEo9t2cXF8OdVCueZV6paBpNEQpBgqbYWA=' 'sha256-Kd6jrSJ+A8S4mbnMXfLL0WXdMJ02uYTrwrdvhPTpDug=' 'sha256-JAe3kXNkLbcxHg2ubdnFd1ozxf8byMAcYA7B4I7gV5I=' https://www.gstatic.com https://apis.google.com",
+    // FlutterFire (SDK Firebase Web) injecte un court script inline par service
+    // pour charger le SDK modulaire depuis gstatic. Chaque script est autorisé
+    // par EMPREINTE SHA-256 (aucun 'unsafe-inline').
+    // ⚠️ Si la version du SDK Firebase JS change (11.9.1), ces empreintes
+    // changent : le script de déploiement les recalcule dans finalize_web.py.
+    //   firebase_core      → lxybZtu/9pEo9t2cXF8OdVCueZV6paBpNEQpBgqbYWA=
+    //   firebase_firestore → Kd6jrSJ+A8S4mbnMXfLL0WXdMJ02uYTrwrdvhPTpDug=
+    //   firebase_auth      → JAe3kXNkLbcxHg2ubdnFd1ozxf8byMAcYA7B4I7gV5I=
+    //   firebase_app_check → wtfUX3o+VhYEVP+bzIDF4V/mircbtP9PtlVEYPDTvb0=
+    "script-src 'self' 'wasm-unsafe-eval' 'sha256-lxybZtu/9pEo9t2cXF8OdVCueZV6paBpNEQpBgqbYWA=' 'sha256-Kd6jrSJ+A8S4mbnMXfLL0WXdMJ02uYTrwrdvhPTpDug=' 'sha256-JAe3kXNkLbcxHg2ubdnFd1ozxf8byMAcYA7B4I7gV5I=' 'sha256-wtfUX3o+VhYEVP+bzIDF4V/mircbtP9PtlVEYPDTvb0=' https://www.gstatic.com https://apis.google.com https://www.google.com https://www.recaptcha.net",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "img-src 'self' data: blob:",
+    "img-src 'self' data: blob: https://www.gstatic.com https://www.google.com",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "connect-src 'self' https://www.gstatic.com https://fonts.gstatic.com https://firestore.googleapis.com https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net",
+    "connect-src 'self' https://www.gstatic.com https://fonts.gstatic.com https://firestore.googleapis.com https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://www.google.com https://www.recaptcha.net",
     "worker-src 'self' blob:",
     "child-src 'self' blob:",
-    "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com",
+    "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://www.google.com https://recaptcha.google.com https://www.recaptcha.net",
     "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",
