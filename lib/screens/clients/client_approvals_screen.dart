@@ -126,6 +126,24 @@ class _ApprovalCardState extends State<_ApprovalCard> {
           backgroundColor: AppColors.success,
         ),
       );
+    } on CloudWriteException catch (e) {
+      // Deux causes distinctes, deux messages distincts — le validateur doit
+      // savoir s'il peut réessayer tout de suite ou non.
+      final numero = e.what.contains('numéro');
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            numero
+                ? 'Validation interrompue : le numéro de dossier n\'a pas pu '
+                      'être réservé. Le dossier reste en attente, aucune '
+                      'donnée n\'a été modifiée. Vérifiez votre connexion puis '
+                      'réessayez.'
+                : 'Validation impossible : la fiche n\'a pas pu être '
+                      'enregistrée sur le serveur. Le dossier reste en attente.',
+          ),
+          backgroundColor: AppColors.urgent,
+        ),
+      );
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(
@@ -190,7 +208,17 @@ class _ApprovalCardState extends State<_ApprovalCard> {
             ],
           ),
           const SizedBox(height: 12),
-          InfoRow(label: 'Dossier', value: c.code),
+          // Le numéro définitif est attribué À LA VALIDATION, côté serveur
+          // (réservation atomique). Afficher ici « GRX-ATTENTE-2026… »
+          // laisserait croire à une référence de dossier alors qu'elle n'en
+          // est pas une : deux dossiers peuvent porter le même numéro
+          // provisoire. On annonce donc clairement ce qui va se passer.
+          InfoRow(
+            label: 'Dossier',
+            value: c.hasAssignedCode
+                ? c.code
+                : 'À attribuer à la validation',
+          ),
           const SizedBox(height: 6),
           InfoRow(label: 'E-mail', value: c.email),
           if (c.phone.isNotEmpty) ...[

@@ -241,8 +241,19 @@ service cloud.firestore {
       // EN ATTENTE : `approvalStatus` est imposé à 'pending' par la règle.
       // Sans cette contrainte, elle pourrait écrire 'approved' directement
       // via l'API REST et contourner entièrement la validation du personnel.
-      // Le personnel, lui, crée des fiches déjà validées.
-      allow create: if isStaff()
+      //
+      // DÉFAUT CORRIGÉ : la branche « personnel » autorisait n'importe quel
+      // rôle métier à créer une fiche DÉJÀ VALIDÉE. Un concierge — le rôle le
+      // moins élevé — ouvrait donc un accès complet en une seule écriture, ce
+      // qui vidait de son sens la règle de décision ci-dessous. Désormais :
+      //   • l'encadrement (isApprover) peut créer une fiche validée ;
+      //   • les autres membres du personnel ne créent que des fiches EN
+      //     ATTENTE, qui devront être validées par l'encadrement ;
+      //   • le public ne crée que sa propre fiche, en attente.
+      allow create: if isApprover()
+                    || (isStaff()
+                        && request.resource.data.approvalStatus == 'pending'
+                        && request.resource.data.active == true)
                     || (isRealUser()
                         && request.resource.data.email == request.auth.token.email
                         && request.resource.data.approvalStatus == 'pending'
@@ -267,6 +278,30 @@ service cloud.firestore {
                     && onlyOwnContactFields();
 
       allow delete: if isCeo() || isConciergeManager();
+    }
+
+    // ══════════════════════ RÉSERVATION DES NUMÉROS DE DOSSIER ═══════════════
+    //
+    // Un document par numéro attribué : `client_codes/GRX-VIP-0007`.
+    //
+    // POURQUOI UN DOCUMENT ET PAS UN COMPTEUR. Un compteur incrémenté serait
+    // lu puis réécrit : deux validateurs simultanés liraient la même valeur et
+    // écriraient le même numéro. Ici l'attribution repose sur la CRÉATION d'un
+    // document avec la précondition « n'existe pas encore »
+    // (`currentDocument.exists = false`) : c'est le serveur qui arbitre, et le
+    // second appelant reçoit ALREADY_EXISTS. Un numéro ne peut donc pas être
+    // attribué deux fois, même en concurrence parfaite.
+    //
+    // Lecture réservée au personnel : un client n'a aucune raison de parcourir
+    // la liste des numéros, qui révélerait le volume de la clientèle.
+    match /client_codes/{code} {
+      allow read: if isStaff();
+
+      // Création seule, par l'encadrement. Aucune mise à jour ni suppression :
+      // un numéro attribué doit rester attribué, sinon il redeviendrait
+      // disponible et pourrait être réutilisé pour un autre dossier.
+      allow create: if isApprover()
+                    && request.resource.data.code == code;
     }
 
     // ══════════════════════════ DEMANDES DE SERVICE ══════════════════════════

@@ -290,6 +290,80 @@ const check = async (label, fn, expect) => {
     'DENY',
   );
 
+  // ── 19 à 21 : qui peut CRÉER une fiche déjà validée ? ────────────────────
+  // Défaut corrigé : `isStaff()` autorisait n'importe quel rôle métier à créer
+  // une fiche APPROVED, donc à ouvrir un accès complet en une seule écriture.
+  const staffClient = (extra = {}) => ({
+    code: 'GRX-VIP-0500',
+    fullName: 'Fiche montée par le personnel',
+    email: 'monte@example.com',
+    phone: '+32470000500',
+    language: 'fr',
+    approvalStatus: 'approved',
+    active: true,
+    ...extra,
+  });
+
+  const conc = testEnv.authenticatedContext('conc1', tok('conc@gorex-group.eu')).firestore();
+
+  await check(
+    '19. concierge cree une fiche DEJA validee',
+    () => setDoc(doc(conc, 'clients', 'byconc1-' + RUN2), staffClient()),
+    'DENY',
+  );
+
+  await check(
+    '20. concierge cree une fiche EN ATTENTE',
+    () => setDoc(doc(conc, 'clients', 'byconc2-' + RUN2),
+      staffClient({ approvalStatus: 'pending' })),
+    'ALLOW',
+  );
+
+  await check(
+    '21. senior cree une fiche DEJA validee',
+    () => setDoc(doc(testEnv.authenticatedContext('sen1', tok('sen@gorex-group.eu'))
+      .firestore(), 'clients', 'bysen1-' + RUN2), staffClient()),
+    'ALLOW',
+  );
+
+  // ── 22 à 24 : réservation des numéros de dossier ────────────────────────
+  // Le numéro définitif est réservé par CRÉATION d'un document
+  // `client_codes/<numéro>` avec la précondition « n'existe pas ». Seul
+  // l'encadrement peut le faire ; un client ne doit pas pouvoir saturer la
+  // numérotation.
+  const codeBody = (c) => ({ code: c, clientId: 'x', claimedAt: '2026-01-01T00:00:00Z' });
+
+  await check(
+    '22. client reserve un numero de dossier',
+    () => setDoc(doc(client, 'client_codes', 'GRX-VIP-9001'), codeBody('GRX-VIP-9001')),
+    'DENY',
+  );
+
+  await check(
+    '23. concierge simple reserve un numero',
+    () => setDoc(doc(conc, 'client_codes', 'GRX-VIP-9002'), codeBody('GRX-VIP-9002')),
+    'DENY',
+  );
+
+  await check(
+    '24. senior reserve un numero',
+    () => setDoc(doc(testEnv.authenticatedContext('sen1', tok('sen@gorex-group.eu'))
+      .firestore(), 'client_codes', 'GRX-VIP-9003-' + RUN2),
+    codeBody('GRX-VIP-9003-' + RUN2)),
+    'ALLOW',
+  );
+
+  await check(
+    '25. reecriture d un numero deja reserve',
+    async () => {
+      const db = testEnv.authenticatedContext('sen1', tok('sen@gorex-group.eu')).firestore();
+      const p = 'GRX-VIP-9004-' + RUN2;
+      await setDoc(doc(db, 'client_codes', p), codeBody(p));
+      await setDoc(doc(db, 'client_codes', p), codeBody(p));
+    },
+    'DENY',
+  );
+
   await testEnv.cleanup();
 
   const ko = results.filter((r) => !r.ok);

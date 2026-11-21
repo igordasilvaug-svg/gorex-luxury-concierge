@@ -85,8 +85,16 @@ class ClientPendingScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (client != null) ...[
-                        InfoRow(label: 'Dossier', value: client.code),
-                        const SizedBox(height: 8),
+                        // Le numéro de dossier définitif n'existe pas encore :
+                        // il sera réservé par l'équipe au moment de la
+                        // validation. Tant qu'il n'est pas attribué, on
+                        // n'affiche rien plutôt qu'un numéro provisoire
+                        // (« GRX-ATTENTE-… ») que le client prendrait pour sa
+                        // référence et citerait dans ses échanges.
+                        if (client.hasAssignedCode) ...[
+                          InfoRow(label: 'Dossier', value: client.code),
+                          const SizedBox(height: 8),
+                        ],
                         InfoRow(label: 'Titulaire', value: client.fullName),
                         const SizedBox(height: 8),
                         InfoRow(label: 'Adresse', value: client.email),

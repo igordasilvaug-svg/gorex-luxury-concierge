@@ -156,8 +156,7 @@ void main() {
     });
 
     testWidgets('la carte affiche l\'adresse sans dupliquer le pays',
-        (tester) async {
-      // Non-régression sur un défaut signalé à tort puis vérifié.
+        (tester) async {      // Non-régression sur un défaut signalé à tort puis vérifié.
       //
       // Le formulaire d'inscription ne collecte qu'un champ libre « Adresse »
       // et le range dans `city`. La carte l'affichait sous l'étiquette
@@ -194,6 +193,55 @@ void main() {
           reason: 'l\'étiquette doit décrire le contenu réel');
       expect(find.text('LOCALITÉ'), findsNothing,
           reason: 'l\'ancienne étiquette trompeuse doit avoir disparu');
+      expect(tester.takeException(), isNull);
+    });
+
+    test('un numéro provisoire n\'est pas une référence de dossier', () {
+      // Le numéro DÉFINITIF est réservé côté serveur à la validation. Avant
+      // cela la fiche porte « GRX-ATTENTE-… », qui n'identifie rien : deux
+      // dossiers peuvent le partager. L'application doit donc savoir faire la
+      // différence, sous peine d'afficher un faux numéro au client.
+      final pending = _client(
+        id: 'c20',
+        code: 'GRX-ATTENTE-20261121134100',
+        name: 'En attente',
+        status: ClientApprovalStatus.pending,
+      );
+      final approved = _client(
+        id: 'c21',
+        code: 'GRX-VIP-0007',
+        name: 'Validé',
+        status: ClientApprovalStatus.approved,
+      );
+
+      expect(pending.hasAssignedCode, isFalse);
+      expect(approved.hasAssignedCode, isTrue);
+      expect(Client.provisionalCodePrefix, 'GRX-ATTENTE-');
+      expect(AppState.pendingCodePrefix, Client.provisionalCodePrefix,
+          reason: 'une seule définition du préfixe provisoire');
+    });
+
+    testWidgets('la file annonce un numéro à attribuer, pas un faux numéro',
+        (tester) async {
+      // Le validateur ne doit pas lire « GRX-ATTENTE-2026… » et le prendre
+      // pour la référence du dossier. L'écran doit annoncer l'attribution.
+      final state = AppState();
+      state.clients
+        ..clear()
+        ..add(_client(
+          id: 'c22',
+          code: 'GRX-ATTENTE-20261121134100',
+          name: 'Sans Numéro',
+          status: ClientApprovalStatus.pending,
+        ));
+      state.currentUser = _ceo();
+
+      await tester.pumpWidget(_wrap(state));
+      await tester.pumpAndSettle();
+
+      expect(find.text('GRX-ATTENTE-20261121134100'), findsNothing,
+          reason: 'un numéro provisoire ne doit jamais être présenté');
+      expect(find.text('À attribuer à la validation'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

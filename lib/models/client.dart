@@ -122,9 +122,10 @@ class Client {
     String? billingEmail,
     bool? peppolEnabled,
     ClientApprovalStatus? approvalStatus,
+    String? code,
   }) => Client(
     id: id,
-    code: code,
+    code: code ?? this.code,
     fullName: fullName ?? this.fullName,
     companyName: companyName ?? this.companyName,
     category: category ?? this.category,
@@ -240,6 +241,20 @@ class Client {
 
   /// Dossier refusé : la personne ne doit pas accéder aux services.
   bool get isRejected => approvalStatus == ClientApprovalStatus.rejected;
+
+  /// Préfixe des numéros PROVISOIRES portés par une fiche non encore validée.
+  ///
+  /// Le numéro définitif (`GRX-VIP-0007`) n'est réservé qu'à la validation,
+  /// côté serveur, par l'encadrement (voir `AppState.approveClient`). Avant
+  /// cela un visiteur ne connaît aucune autre fiche et n'a pas le droit de
+  /// lister la collection : tout numéro calculé dans son navigateur serait
+  /// local à son appareil, donc sujet aux doublons. Ce préfixe rend cet état
+  /// visible au lieu de faire croire à une référence durable.
+  static const String provisionalCodePrefix = 'GRX-ATTENTE-';
+
+  /// La fiche porte-t-elle déjà sa référence de dossier DÉFINITIVE ?
+  bool get hasAssignedCode =>
+      code.isNotEmpty && !code.startsWith(provisionalCodePrefix);
 
   /// Le compte est-il en droit de solliciter la conciergerie ?
   ///

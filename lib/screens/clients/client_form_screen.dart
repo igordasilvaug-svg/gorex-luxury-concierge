@@ -151,6 +151,23 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
             ? null
             : _billingEmail.text.trim(),
         peppolEnabled: _isBusiness && _peppolEnabled,
+        // ── STATUT DE VALIDATION ──────────────────────────────────────────
+        // DÉFAUT CORRIGÉ, deux conséquences :
+        //
+        // 1. En MODIFICATION, le statut existant est PRÉSERVÉ. Sans cette
+        //    ligne, la valeur par défaut (`approved`) écrasait le statut :
+        //    un simple enregistrement de coordonnées validait un dossier en
+        //    attente, ou levait un refus des règles pour un concierge qui
+        //    n'a pas le droit de décider.
+        //
+        // 2. À LA CRÉATION, seul l'encadrement peut ouvrir un accès : les
+        //    autres rôles créent une fiche EN ATTENTE, exactement comme le
+        //    public. Les règles Firestore imposent la même chose ; s'aligner
+        //    ici évite un écran qui semble fonctionner puis échoue.
+        approvalStatus: widget.existing?.approvalStatus ??
+            (s.can('client_approval')
+                ? ClientApprovalStatus.approved
+                : ClientApprovalStatus.pending),
       );
 
       if (_isEdit) {

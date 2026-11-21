@@ -766,6 +766,63 @@ class RestAuthService {
     }
   }
 
+  /// Vérifie l'existence d'un document, en distinguant « absent » de « panne ».
+  ///
+  /// [fetchDocument] renvoie `null` dans les deux cas, ce qui est dangereux
+  /// pour une réservation de numéro : une panne réseau passerait pour un
+  /// numéro libre. Ici :
+  ///  • 200 → le document existe ;
+  ///  • 404 → il n'existe pas (réponse formelle du serveur) ;
+  ///  • autre / exception → `null`, l'appelant doit s'arrêter.
+  static Future<bool?> documentExists(String path, String idToken) async {
+    try {
+      final resp = await http
+          .get(
+            Uri.parse('$_firestoreBase/$path'),
+            headers: await _json(idToken),
+          )
+          .timeout(_timeout);
+      if (resp.statusCode == 200) return true;
+      if (resp.statusCode == 404) return false;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Crée un document SEULEMENT s'il n'existe pas encore — atomiquement.
+  ///
+  /// Repose sur la précondition Firestore `currentDocument.exists = false` :
+  /// le serveur rejette l'écriture en 409 (FAILED_PRECONDITION) si le document
+  /// est déjà là. Deux appareils qui tentent le même identifiant au même
+  /// instant ne peuvent donc pas l'obtenir tous les deux : c'est le serveur
+  /// qui arbitre, pas l'ordre d'arrivée dans un navigateur.
+  ///
+  /// Retour :
+  ///  • [created] `true`  → réservation acquise ;
+  ///  • [created] `false` → déjà pris (ou précondition refusée) ;
+  ///  • [status]  `0`     → réseau injoignable, résultat INCONNU.
+  static Future<({bool created, int status})> createDocumentIfAbsent(
+    String path,
+    String idToken,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final resp = await http
+          .patch(
+            Uri.parse('$_firestoreBase/$path'
+                '?currentDocument.exists=false'),
+            headers: await _json(idToken),
+            body: jsonEncode({'fields': _encodeFields(data)}),
+          )
+          .timeout(_timeout);
+      if (resp.statusCode == 200) return (created: true, status: 200);
+      return (created: false, status: resp.statusCode);
+    } catch (_) {
+      return (created: false, status: 0);
+    }
+  }
+
   /// Crée un compte Firebase Auth (inscription) SANS le SDK.
   ///
   /// Renvoie l'`idToken` et l'`uid` du compte créé, ou un code d'erreur

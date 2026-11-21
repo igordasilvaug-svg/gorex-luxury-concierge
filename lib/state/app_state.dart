@@ -1956,7 +1956,28 @@ class AppState extends ChangeNotifier {
     final i = clients.indexWhere((c) => c.id == clientId);
     if (i < 0) return;
     final before = clients[i];
+
+    // ── NUMÉRO DÉFINITIF ──────────────────────────────────────────────────
+    // Une fiche issue d'une inscription publique porte un numéro provisoire
+    // (« GRX-ATTENTE-… »). C'est ICI qu'elle reçoit sa référence durable, et
+    // c'est le SERVEUR qui l'attribue : la réservation est atomique, donc
+    // deux validateurs simultanés ne peuvent pas obtenir le même numéro.
+    //
+    // Si la réservation échoue, on N'INVENTE PAS de numéro : sans session ni
+    // réseau fiable, mieux vaut refuser la validation que créer un doublon.
+    var code = before.code;
+    if (code.startsWith(pendingCodePrefix)) {
+      final claimed = await _claimNextClientCode(before.id);
+      if (claimed == null) {
+        throw const CloudWriteException(
+          'Attribution du numéro de dossier',
+        );
+      }
+      code = claimed;
+    }
+
     final updated = before.copyWith(
+      code: code,
       approvalStatus: ClientApprovalStatus.approved,
       active: true,
       notes: note == null || note.trim().isEmpty
@@ -2087,24 +2108,62 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Numéro de dossier suivant, au format `GRX-VIP-0001`.
+  /// Numéro de dossier PROVISOIRE, porté par une fiche non encore validée.
   ///
-  /// BUG CORRIGÉ : la version précédente utilisait `clients.length + 1`, ce
-  /// qui produit un doublon dès que la liste locale n'est pas complète
-  /// (suppression, import partiel, ou — cas réel constaté — inscription
-  /// publique : un visiteur non connecté n'a AUCUNE fiche en mémoire, donc
-  /// tout nouvel inscrit recevait « GRX-VIP-0001 »). On se fonde désormais
-  /// sur le plus grand numéro déjà attribué localement.
+  /// Le numéro DÉFINITIF est attribué par le serveur au moment de la
+  /// validation (voir [_claimNextClientCode]). Avant cela, la fiche porte ce
+  /// préfixe : il n'est pas unique, et c'est assumé — il n'est jamais présenté
+  /// comme une référence durable.
   ///
-  /// LIMITE CONNUE : la numérotation reste locale à l'appareil. Deux
-  /// inscriptions simultanées depuis deux navigateurs peuvent donc encore
-  /// produire le même numéro. Le champ `id` reste unique, mais deux dossiers
-  /// porteraient la même référence imprimée. Voir le rapport : une
-  /// renumérotation à la validation est la correction propre.
-  String _nextClientCode() {
+  /// POURQUOI LA NUMÉROTATION DÉFINITIVE N'EST PAS FAITE ICI : un visiteur qui
+  /// s'inscrit ne connaît aucune autre fiche, et les règles Firestore lui
+  /// interdisent de lister la collection (un client ne lit que SA fiche).
+  /// Tout calcul fait dans le navigateur est donc locale à l'appareil : deux
+  /// inscriptions simultanées produiraient le même numéro — exactement le
+  /// défaut constaté en production (« GRX-VIP-0001 » attribué deux fois).
+  static const String pendingCodePrefix = Client.provisionalCodePrefix;
+
+  String _provisionalClientCode() {
+    final now = DateTime.now();
+    return '$pendingCodePrefix'
+        '${now.year}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}-'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}'
+        '${now.second.toString().padLeft(2, '0')}';
+  }
+
+  /// Réserve ATOMIQUEMENT le prochain numéro de dossier définitif.
+  ///
+  /// ── MÉCANISME ─────────────────────────────────────────────────────────
+  /// On n'incrémente PAS un compteur : deux appareils liraient la même valeur
+  /// et écriraient le même nombre. On CRÉE le document `client_codes/GRX-VIP-0007`
+  /// avec la précondition Firestore « ce document ne doit pas exister »
+  /// (`currentDocument.exists=false`). Le serveur arbitre : le second appareil
+  /// reçoit 409 ALREADY_EXISTS et passe au numéro suivant. Un numéro déjà
+  /// attribué ne peut donc jamais l'être une seconde fois, même en concurrence.
+  ///
+  /// Mesuré sur le projet réel avant écriture de ce code : le premier appel
+  /// répond 200, le second 409 avec `status: ALREADY_EXISTS`.
+  ///
+  /// ── APPELÉ PAR ────────────────────────────────────────────────────────
+  /// `approveClient`, donc par un membre de l'encadrement : lui seul peut
+  /// lister les fiches existantes et écrire dans `client_codes`. C'est ce qui
+  /// rend le calcul du point de départ fiable.
+  ///
+  /// Retourne le numéro attribué, ou `null` si la réservation a échoué
+  /// (réseau, droits). L'appelant ne doit alors PAS valider avec un numéro
+  /// inventé.
+  /// Numérotation de secours, utilisée UNIQUEMENT hors production.
+  ///
+  /// En développement et dans les tests il n'y a pas de session Firebase, donc
+  /// pas de réservation serveur possible. On garde alors le comportement
+  /// local (plus grand numéro connu + 1), suffisant pour ces usages.
+  String _localNextClientCode() {
     var max = 0;
     for (final c in clients) {
-      final m = RegExp(r'(\d+)\s*$').firstMatch(c.code);
+      final m = RegExp(r'^GRX-VIP-(\d+)\s*$').firstMatch(c.code);
       if (m != null) {
         final n = int.tryParse(m.group(1)!) ?? 0;
         if (n > max) max = n;
@@ -2113,10 +2172,74 @@ class AppState extends ChangeNotifier {
     return 'GRX-VIP-${(max + 1).toString().padLeft(4, '0')}';
   }
 
+  Future<String?> _claimNextClientCode(String clientId) async {
+    final token = restIdToken;
+
+    // Hors production, ou sans session : pas de réservation serveur possible.
+    if (!AppConfig.isProduction || token == null || token.isEmpty) {
+      return _localNextClientCode();
+    }
+
+    var max = 0;
+    for (final c in clients) {
+      final m = RegExp(r'^GRX-VIP-(\d+)\s*$').firstMatch(c.code);
+      if (m != null) {
+        final n = int.tryParse(m.group(1)!) ?? 0;
+        if (n > max) max = n;
+      }
+    }
+
+    // On tente plusieurs numéros au-delà du maximum connu : celui-ci peut
+    // être dépassé si un autre appareil a validé entre-temps, ou si le
+    // personnel ne voit qu'une partie des fiches.
+    for (var n = max + 1; n <= max + 200; n++) {
+      final code = 'GRX-VIP-${n.toString().padLeft(4, '0')}';
+      final res = await RestAuthService.createDocumentIfAbsent(
+        'client_codes/$code',
+        token,
+        {
+          'code': code,
+          'clientId': clientId,
+          'claimedAt': DateTime.now().toUtc().toIso8601String(),
+        },
+      );
+      if (res.created) return code;
+      // 0 = réseau injoignable : le résultat est INCONNU (la réservation a
+      // peut-être abouti). On s'arrête au lieu de continuer à tâtons.
+      if (res.status == 0) return null;
+      // 409 ALREADY_EXISTS → numéro déjà pris, on essaie le suivant.
+      // Tout autre code (401, 403…) est un refus : inutile d'insister.
+      if (res.status != 409) return null;
+    }
+    return null;
+  }
+
   Future<Client> createClient(Client draft) async {
+    // Une fiche issue d'une inscription publique reste en attente : son
+    // numéro définitif sera réservé au moment de la validation, par
+    // l'encadrement. D'ici là elle porte un numéro provisoire, non unique.
+    //
+    // Une fiche créée par le personnel est déjà validée : elle reçoit
+    // immédiatement un numéro définitif, réservé côté serveur (le personnel a
+    // une session, contrairement au visiteur qui s'inscrit).
+    final String code;
+    if (draft.isPending) {
+      code = _provisionalClientCode();
+    } else {
+      // Fiche validée d'emblée : il lui faut TOUT DE SUITE un numéro
+      // définitif. Si la réservation échoue, on préfère refuser la création
+      // plutôt que d'enregistrer un dossier validé affublé d'un numéro
+      // provisoire, qui n'identifie rien.
+      final claimed = await _claimNextClientCode('(creation-par-le-personnel)');
+      if (claimed == null) {
+        throw const CloudWriteException('Attribution du numéro de dossier');
+      }
+      code = claimed;
+    }
+
     final c = Client(
       id: 'c_${DateTime.now().microsecondsSinceEpoch}',
-      code: _nextClientCode(),
+      code: code,
       fullName: draft.fullName,
       companyName: draft.companyName,
       category: draft.category,
