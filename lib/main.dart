@@ -9,6 +9,7 @@ import 'core/firebase/firebase_bootstrap.dart';
 import 'widgets/animations.dart';
 import 'state/app_state.dart';
 import 'screens/login_screen.dart';
+import 'screens/client/client_pending_screen.dart';
 import 'screens/password_reset_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/force_password_change_screen.dart';
@@ -119,6 +120,18 @@ class _RootState extends State<_Root> {
     if (state.currentUser == null) return const LoginScreen();
     if (state.currentUser!.mustChangePassword) {
       return const ForcePasswordChangeScreen();
+    }
+    // Un client dont le dossier n'est pas encore accepté n'accède PAS à
+    // l'espace client : l'inscription est publique, les services sont
+    // réservés aux dossiers validés par le personnel. On n'affiche donc pas
+    // les écrans (vides) de demandes et de factures, mais un état de dossier.
+    // La fiche peut être absente au tout premier instant du chargement : dans
+    // ce cas on laisse passer, l'écran client gère l'absence de données.
+    if (state.isClient) {
+      final client = state.currentClient;
+      if (client != null && !client.hasServiceAccess) {
+        return const ClientPendingScreen();
+      }
     }
     return const AppShell();
   }

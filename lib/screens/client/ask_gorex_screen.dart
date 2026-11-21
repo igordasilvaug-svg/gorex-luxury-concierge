@@ -377,6 +377,18 @@ class _AskGorexScreenState extends State<AskGorexScreen> {
             ? 'Transmis à GOREX SECURITY'
             : null,
       );
+    } on ClientNotApprovedException catch (e) {
+      // Dossier non validé (ou refusé) : on affiche l'explication fournie par
+      // l'état, au lieu de laisser l'écran bloqué sur « envoi en cours ».
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+      return;
     } on CloudWriteException {
       // Le serveur a refusé l'enregistrement : ne surtout pas annoncer
       // une transmission qui n'a pas eu lieu.

@@ -21,6 +21,45 @@ enum ClientCategory {
       );
 }
 
+/// Statut de validation d'un compte client.
+///
+/// ── POURQUOI CE STATUT EXISTE ─────────────────────────────────────────
+/// Le formulaire d'inscription est public. Sans validation, n'importe qui
+/// pouvait créer un compte, s'attribuer le premier palier d'abonnement et
+/// adresser des demandes à la conciergerie — donc consommer du temps de
+/// votre équipe et apparaître comme un client légitime.
+///
+/// `active` (champ historique) répond à une autre question : le compte
+/// est-il suspendu ? Un compte suspendu mais validé reste `approved` ; un
+/// compte en attente n'a jamais été ouvert.
+enum ClientApprovalStatus {
+  /// Dossier déposé, en attente de décision du personnel. Aucun accès aux
+  /// services de conciergerie.
+  pending('En attente de validation'),
+
+  /// Dossier accepté : l'accès aux services est ouvert.
+  approved('Validé'),
+
+  /// Dossier refusé. La personne ne peut pas utiliser la plateforme ; le
+  /// motif est communiqué et le compte peut être supprimé définitivement.
+  rejected('Refusé');
+
+  final String label;
+  const ClientApprovalStatus(this.label);
+
+  /// Une valeur inconnue ou absente est traitée comme `approved`.
+  ///
+  /// C'est volontaire : les fiches créées par le personnel avant l'existence
+  /// de ce champ sont des clients réels et ne doivent pas basculer
+  /// rétroactivement « en attente ». Seule une inscription passée par le
+  /// formulaire public écrit explicitement `pending`.
+  static ClientApprovalStatus fromName(String? name) =>
+      ClientApprovalStatus.values.firstWhere(
+        (e) => e.name == name,
+        orElse: () => ClientApprovalStatus.approved,
+      );
+}
+
 /// Statut d'envoi d'une facture via le réseau Peppol
 enum PeppolStatus {
   notApplicable('Non applicable', ''),

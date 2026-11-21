@@ -25,6 +25,7 @@ import '../audit/audit_log_screen.dart';
 import '../backup/backup_screen.dart';
 import '../security/security_dashboard_screen.dart';
 import '../clients/clients_screen.dart';
+import '../clients/client_approvals_screen.dart';
 import '../settings/company_settings_screen.dart';
 import '../settings/peppol_settings_screen.dart';
 import '../settings/reminder_settings_screen.dart';
@@ -95,6 +96,18 @@ class _StaffShellState extends State<StaffShell> {
         Icons.people,
         const ClientsScreen(),
         permission: 'staff',
+      ),
+      // File d'attente des inscriptions publiques. Le libellé porte le nombre
+      // de dossiers à traiter : sans ce compteur, une inscription pouvait
+      // attendre indéfiniment sans que personne ne le remarque.
+      _NavItem(
+        s.pendingApprovalsCount > 0
+            ? '${s.tr('nav.approvals')} (${s.pendingApprovalsCount})'
+            : s.tr('nav.approvals'),
+        Icons.how_to_reg_outlined,
+        Icons.how_to_reg,
+        const ClientApprovalsScreen(),
+        permission: 'client_approval',
       ),
       _NavItem(
         s.tr('nav.finance'),

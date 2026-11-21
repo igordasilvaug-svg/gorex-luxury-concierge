@@ -29,6 +29,13 @@ class Client {
 
   final String? notes;
   final bool active;
+
+  /// Statut de validation du compte (voir [ClientApprovalStatus]).
+  ///
+  /// Une inscription passée par le formulaire public arrive en `pending` :
+  /// l'accès aux services reste fermé jusqu'à décision du personnel.
+  final ClientApprovalStatus approvalStatus;
+
   final DateTime createdAt;
 
   // ─── Identification & facturation ───
@@ -75,6 +82,7 @@ class Client {
     this.interests = const [],
     this.notes,
     this.active = true,
+    this.approvalStatus = ClientApprovalStatus.approved,
     required this.createdAt,
     this.isBusiness = false,
     this.companyNumber,
@@ -113,6 +121,7 @@ class Client {
     String? billingAddress,
     String? billingEmail,
     bool? peppolEnabled,
+    ClientApprovalStatus? approvalStatus,
   }) => Client(
     id: id,
     code: code,
@@ -138,6 +147,7 @@ class Client {
     interests: interests ?? this.interests,
     notes: notes ?? this.notes,
     active: active ?? this.active,
+    approvalStatus: approvalStatus ?? this.approvalStatus,
     createdAt: createdAt,
     isBusiness: isBusiness ?? this.isBusiness,
     companyNumber: companyNumber ?? this.companyNumber,
@@ -172,6 +182,7 @@ class Client {
     'interests': interests,
     'notes': notes,
     'active': active,
+    'approvalStatus': approvalStatus.name,
     'createdAt': createdAt.toIso8601String(),
     'isBusiness': isBusiness,
     'companyNumber': companyNumber,
@@ -208,6 +219,9 @@ class Client {
     interests: _list(m['interests']),
     notes: m['notes'] as String?,
     active: m['active'] as bool? ?? true,
+    approvalStatus: ClientApprovalStatus.fromName(
+      m['approvalStatus'] as String?,
+    ),
     createdAt: DateTime.parse(m['createdAt'] as String),
     isBusiness: m['isBusiness'] as bool? ?? false,
     companyNumber: m['companyNumber'] as String?,
@@ -219,4 +233,17 @@ class Client {
 
   static List<String> _list(dynamic v) =>
       v == null ? <String>[] : (v as List).map((e) => e.toString()).toList();
+
+  /// Dossier en attente de décision : la personne peut se connecter, mais pas
+  /// solliciter la conciergerie.
+  bool get isPending => approvalStatus == ClientApprovalStatus.pending;
+
+  /// Dossier refusé : la personne ne doit pas accéder aux services.
+  bool get isRejected => approvalStatus == ClientApprovalStatus.rejected;
+
+  /// Le compte est-il en droit de solliciter la conciergerie ?
+  ///
+  /// Deux conditions : le dossier doit être validé ET le compte non suspendu.
+  bool get hasServiceAccess =>
+      approvalStatus == ClientApprovalStatus.approved && active;
 }

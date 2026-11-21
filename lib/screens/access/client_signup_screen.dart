@@ -136,6 +136,11 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
           ? null
           : _billingAddress.text.trim(),
       billingEmail: email,
+      // ── VALIDATION OBLIGATOIRE ──
+      // Une inscription passée par ce formulaire public n'ouvre AUCUN accès
+      // aux services tant que le personnel n'a pas statué. Sans ce marquage,
+      // le compte serait immédiatement opérationnel (voir ClientApprovalStatus).
+      approvalStatus: ClientApprovalStatus.pending,
       createdAt: DateTime.now(),
     );
     final client = await state.createClient(draft);

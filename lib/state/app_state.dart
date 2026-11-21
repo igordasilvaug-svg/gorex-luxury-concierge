@@ -50,6 +50,20 @@ class CloudWriteException implements Exception {
       'La modification n\'a pas été conservée.';
 }
 
+/// Tentative d'utiliser un service alors que le dossier client n'est pas
+/// validé par le personnel (ou a été refusé).
+///
+/// Exception distincte de [CloudWriteException] : ici la connexion et le
+/// serveur fonctionnent, c'est l'ACCÈS qui n'est pas ouvert. Le message est
+/// destiné à être affiché tel quel à la personne.
+class ClientNotApprovedException implements Exception {
+  const ClientNotApprovedException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 /// État applicatif central — persistance locale (shared_preferences JSON)
 /// Architecture API-ready : chaque mutation passe par une méthode dédiée
 /// qui pourra être remplacée par un appel HTTP.
@@ -1312,6 +1326,13 @@ class AppState extends ChangeNotifier {
         return role == UserRole.ceo || role == UserRole.conciergeManager;
       case 'user_access':
         return role == UserRole.ceo || role == UserRole.conciergeManager;
+      // Décision d'ouverture d'un compte client : encadrement uniquement.
+      // Doit rester aligné sur la fonction `isApprover()` des règles Firestore,
+      // faute de quoi l'écran s'afficherait puis échouerait à l'enregistrement.
+      case 'client_approval':
+        return role == UserRole.ceo ||
+            role == UserRole.conciergeManager ||
+            role == UserRole.seniorConcierge;
       case 'subscriptions':
         return role == UserRole.ceo;
       case 'security':
@@ -1466,6 +1487,22 @@ class AppState extends ChangeNotifier {
     bool securityEscalation = false,
     String? escalationNote,
   }) async {
+    // ── VALIDATION OBLIGATOIRE ──
+    // Un dossier en attente (ou refusé) ne peut pas solliciter la
+    // conciergerie : le compte existe, mais les services restent fermés
+    // jusqu'à la décision du personnel. Cette garde est côté application ;
+    // elle complète les règles Firestore, qui empêchent déjà le client de
+    // s'auto-valider.
+    final demandeur = clientById(clientId);
+    if (demandeur != null && !demandeur.hasServiceAccess) {
+      throw ClientNotApprovedException(
+        demandeur.isRejected
+            ? 'Votre demande n\'a pas été acceptée. Contactez la conciergerie '
+                  'pour en connaître le motif.'
+            : 'Votre compte est en cours de validation. Vous pourrez adresser '
+                  'des demandes dès qu\'il aura été accepté.',
+      );
+    }
     final client = clientById(clientId);
     final r = ServiceRequest(
       id: 'r_${DateTime.now().microsecondsSinceEpoch}',
@@ -1898,6 +1935,144 @@ class AppState extends ChangeNotifier {
   }
 
   // ─────────────────────────── CLIENTS ───────────────────────────
+  /// Dossiers d'inscription en attente de décision, du plus ancien au plus
+  /// récent : c'est l'ordre dans lequel le personnel doit les traiter.
+  List<Client> get pendingClientApprovals {
+    final out = clients.where((c) => c.isPending).toList();
+    out.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return out;
+  }
+
+  /// Nombre de dossiers à traiter (pastille de navigation).
+  int get pendingApprovalsCount => pendingClientApprovals.length;
+
+  /// Valide un dossier client : l'accès aux services est ouvert.
+  ///
+  /// L'écriture serveur est OBLIGATOIRE : une validation qui ne vivrait que
+  /// dans le navigateur de l'administrateur laisserait le client bloqué sur
+  /// son propre appareil, et la décision serait perdue au rechargement.
+  /// En cas d'échec, la décision locale est annulée et l'erreur remontée.
+  Future<void> approveClient(String clientId, {String? note}) async {
+    final i = clients.indexWhere((c) => c.id == clientId);
+    if (i < 0) return;
+    final before = clients[i];
+    final updated = before.copyWith(
+      approvalStatus: ClientApprovalStatus.approved,
+      active: true,
+      notes: note == null || note.trim().isEmpty
+          ? before.notes
+          : [before.notes, 'Validation : ${note.trim()}']
+                .whereType<String>()
+                .where((e) => e.isNotEmpty)
+                .join('\n'),
+    );
+    clients[i] = updated;
+    notifyListeners();
+
+    final ok = await _pushToCloud('clients', updated.toMap(), docId: updated.id);
+    if (!ok) {
+      clients[i] = before; // retour à l'état antérieur : rien n'a changé
+      notifyListeners();
+      throw const CloudWriteException('Validation du client');
+    }
+    log(
+      'Validation client',
+      updated.email,
+      detail: 'approuvé par ${currentUser?.email ?? '?'}',
+    );
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Refuse un dossier client. Le motif est communiqué à la personne.
+  ///
+  /// `active` reste vrai : le compte existe et peut se connecter pour lire le
+  /// motif. C'est `approvalStatus` qui ferme l'accès aux services.
+  Future<void> rejectClient(String clientId, {required String reason}) async {
+    final i = clients.indexWhere((c) => c.id == clientId);
+    if (i < 0) return;
+    final before = clients[i];
+    final motif = reason.trim();
+    final updated = before.copyWith(
+      approvalStatus: ClientApprovalStatus.rejected,
+      notes: [before.notes, 'Refus : $motif']
+          .whereType<String>()
+          .where((e) => e.isNotEmpty)
+          .join('\n'),
+    );
+    clients[i] = updated;
+    notifyListeners();
+
+    final ok = await _pushToCloud('clients', updated.toMap(), docId: updated.id);
+    if (!ok) {
+      clients[i] = before;
+      notifyListeners();
+      throw const CloudWriteException('Refus du client');
+    }
+    log(
+      'Refus client',
+      updated.email,
+      detail: motif.isEmpty ? 'sans motif' : motif,
+    );
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Suspension / réactivation d'un compte déjà validé.
+  ///
+  /// Distincte de la validation : un compte suspendu garde son statut
+  /// `approved` (il a bien été accepté) mais perd l'accès aux services.
+  Future<void> setClientActive(String clientId, bool active) async {
+    final i = clients.indexWhere((c) => c.id == clientId);
+    if (i < 0) return;
+    final before = clients[i];
+    final updated = before.copyWith(active: active);
+    clients[i] = updated;
+    notifyListeners();
+
+    final ok = await _pushToCloud('clients', updated.toMap(), docId: updated.id);
+    if (!ok) {
+      clients[i] = before;
+      notifyListeners();
+      throw const CloudWriteException('Statut du client');
+    }
+    log(
+      active ? 'Réactivation client' : 'Suspension client',
+      updated.email,
+    );
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Recharge la fiche du client connecté depuis le serveur.
+  ///
+  /// Utilisée par l'écran « dossier en cours d'examen » : le personnel peut
+  /// valider le dossier pendant que la personne attend, et elle n'a alors pas
+  /// besoin de se déconnecter pour en bénéficier.
+  Future<void> refreshMyClientStatus() async {
+    final token = restIdToken;
+    final email = currentUser?.email;
+    if (token == null || token.isEmpty || email == null) return;
+    try {
+      final res = await RestAuthService.findClientByEmail(email, token);
+      final row = res.data;
+      if (row == null) return;
+      _upsertClientFromRow(row);
+      // La valeur par défaut est `approved` : une fiche dont le champ est
+      // absent est un client historique, déjà accepté.
+      final statut = ClientApprovalStatus.fromName(
+        row['approvalStatus'] as String?,
+      );
+      if (kDebugMode) {
+        debugPrint('[State] statut du dossier client : ${statut.name}');
+      }
+      await _persist();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[State] rafraîchissement du dossier : $e');
+    }
+  }
+
   Future<void> updateClient(Client c) async {
     final i = clients.indexWhere((e) => e.id == c.id);
     if (i < 0) return;
@@ -1947,6 +2122,12 @@ class AppState extends ChangeNotifier {
       billingAddress: draft.billingAddress,
       billingEmail: draft.billingEmail,
       peppolEnabled: draft.peppolEnabled,
+      // Le statut de validation est PROPAGÉ depuis le brouillon.
+      // Sans cette ligne, la reconstruction champ par champ retombait sur la
+      // valeur par défaut (`approved`) : une inscription passée par le
+      // formulaire public devenait un client pleinement opérationnel, ce que
+      // la validation par le personnel est précisément censée empêcher.
+      approvalStatus: draft.approvalStatus,
     );
 
     // Serveur d'abord : une fiche client créée par le personnel doit être
@@ -1971,6 +2152,10 @@ class AppState extends ChangeNotifier {
       c.code,
       detail: c.isBusiness ? 'Professionnel (facturation B2B)' : null,
     );
+    if (c.isPending) {
+      // Trace explicite : c'est la file d'attente que le personnel surveille.
+      log('Inscription client à valider', c.email, detail: c.code);
+    }
     await _persist();
     notifyListeners();
     return c;
