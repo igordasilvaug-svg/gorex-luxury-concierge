@@ -78,43 +78,86 @@
   // derniers éléments de CHAQUE écran (le bouton « COMPLÉTER MES
   // INFORMATIONS » devenait inatteignable sur un téléphone).
   //
-  // On réduit la hauteur de la vue Flutter de la hauteur réelle de la
-  // bannière : le contenu se réorganise au-dessus, rien n'est masqué. La
-  // hauteur est mesurée après insertion (elle dépend du texte et du retour à
-  // la ligne) et réappliquée au redimensionnement, car Flutter réécrit ses
-  // styles en ligne à chaque changement de taille de la fenêtre.
-  var reserved = null;
+  // Deux tentatives ont été mesurées avant d'aboutir, et sont documentées ici
+  // pour ne pas les refaire :
+  //   1. Mesure immédiate : le script est chargé en `defer` et s'exécute
+  //      AVANT que Flutter n'ait créé `flutter-view` (bannière à 180 ms, vue
+  //      à 1 469 ms sur le réseau réel) → mesure vide, échec silencieux.
+  //   2. Style EN LIGNE avec `!important` : Flutter réécrit l'attribut style
+  //      de la vue à chaque redimensionnement, ce qui efface la déclaration
+  //      (mesuré : `height` revenu à 932px, chevauchement de 197px).
+  //
+  // Solution retenue : une RÈGLE DE FEUILLE DE STYLE. Une déclaration
+  // `!important` d'une feuille de style l'emporte sur un style en ligne
+  // ordinaire, donc Flutter ne peut plus l'écraser. La hauteur à réserver est
+  // passée par une variable CSS, mise à jour quand la bannière apparaît, se
+  // ferme ou que la fenêtre change de taille.
+  var reserved = 0; // hauteur de bannière à réserver, en pixels
+  var barRef = null;
 
   function flutterView() {
     return document.querySelector('flutter-view');
   }
 
-  function applyReservation() {
-    var view = flutterView();
-    if (!view || !reserved) return;
-    view.style.setProperty('bottom', 'auto', 'important');
-    view.style.setProperty('height', reserved.height, 'important');
+  function installRule() {
+    if (document.getElementById('gorex-cookie-space')) return;
+    var el = document.createElement('style');
+    el.id = 'gorex-cookie-space';
+    el.textContent =
+      ':root{--gorex-cookie-h:0px}' +
+      'flutter-view{' +
+      'height:calc(100vh - var(--gorex-cookie-h)) !important;' +
+      'bottom:auto !important;' +
+      '}';
+    document.head.appendChild(el);
+  }
+
+  function setReserved(px) {
+    reserved = px > 0 ? px : 0;
+    document.documentElement.style.setProperty(
+      '--gorex-cookie-h', reserved + 'px');
+    // Flutter dimensionne son canevas d'après la taille de la fenêtre : on le
+    // prévient pour qu'il recalcule sa mise en page à la nouvelle hauteur.
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  // Attend que Flutter ait monté sa vue (abandonne au bout de ~10 s).
+  function whenView(cb) {
+    if (flutterView()) {
+      cb();
+      return;
+    }
+    var tries = 0;
+    (function loop() {
+      if (flutterView()) {
+        cb();
+        return;
+      }
+      if (++tries > 600) return;
+      requestAnimationFrame(loop);
+    })();
+  }
+
+  function measure() {
+    if (!barRef) return 0;
+    var h = Math.ceil(barRef.getBoundingClientRect().height);
+    return h > 0 ? h : 0;
   }
 
   function reserveSpace(bar) {
-    var view = flutterView();
-    if (!view) return;
-    var h = Math.ceil(bar.getBoundingClientRect().height);
-    if (!h) return;
-    reserved = { height: 'calc(100vh - ' + h + 'px)' };
-    applyReservation();
+    barRef = bar;
+    installRule();
+    setReserved(measure());
   }
 
   function releaseSpace() {
-    var view = flutterView();
-    reserved = null;
-    if (!view) return;
-    view.style.removeProperty('bottom');
-    view.style.removeProperty('height');
+    barRef = null;
+    setReserved(0);
   }
 
   window.addEventListener('resize', function () {
-    if (reserved) applyReservation();
+    if (!barRef) return;
+    setReserved(measure()); // la bannière change de hauteur selon la largeur
   });
 
   function build() {
@@ -200,9 +243,11 @@
     if (alreadyChosen()) return;
     var bar = build();
     document.body.appendChild(bar);
-    // Mesure APRÈS insertion : la hauteur dépend du texte et du retour à la
-    // ligne, elle n'est pas connue avant.
-    reserveSpace(bar);
+    // Mesure après insertion (la hauteur dépend du texte), puis application
+    // dès que Flutter a monté sa vue.
+    whenView(function () {
+      reserveSpace(bar);
+    });
   }
 
   if (document.readyState === 'loading') {
