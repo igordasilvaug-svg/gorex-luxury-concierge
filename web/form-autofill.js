@@ -45,75 +45,151 @@
 (function () {
   'use strict';
 
-  // Attributs à appliquer selon le type de champ.
-  var SPECS = {
-    email: { name: 'gorex-username', autocomplete: 'username' },
-    password: { name: 'gorex-password', autocomplete: 'current-password' },
-  };
+  // ── RÉGRESSION CORRIGÉE (trouvée par un test, pas par lecture de code) ──
+  // La première version appliquait `current-password` et le nom
+  // « gorex-password » à TOUT champ de type password. Sur l'écran de
+  // changement obligatoire, qui en compte TROIS (temporaire, nouveau,
+  // confirmer), cela produisait :
+  //   [0] current-password  name="gorex-password"   (correct)
+  //   [1] current-password  name="gorex-password"   (FAUX)
+  //   [2] current-password  name="gorex-password"   (FAUX)
+  // Deux défauts d'un coup :
+  //   • les champs « nouveau mot de passe » n'auraient plus reçu la
+  //     proposition de GÉNÉRATION, et le gestionnaire y aurait collé
+  //     l'ancien mot de passe ;
+  //   • trois `id` identiques dans la même page = HTML invalide, et un
+  //     gestionnaire qui indexe par `id` écrase deux champs sur trois.
+  //
+  // Le rôle est donc déduit du LIBELLÉ du champ (que Flutter publie dans
+  // `aria-label`), et les noms sont rendus uniques par un compteur.
 
-  // Noms stables et explicites : deux champs distincts ne doivent pas se
-  // retrouver avec le même `name`, sinon le gestionnaire écrase l'un avec
-  // l'autre dans le couple qu'il enregistre.
-  function applyAttributes(input) {
-    if (!input || input.tagName !== 'INPUT') return;
+  var LABEL_NEW = /nouveau|new|confirmer|confirm|r[ée]p[ée]ter|r[ée]p[ée]t/i;
+  var LABEL_CURRENT = /temporaire|actuel|current|existant|ancien/i;
+
+  /// Rôle d'un champ : 'username' | 'current-password' | 'new-password'.
+  ///
+  /// Le repli dépend du NOMBRE de champs de mot de passe présents :
+  ///  • un seul → c'est un mot de passe existant (écran de connexion) ;
+  ///  • plusieurs et aucun libellé exploitable → on ne devine pas : on
+  ///    retourne null et on ne touche à rien. Mieux vaut ne rien faire que
+  ///    marquer trois champs différenciés comme identiques.
+  function roleOf(input, passwordCount) {
     var type = (input.getAttribute('type') || '').toLowerCase();
-    // Un champ de NOUVEAU mot de passe (création de compte) ne doit pas être
-    // traité comme un mot de passe existant : il perdrait sa proposition de
-    // génération. On respecte donc ce que Flutter a déjà indiqué.
-    var existing = (input.getAttribute('autocomplete') || '').toLowerCase();
-    if (type === 'password' && existing === 'new-password') return;
+    var declared = (input.getAttribute('autocomplete') || '').toLowerCase();
 
-    var spec = SPECS[type];
-    if (!spec) return;
+    if (type === 'email') return 'username';
+    if (type !== 'password') return null;
 
-    var changed = false;
+    // Si Flutter a déjà su dire « nouveau mot de passe », on le respecte.
+    if (declared === 'new-password') return 'new-password';
 
-    if (input.getAttribute('autocomplete') !== spec.autocomplete) {
-      input.setAttribute('autocomplete', spec.autocomplete);
-      changed = true;
-    }
-    if (!input.getAttribute('name')) {
-      input.setAttribute('name', spec.name);
-      changed = true;
-    }
-    if (!input.getAttribute('id')) {
-      input.setAttribute('id', spec.name);
-      changed = true;
-    }
-    // `inputmode` aide les claviers mobiles à proposer l'autocomplétion.
-    if (type === 'email' && input.getAttribute('inputmode') !== 'email') {
-      input.setAttribute('inputmode', 'email');
-      changed = true;
-    }
-    // Marqueur de diagnostic : permet de vérifier depuis les tests que la
-    // correction a bien été appliquée, sans deviner.
-    if (changed) input.setAttribute('data-gorex-autofill', '1');
+    var label = (input.getAttribute('aria-label') || '') + ' ' +
+                (input.getAttribute('placeholder') || '');
+    if (LABEL_NEW.test(label)) return 'new-password';
+    if (LABEL_CURRENT.test(label)) return 'current-password';
+
+    // Libellé inutilisable : on ne se prononce que s'il n'y a qu'un champ.
+    return passwordCount === 1 ? 'current-password' : null;
   }
 
-  function scan(root) {
+  var NAME_BY_ROLE = {
+    username: 'gorex-username',
+    'current-password': 'gorex-password',
+    'new-password': 'gorex-new-password',
+  };
+
+  /// Applique les attributs à tous les champs d'une racine.
+  ///
+  /// Le compteur de noms est recalculé à chaque passe à partir du document,
+  /// ce qui rend l'opération IDEMPOTENTE : ré-exécuter le script (l'observateur
+  /// le fait souvent) ne produit jamais « gorex-password-2-2-2 ».
+  function applyAll(root) {
     if (!root || !root.querySelectorAll) return;
-    root.querySelectorAll('input').forEach(applyAttributes);
+    var inputs = Array.prototype.slice.call(root.querySelectorAll('input'));
+    if (!inputs.length) return;
+
+    var passwordCount = inputs.filter(function (i) {
+      return (i.getAttribute('type') || '').toLowerCase() === 'password';
+    }).length;
+
+    var used = {};
+
+    inputs.forEach(function (input) {
+      var role = roleOf(input, passwordCount);
+      if (!role) return;
+
+      var base = NAME_BY_ROLE[role];
+      var name = base;
+      if (used[name]) {
+        used[name] += 1;
+        name = base + '-' + used[name];
+      } else {
+        used[name] = 1;
+      }
+
+      var changed = false;
+
+      if (input.getAttribute('autocomplete') !== role) {
+        input.setAttribute('autocomplete', role);
+        changed = true;
+      }
+      // On (re)nomme aussi les champs que NOUS avons nommés lors d'une passe
+      // précédente : sinon un champ resterait bloqué sur un ancien suffixe.
+      var currentName = input.getAttribute('name') || '';
+      if (!currentName || currentName.indexOf('gorex-') === 0) {
+        if (currentName !== name) {
+          input.setAttribute('name', name);
+          changed = true;
+        }
+      }
+      var currentId = input.getAttribute('id') || '';
+      if (!currentId || currentId.indexOf('gorex-') === 0) {
+        if (currentId !== name) {
+          input.setAttribute('id', name);
+          changed = true;
+        }
+      }
+      if (role === 'username' && input.getAttribute('inputmode') !== 'email') {
+        input.setAttribute('inputmode', 'email');
+        changed = true;
+      }
+      if (changed) input.setAttribute('data-gorex-autofill', '1');
+    });
   }
 
   function init() {
-    scan(document);
+    applyAll(document);
 
     // Flutter crée ses champs d'édition à la demande (au premier focus
-    // parfois). Un observateur garantit que les champs apparus PLUS TARD
-    // reçoivent aussi les attributs, sans avoir à deviner le bon moment.
+    // parfois), et le NOMBRE de champs de mot de passe change d'un écran à
+    // l'autre. Un observateur garantit que chaque nouvelle composition est
+    // réévaluée — le rôle d'un champ dépend en effet de ce nombre.
     if (typeof MutationObserver === 'undefined') return;
+
+    // Regroupement : les mutations arrivent par rafales. Sans ce drapeau, on
+    // relancerait une passe complète des dizaines de fois par écran.
+    var pending = false;
+    function schedule() {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(function () {
+        pending = false;
+        applyAll(document);
+      });
+    }
+
     var observer = new MutationObserver(function (mutations) {
       for (var i = 0; i < mutations.length; i++) {
         var m = mutations[i];
-        if (m.type === 'attributes' && m.target && m.target.tagName === 'INPUT') {
-          applyAttributes(m.target);
-          continue;
+        if (m.type === 'attributes') {
+          schedule();
+          return;
         }
         for (var j = 0; j < m.addedNodes.length; j++) {
           var node = m.addedNodes[j];
           if (node && node.nodeType === 1) {
-            if (node.tagName === 'INPUT') applyAttributes(node);
-            else scan(node);
+            schedule();
+            return;
           }
         }
       }
