@@ -154,5 +154,47 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('la carte affiche l\'adresse sans dupliquer le pays',
+        (tester) async {
+      // Non-régression sur un défaut signalé à tort puis vérifié.
+      //
+      // Le formulaire d'inscription ne collecte qu'un champ libre « Adresse »
+      // et le range dans `city`. La carte l'affichait sous l'étiquette
+      // « Localité », ce qui laissait croire à une ville. Le rendu réel a été
+      // observé : « Rue de la Loi 16, Belgique » — le pays n'est PAS dupliqué.
+      // Ce test fige les deux points : bonne étiquette, pas de doublon.
+      final state = AppState();
+      state.clients
+        ..clear()
+        ..add(Client(
+          id: 'c9',
+          code: 'GRX-VIP-0009',
+          fullName: 'Client Vérification',
+          email: 'verif@example.com',
+          phone: '+32470000009',
+          country: 'Belgique',
+          city: 'Rue de la Loi 16',
+          subscriptionTierId: 't1',
+          confidentiality: ConfidentialityLevel.elevated,
+          category: ClientCategory.individualVip,
+          createdAt: DateTime(2026, 11, 21, 13, 41),
+          approvalStatus: ClientApprovalStatus.pending,
+        ));
+      state.currentUser = _ceo();
+
+      await tester.pumpWidget(_wrap(state));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rue de la Loi 16, Belgique'), findsOneWidget,
+          reason: 'adresse suivie du pays, une seule fois');
+      expect(find.textContaining('BelgiqueBelgique'), findsNothing,
+          reason: 'le pays ne doit jamais être collé deux fois');
+      expect(find.text('ADRESSE'), findsOneWidget,
+          reason: 'l\'étiquette doit décrire le contenu réel');
+      expect(find.text('LOCALITÉ'), findsNothing,
+          reason: 'l\'ancienne étiquette trompeuse doit avoir disparu');
+      expect(tester.takeException(), isNull);
+    });
   });
 }

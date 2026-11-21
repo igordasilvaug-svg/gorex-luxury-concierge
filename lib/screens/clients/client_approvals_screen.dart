@@ -210,8 +210,17 @@ class _ApprovalCardState extends State<_ApprovalCard> {
             InfoRow(label: 'TVA', value: c.vatNumber!),
           ],
           const SizedBox(height: 6),
+          // Étiquette corrigée. Le formulaire d'inscription ne demande qu'un
+          // seul champ libre, « Adresse », et le stocke dans `city`. Afficher
+          // « Localité » au-dessus d'une adresse de rue (« Rue de la Loi 16,
+          // Belgique ») induisait en erreur le validateur, qui cherchait une
+          // ville. On nomme donc ce qui est réellement affiché.
+          //
+          // Le modèle distingue bien `city` et `country` ; c'est le formulaire
+          // qui ne collecte pas la ville séparément. Une vraie séparation
+          // ville / code postal demanderait d'ajouter ces champs au formulaire.
           InfoRow(
-            label: 'Localité',
+            label: 'Adresse',
             value: [
               c.city,
               c.country,
