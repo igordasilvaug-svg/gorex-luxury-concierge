@@ -119,6 +119,16 @@
   <script src="flutter_bootstrap.js" async></script>
   <script src="cookie-consent.js" defer></script>
 
+  <!-- ─── Compatibilité gestionnaires de mots de passe ──────────────────────
+       Flutter web force `autocomplete="off"` et ne donne ni `name` ni `id` à
+       ses champs. Les `autofillHints` écrits en Dart ne survivent donc pas
+       jusqu'au navigateur, et un gestionnaire de mots de passe n'a plus rien
+       à quoi rattacher le couple identifiant / mot de passe qu'il doit
+       enregistrer. Ce script rétablit les attributs HTML normalisés.
+       Script EXTERNE car la CSP du site bloque les scripts « inline ».
+  -->
+  <script src="form-autofill.js" defer></script>
+
   <!-- ─── Auto-réparation : purge des Service Worker / caches résiduels ──────
        L'ancien Service Worker Flutter mettait l'application en cache et
        servait une version obsolète SANS contacter le serveur (empêchait toute
