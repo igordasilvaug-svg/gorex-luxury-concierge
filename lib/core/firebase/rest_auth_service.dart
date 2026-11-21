@@ -44,6 +44,19 @@ class RestSignInResult {
   final String? error;
 }
 
+/// Résultat de la vérification d'un code de réinitialisation de mot de passe.
+class RestResetCheck {
+  const RestResetCheck({required this.ok, this.email, this.error});
+
+  final bool ok;
+
+  /// Adresse du compte concerné (renseignée si [ok]).
+  final String? email;
+
+  /// EXPIRED_OOB_CODE, INVALID_OOB_CODE, NETWORK, UNKNOWN…
+  final String? error;
+}
+
 /// Résultat d'une lecture Firestore REST.
 ///
 /// `status == 0` signale une impossibilité réseau (aucune conclusion possible),
@@ -328,7 +341,19 @@ class RestAuthService {
   }
 
   /// Envoie un e-mail de réinitialisation de mot de passe.
-  static Future<bool> sendPasswordReset(String email) async {
+  ///
+  /// [continueUrl] : adresse de retour utilisée par Firebase APRÈS que la
+  /// personne a choisi son nouveau mot de passe. On y place l'application
+  /// elle-même, de sorte que la réinitialisation se termine dans nos écrans
+  /// (politique de 12 caractères appliquée) et non sur la page générique
+  /// Google, puis que la session s'ouvre directement.
+  ///
+  /// [locale] : langue de l'e-mail envoyé par Firebase (fr / nl / en).
+  static Future<bool> sendPasswordReset(
+    String email, {
+    String? continueUrl,
+    String? locale,
+  }) async {
     try {
       final resp = await http
           .post(
@@ -337,12 +362,101 @@ class RestAuthService {
             body: jsonEncode({
               'requestType': 'PASSWORD_RESET',
               'email': email.trim().toLowerCase(),
+              if (continueUrl != null && continueUrl.isNotEmpty)
+                'continueUrl': continueUrl,
+              if (locale != null && locale.isNotEmpty) 'locale': locale,
             }),
           )
           .timeout(_timeout);
       return resp.statusCode == 200;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Vérifie un code de réinitialisation (`oobCode`) et retourne l'adresse
+  /// du compte concerné.
+  ///
+  /// Endpoint officiel `accounts:verifyPasswordResetCode`. Il permet de
+  /// distinguer un lien expiré ou déjà utilisé d'un lien valide AVANT de
+  /// faire saisir un mot de passe : sans cela, la personne composerait un
+  /// mot de passe pour rien.
+  static Future<RestResetCheck> verifyResetCode(String oobCode) async {
+    final code = oobCode.trim();
+    if (code.isEmpty) {
+      return const RestResetCheck(ok: false, error: 'INVALID_OOB_CODE');
+    }
+    try {
+      final resp = await http
+          .post(
+            Uri.parse(
+              '$_identityBase/accounts:verifyPasswordResetCode?key=$_apiKey',
+            ),
+            headers: await _plain(),
+            body: jsonEncode({'oobCode': code}),
+          )
+          .timeout(_timeout);
+      if (resp.statusCode == 200) {
+        String? email;
+        try {
+          final m = jsonDecode(resp.body);
+          if (m is Map) email = m['email'] as String?;
+        } catch (_) {}
+        return RestResetCheck(ok: true, email: email);
+      }
+      return RestResetCheck(ok: false, error: _errorCode(resp.body));
+    } catch (_) {
+      return const RestResetCheck(ok: false, error: 'NETWORK');
+    }
+  }
+
+  /// Applique le nouveau mot de passe à partir du code de réinitialisation.
+  ///
+  /// Endpoint officiel `accounts:resetPassword`. En cas de succès, Firebase
+  /// renvoie un jeton de connexion : la personne est donc immédiatement
+  /// authentifiée, sans avoir à ressaisir son mot de passe tout juste défini.
+  ///
+  /// Le compte est conservé : seule l'empreinte du mot de passe change. Les
+  /// dossiers, l'historique et le rôle restent attachés au même `localId`.
+  static Future<RestSignInResult> resetPassword(
+    String oobCode,
+    String newPassword,
+  ) async {
+    try {
+      final resp = await http
+          .post(
+            Uri.parse('$_identityBase/accounts:resetPassword?key=$_apiKey'),
+            headers: await _plain(),
+            body: jsonEncode({
+              'oobCode': oobCode.trim(),
+              'newPassword': newPassword,
+            }),
+          )
+          .timeout(_timeout);
+
+      if (resp.statusCode == 200) {
+        String? email, uid, idToken;
+        try {
+          final m = jsonDecode(resp.body);
+          if (m is Map) {
+            email = m['email'] as String?;
+            uid = m['localId'] as String?;
+            idToken = m['idToken'] as String?;
+          }
+        } catch (_) {}
+        return RestSignInResult(
+          ok: true,
+          uid: uid,
+          idToken: idToken,
+          email: email,
+        );
+      }
+      return RestSignInResult(
+        ok: false,
+        error: _normalize(_errorCode(resp.body)),
+      );
+    } catch (_) {
+      return const RestSignInResult(ok: false, error: 'NETWORK');
     }
   }
 

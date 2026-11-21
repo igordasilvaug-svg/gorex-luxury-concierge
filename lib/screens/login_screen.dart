@@ -74,17 +74,28 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _forgotPassword(AppState state) async {
     final email = _email.text.trim();
     if (email.isEmpty) {
-      setState(() => _error = 'Saisissez votre e-mail pour recevoir le lien.');
+      setState(
+        () => _error =
+            'Saisissez d\'abord votre adresse e-mail : le lien de '
+            'réinitialisation y sera envoyé.',
+      );
       return;
     }
+    setState(() => _busy = true);
     final sent = await state.sendPasswordReset(email);
     if (!mounted) return;
+    setState(() => _busy = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        duration: const Duration(seconds: 6),
         content: Text(
           sent
-              ? 'Lien de réinitialisation envoyé à $email.'
-              : 'Impossible d\'envoyer le lien pour le moment.',
+              ? 'Lien envoyé à $email. Ouvrez-le pour choisir un nouveau mot '
+                    'de passe : votre compte et vos dossiers sont conservés. '
+                    'Rien reçu ? Vérifiez les indésirables, ou écrivez à '
+                    '${AppConfig.supportEmail}.'
+              : 'Envoi impossible pour le moment. Réessayez dans un instant, '
+                    'ou écrivez à ${AppConfig.supportEmail}.',
         ),
       ),
     );
@@ -92,7 +103,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _quickFill(String email) {
     _email.text = email;
-    _password.text = 'gorex2025';
+    // Aucun mot de passe n'est pré-rempli : un mot de passe en clair écrit
+    // dans le code se retrouve dans le paquet JavaScript publié, où il est
+    // lisible par n'importe qui. Le raccourci ne renseigne donc que l'adresse.
     setState(() => _error = null);
   }
 
@@ -342,6 +355,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
+                      _footSep(),
+                      _footLink(
+                        state.tr('login.support'),
+                        () => _showSupportDialog(),
+                      ),
                     ],
                   ),
                 ),
@@ -375,6 +393,67 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _footSep() =>
       Container(width: 1, height: 12, color: AppColors.divider);
+
+  /// Affiche les coordonnées d'assistance du groupe.
+  ///
+  /// Sert aussi à désamorcer un doute légitime : les e-mails de
+  /// réinitialisation sont émis par l'infrastructure Firebase (adresse en
+  /// `@gorex-concierge.firebaseapp.com`), pas depuis `@gorex-group.eu`. Un
+  /// utilisateur qui ne sait pas cela peut croire à une tentative d'hameçonnage
+  /// et ignorer le lien. L'écran explique l'origine réelle du message et donne
+  /// l'adresse à contacter en cas de doute.
+  void _showSupportDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Assistance', style: AppTypography.title),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SelectableText(
+                AppConfig.supportEmail,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.champagne,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Écrivez à cette adresse pour toute difficulté de connexion, '
+                'perte d\'accès ou question sur votre compte.',
+                style: AppTypography.caption,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'ORIGINE DES E-MAILS DE MOT DE PASSE',
+                style: AppTypography.eyebrow,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Les messages de réinitialisation sont expédiés par '
+                'l\'infrastructure d\'authentification Firebase, depuis une '
+                'adresse en @gorex-concierge.firebaseapp.com. Une adresse '
+                'd\'expédition en @gorex-group.eu exigerait un serveur '
+                'd\'envoi externe. En cas de doute sur un message reçu, ne '
+                'cliquez pas et écrivez-nous à l\'adresse ci-dessus.',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.greyDark,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('FERMER'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _demoGrid() {
     final accounts = [

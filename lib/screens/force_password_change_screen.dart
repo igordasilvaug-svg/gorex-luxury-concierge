@@ -40,9 +40,24 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
     await s.changeOwnPassword(_next.text, currentPassword: _current.text);
     if (!mounted) return;
     setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Mot de passe mis à jour avec succès.')),
-    );
+    if (s.currentUser?.mustChangePassword == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mot de passe mis à jour avec succès.')),
+      );
+    } else {
+      // Sans ce retour, un refus de Firebase (mot de passe temporaire erroné,
+      // jeton expiré) laissait la personne devant un formulaire inchangé.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            s.lastAuthError ??
+                'Le mot de passe n\'a pas pu être modifié. '
+                    'Vérifiez le mot de passe temporaire.',
+          ),
+          backgroundColor: AppColors.urgent,
+        ),
+      );
+    }
   }
 
   @override
@@ -50,15 +65,21 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
     final s = context.watch<AppState>();
     final user = s.currentUser;
 
+    // Deux motifs possibles : première connexion, ou mot de passe trop faible
+    // détecté à la connexion (défini via la page générique de Firebase, qui
+    // n'impose aucune longueur minimale). Le message doit dire lequel.
+    final weak = s.mustChangeReason == 'weak-password';
+
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(28),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
-            child: Form(
-              key: _formKey,
-              child: Column(
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Center(child: GorexBrand()),
@@ -72,13 +93,20 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Première connexion',
+                    weak ? 'Mot de passe à renforcer' : 'Première connexion',
                     style: AppTypography.headline,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Bonjour ${user?.fullName ?? ''}, pour des raisons de confidentialité, vous devez définir un nouveau mot de passe avant d\'accéder à la plateforme.',
+                    weak
+                        ? 'Bonjour ${user?.fullName ?? ''}, votre mot de passe '
+                              'actuel ne respecte pas la règle de sécurité de '
+                              'la plateforme. Votre compte et vos dossiers '
+                              'sont conservés : seul le mot de passe change.'
+                        : 'Bonjour ${user?.fullName ?? ''}, pour des raisons de '
+                              'confidentialité, vous devez définir un nouveau '
+                              'mot de passe avant d\'accéder à la plateforme.',
                     style: AppTypography.bodyMedium,
                     textAlign: TextAlign.center,
                   ),

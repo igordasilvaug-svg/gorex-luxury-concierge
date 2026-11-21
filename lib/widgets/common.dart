@@ -298,10 +298,13 @@ class GoldButton extends StatelessWidget {
           ),
           const SizedBox(width: 10),
         ],
-        Text(
-          label.toUpperCase(),
-          style: AppTypography.button.copyWith(
-            color: outlined ? AppColors.champagne : AppColors.black,
+        Flexible(
+          child: Text(
+            label.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: AppTypography.button.copyWith(
+              color: outlined ? AppColors.champagne : AppColors.black,
+            ),
           ),
         ),
       ],

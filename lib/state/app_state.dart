@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/i18n/app_localizations.dart';
 import '../core/app_config.dart';
+import '../core/security/password_policy.dart';
 import '../core/firebase/firebase_auth_service.dart';
 import '../core/firebase/rest_auth_service.dart';
 import '../core/firebase/firestore_service.dart';
@@ -76,6 +77,23 @@ class AppState extends ChangeNotifier {
   /// erreur). Permet d'afficher une cause précise à l'utilisateur au lieu du
   /// générique « identifiants invalides » (aide au support).
   String? lastAuthError;
+
+  /// Raison du changement de mot de passe imposé, lorsque la session vient
+  /// d'être ouverte. `'weak-password'` signale un mot de passe trop faible
+  /// détecté à la connexion : l'écran de changement doit alors expliquer
+  /// pourquoi il s'affiche, plutôt que de parler de « première connexion ».
+  String? mustChangeReason;
+
+  /// Un essai de réinitialisation par lien e-mail a-t-il déjà été consommé ?
+  ///
+  /// Un `oobCode` est à usage unique : recharger la page après un changement
+  /// réussi renverrait « code déjà utilisé » alors que l'opération a réussi.
+  /// L'écran de réinitialisation lit puis efface ce drapeau pour éviter ce
+  /// faux message d'échec.
+  bool resetAttempted = false;
+
+  /// Efface le drapeau d'essai de réinitialisation.
+  void consumeResetAttempt() => resetAttempted = false;
 
   /// Jeton de session obtenu via l'API REST (repli sans SDK JavaScript).
   /// Conservé pour permettre le changement de mot de passe en cours de session.
@@ -856,8 +874,86 @@ class AppState extends ChangeNotifier {
       return false;
     }
 
-    final uid = r.uid;
-    final token = r.idToken;
+    return _openRestSession(email, r.uid, r.idToken, password: password);
+  }
+
+  /// Connexion via un code de réinitialisation de mot de passe.
+  ///
+  /// Utilisée par l'écran de réinitialisation : la personne n'a plus à saisir
+  /// son mot de passe une seconde fois, puisque `accounts:resetPassword`
+  /// retourne directement un jeton de connexion.
+  ///
+  /// Le compte est CONSERVÉ : mêmes `uid`, mêmes dossiers, même rôle.
+  /// Si l'adresse ne correspond à aucune fiche métier, la session n'est pas
+  /// ouverte et le message explique de contacter l'administrateur — le mot de
+  /// passe reste néanmoins modifié côté Firebase.
+  Future<bool?> signInAfterPasswordReset(
+    String oobCode,
+    String newPassword,
+  ) async {
+    resetAttempted = true;
+    final r = await RestAuthService.resetPassword(oobCode, newPassword);
+    if (!r.ok) {
+      if (r.error == 'NETWORK' || r.error == 'UNKNOWN') return null;
+      if (r.error == 'EXPIRED_OOB_CODE') {
+        lastAuthError =
+            'Ce lien a expiré. Demandez un nouveau lien de réinitialisation.';
+        return false;
+      }
+      if (r.error == 'INVALID_OOB_CODE') {
+        lastAuthError =
+            'Ce lien n\'est plus valide (déjà utilisé ou incomplet). '
+            'Demandez un nouveau lien de réinitialisation.';
+        return false;
+      }
+      if (r.error == 'WEAK_PASSWORD') {
+        lastAuthError =
+            'Mot de passe refusé : 12 caractères minimum, avec majuscule, '
+            'minuscule, chiffre et symbole.';
+        return false;
+      }
+      lastAuthError = 'La réinitialisation a échoué. Réessayez dans un instant.';
+      return false;
+    }
+
+    final email = r.email ?? '';
+    await _logAudit(
+      'Mot de passe réinitialisé',
+      email,
+      detail: 'lien e-mail',
+    );
+    final opened = await _openRestSession(email, r.uid, r.idToken);
+    if (opened == true) {
+      // Mot de passe choisi par la personne elle-même : la contrainte de
+      // changement à la première connexion n'a plus lieu d'être.
+      final u = currentUser;
+      if (u != null && u.mustChangePassword) {
+        final uid = restUid;
+        final token = restIdToken;
+        if (uid != null && token != null) {
+          await RestAuthService.clearMustChangePassword(uid, token);
+          currentUser = u.copyWith(mustChangePassword: false);
+          final i = users.indexWhere((e) => e.id == u.id);
+          if (i >= 0) users[i] = currentUser!;
+          await _persist();
+          notifyListeners();
+        }
+      }
+    }
+    return opened;
+  }
+
+  /// Ouvre la session applicative à partir d'un jeton Firebase déjà obtenu.
+  ///
+  /// Extraite pour être partagée par la connexion classique et par la
+  /// réinitialisation de mot de passe : les deux doivent charger le profil
+  /// métier, le jeton REST et les données cloud de façon IDENTIQUE.
+  Future<bool?> _openRestSession(
+    String email,
+    String? uid,
+    String? token, {
+    String? password,
+  }) async {
     if (uid == null || token == null || token.isEmpty) return null;
 
     // Résolution du profil métier : personnel (`staff`) puis client (`clients`).
@@ -891,6 +987,23 @@ class AppState extends ChangeNotifier {
           'Ce compte n\'est pas habilité à accéder au portail. '
           'Contactez l\'administrateur.';
       return false;
+    }
+
+    // ── CONTRÔLE DE ROBUSTESSE DU MOT DE PASSE ──────────────────────────
+    // Firebase n'applique aucune longueur minimale : un compte dont le mot de
+    // passe a été défini sur la page générique de réinitialisation peut très
+    // bien n'avoir que six caractères. Cette vérification est faite ICI, à la
+    // connexion, car c'est le seul endroit où le mot de passe est disponible
+    // en clair. Un mot de passe faible ne bloque pas l'accès (la personne
+    // resterait sinon enfermée dehors) : il ouvre la session puis impose le
+    // choix d'un mot de passe conforme, exactement comme à la première
+    // connexion. La fiche Firestore n'est pas modifiée : le drapeau est local,
+    // ce qui évite d'exiger une écriture non autorisée pour un client.
+    if (password != null &&
+        password.isNotEmpty &&
+        PasswordPolicy.validate(password).isNotEmpty) {
+      profile = profile.copyWith(mustChangePassword: true);
+      mustChangeReason = 'weak-password';
     }
 
     currentUser = profile.copyWith(lastLogin: DateTime.now());
@@ -1006,8 +1119,18 @@ class AppState extends ChangeNotifier {
   /// Envoie un lien de réinitialisation de mot de passe.
   ///
   /// REST d'abord (robuste, sans SDK), puis SDK en secours.
+  ///
+  /// Le lien renvoie vers l'application elle-même ([continueUrl]) : la
+  /// personne choisit alors son mot de passe dans NOS écrans, où la règle des
+  /// 12 caractères est appliquée, au lieu de la page générique Google.
   Future<bool> sendPasswordReset(String email) async {
-    if (await RestAuthService.sendPasswordReset(email)) return true;
+    if (await RestAuthService.sendPasswordReset(
+      email,
+      continueUrl: AppConfig.passwordResetContinueUrl,
+      locale: language,
+    )) {
+      return true;
+    }
     return FirebaseAuthService.sendPasswordReset(email);
   }
 
@@ -1030,7 +1153,15 @@ class AppState extends ChangeNotifier {
         restIdToken!,
         newPassword,
       );
-      if (!ok) return; // échec : on ne modifie pas l'état local
+      if (!ok) {
+        // Sans message, l'écran de changement affichait « succès » alors que
+        // Firebase avait refusé (jeton de session expiré, par exemple).
+        lastAuthError =
+            'La modification a été refusée par le service '
+            'd\'authentification : la session a probablement expiré. '
+            'Déconnectez-vous puis reconnectez-vous pour réessayer.';
+        return;
+      }
       await RestAuthService.clearMustChangePassword(restUid!, restIdToken!);
     } else if (FirebaseAuthService.isNamedUser) {
       if (currentPassword != null) {
@@ -1053,6 +1184,7 @@ class AppState extends ChangeNotifier {
       currentUser = u.copyWith(mustChangePassword: false);
     }
     log('Changement mot de passe', u.email);
+    mustChangeReason = null;
     await _persist();
     notifyListeners();
   }

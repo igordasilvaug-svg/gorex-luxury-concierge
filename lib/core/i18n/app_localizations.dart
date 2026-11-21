@@ -96,6 +96,7 @@ class L10n {
     'login.guide': 'Guide d\'utilisation',
     'login.legal': 'Mentions légales',
     'login.about': 'À propos',
+    'login.support': 'Assistance',
     // Commun
     'common.logout': 'Déconnexion',
     'common.close': 'Fermer',
@@ -189,6 +190,7 @@ class L10n {
     'login.guide': 'Gebruikershandleiding',
     'login.legal': 'Juridische informatie',
     'login.about': 'Over ons',
+    'login.support': 'Ondersteuning',
     'common.logout': 'Afmelden',
     'common.close': 'Sluiten',
     'common.language': 'Taal',
@@ -279,6 +281,7 @@ class L10n {
     'login.guide': 'User guide',
     'login.legal': 'Legal notice',
     'login.about': 'About',
+    'login.support': 'Support',
     'common.logout': 'Log out',
     'common.close': 'Close',
     'common.language': 'Language',

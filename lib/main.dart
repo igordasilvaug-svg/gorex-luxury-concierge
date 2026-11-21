@@ -3,11 +3,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
+import 'core/app_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/firebase/firebase_bootstrap.dart';
 import 'widgets/animations.dart';
 import 'state/app_state.dart';
 import 'screens/login_screen.dart';
+import 'screens/password_reset_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/force_password_change_screen.dart';
 import 'screens/shell/app_shell.dart';
@@ -67,6 +69,13 @@ class _RootState extends State<_Root> {
   bool _splashDone = false;
   bool _remindersChecked = false;
 
+  /// Code de réinitialisation lu dans l'URL au chargement de la page.
+  ///
+  /// Sur le Web, `Uri.base` reflète l'adresse demandée : un lien de
+  /// réinitialisation ouvert sur `https://gorex-luxury-concierge.eu/?oobCode=…`
+  /// arrive donc bien ici, et non sur un écran de connexion générique.
+  late String? _resetCode = AppConfig.passwordResetCode;
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -87,6 +96,17 @@ class _RootState extends State<_Root> {
         onFinished: () {
           if (mounted) setState(() => _splashDone = true);
         },
+      );
+    }
+
+    // Réinitialisation de mot de passe : prioritaire sur tout le reste.
+    // Une personne qui arrive par un lien expiré ne doit pas être renvoyée
+    // vers l'écran de connexion sans explication.
+    final code = _resetCode;
+    if (code != null && code.isNotEmpty) {
+      return PasswordResetScreen(
+        oobCode: code,
+        onFinished: () => setState(() => _resetCode = null),
       );
     }
 
