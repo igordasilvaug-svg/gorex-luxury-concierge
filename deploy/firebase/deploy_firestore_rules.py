@@ -50,6 +50,12 @@ REQUIRED_MARKERS = [
     # Mandat SEPA signé par le débiteur (seul le titulaire peut signer).
     "match /sepa_mandates/",
     "request.resource.data.clientId == myClientId()",
+    # La date de signature doit accepter un TIMESTAMP, pas seulement une
+    # chaîne : l'application écrit de l'ISO 8601, que l'encodeur REST convertit
+    # en timestampValue. Une version n'acceptant que `is string` renvoyait 403
+    # à l'application elle-même (défaut constaté en production, invisible sur
+    # l'émulateur). Ce marqueur empêche la réapparition du bug.
+    "is timestamp",
 ]
 
 

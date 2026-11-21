@@ -701,6 +701,56 @@ const check = async (label, fn, expect) => {
     'DENY',
   );
 
+  // ══════════════════════════════════════════════════════════════════════
+  // 53 et 54 : LA DATE DE SIGNATURE EN TANT QUE TIMESTAMP
+  //
+  // ── BUG DE PRODUCTION TROUVÉ PAR LE TEST BOUT-EN-BOUT ─────────────────
+  // Les tests 40 à 52 passaient en envoyant `signatureDate` comme CHAÎNE.
+  // L'application, elle, écrit une chaîne ISO 8601 que l'encodeur REST
+  // Firestore convertit en `timestampValue` : le serveur stocke donc un
+  // TIMESTAMP. La règle exigeait `is string` et répondait 403 à
+  // l'application — un refus que l'émulateur ne reproduisait pas, mes
+  // documents de test n'ayant pas la même forme que les vrais.
+  //
+  // Ces deux tests écrivent un objet `Timestamp` Firestore, exactement comme
+  // le serveur le reçoit. C'est ce qui aurait dû exister dès le départ.
+  // ══════════════════════════════════════════════════════════════════════
+  const { Timestamp } = require('firebase/firestore');
+
+  const mandBodyTs = (extra = {}) => ({
+    id: 'mand-ts',
+    clientId: 'gx-cli-2ok',
+    clientName: 'Client Abonne',
+    mandateReference: 'GRX-ABO-2026-0100',
+    iban: 'BE68539007547034',
+    bic: null,
+    accountHolder: 'Client Abonne',
+    type: 'core',
+    status: 'active',
+    // L'objet réellement stocké par Firestore.
+    signatureDate: Timestamp.fromDate(new Date('2026-03-01T09:00:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-03-01T09:00:00Z')),
+    cancelledAt: null,
+    lastUsedAt: null,
+    preNotificationDays: 14,
+    notes: 'Signe par le client depuis son espace personnel.',
+    ...extra,
+  });
+
+  await check(
+    '53. mandat avec signatureDate en TIMESTAMP -> accepte',
+    () => setDoc(doc(cli2, 'sepa_mandates', 'mand-ts-' + RUN2),
+      mandBodyTs({ id: 'mand-ts-' + RUN2 })),
+    'ALLOW',
+  );
+
+  await check(
+    '54. mandat TIMESTAMP mais status=active force sur autrui -> refuse',
+    () => setDoc(doc(cli2, 'sepa_mandates', 'mand-ts-oth-' + RUN2),
+      mandBodyTs({ id: 'mand-ts-oth-' + RUN2, clientId: 'gx-cli-1' })),
+    'DENY',
+  );
+
   await testEnv.cleanup();
 
   const ko = results.filter((r) => !r.ok);

@@ -469,6 +469,17 @@ service cloud.firestore {
     match /sepa_mandates/{doc} {
       allow read: if isFinanceRole() || ownsClientData(resource.data);
 
+      // ── BUG DE PRODUCTION CORRIGÉ ICI ────────────────────────────────
+      // La condition exigeait `signatureDate is string`. Or l'application
+      // écrit ses dates au format ISO 8601, et l'encodeur REST Firestore les
+      // convertit en `timestampValue` : le serveur stocke donc un TIMESTAMP,
+      // jamais une chaîne. La règle refusait l'écriture de l'application
+      // elle-même — 403 « Missing or insufficient permissions » observé en
+      // production, alors que l'émulateur répondait « autorisé » parce que
+      // mes tests y envoyaient, eux, une vraie chaîne.
+      //
+      // Les deux formes sont désormais acceptées : c'est la présence de la
+      // date de signature qui compte, pas son encodage.
       allow create: if isFinanceRole()
                     || (isApprovedClient()
                         && request.resource.data.clientId == myClientId()
@@ -476,7 +487,8 @@ service cloud.firestore {
                         && request.resource.data.mandateReference is string
                         && request.resource.data.iban is string
                         && request.resource.data.accountHolder is string
-                        && request.resource.data.signatureDate is string
+                        && (request.resource.data.signatureDate is timestamp
+                            || request.resource.data.signatureDate is string)
                         && request.resource.data.get('cancelledAt', null) == null
                         && request.resource.data.get('lastUsedAt', null) == null);
 
