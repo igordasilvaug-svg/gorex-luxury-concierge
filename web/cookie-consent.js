@@ -112,13 +112,48 @@
     document.head.appendChild(el);
   }
 
+  // DÉFAUT CORRIGÉ (mesuré en production, pas en théorie).
+  //
+  // `setReserved()` émettait un `resize` pour prévenir Flutter. Or
+  // `dispatchEvent` est SYNCHRONE : l'écouteur `resize` plus bas appelle
+  // `setReserved()`, qui ré-émettait un `resize`, qui rappelait l'écouteur…
+  // La récursion ne s'arrêtait qu'à l'explosion de la pile. Constat sur le
+  // site réel, à CHAQUE chargement de page :
+  //
+  //   RangeError: Maximum call stack size exceeded.
+  //     at setReserved (cookie-consent.js:121:12)
+  //     at <anonymous> (cookie-consent.js:160:5)
+  //     at setReserved (cookie-consent.js:121:12)   ← ×des centaines
+  //
+  // Conséquences : une exception non rattrapée à chaque visite, ET la
+  // notification de redimensionnement perdue pour Flutter (l'exception
+  // interrompt la chaîne avant que la vue n'ait fini de se reconfigurer).
+  //
+  // Deux garde-fous, complémentaires :
+  //   1. on n'émet un `resize` que si la hauteur réservée change VRAIMENT
+  //      (l'écouteur mesure la même valeur → aucune ré-émission) ;
+  //   2. l'émission est différée à la frame suivante et dédoublonnée, donc
+  //      elle ne peut plus s'insérer dans sa propre pile d'appel.
+  var resizePending = false;
+
+  function scheduleResize() {
+    if (resizePending) return;
+    resizePending = true;
+    requestAnimationFrame(function () {
+      resizePending = false;
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
+
   function setReserved(px) {
-    reserved = px > 0 ? px : 0;
+    var next = px > 0 ? Math.round(px) : 0;
+    var changed = next !== reserved;
+    reserved = next;
     document.documentElement.style.setProperty(
       '--gorex-cookie-h', reserved + 'px');
     // Flutter dimensionne son canevas d'après la taille de la fenêtre : on le
     // prévient pour qu'il recalcule sa mise en page à la nouvelle hauteur.
-    window.dispatchEvent(new Event('resize'));
+    if (changed) scheduleResize();
   }
 
   // Attend que Flutter ait monté sa vue (abandonne au bout de ~10 s).
@@ -155,9 +190,12 @@
     setReserved(0);
   }
 
+  // La bannière change de hauteur selon la largeur : on remesure. Grâce au
+  // test `changed` de setReserved(), un même résultat n'émet aucun événement,
+  // donc cet écouteur ne peut plus se rappeler lui-même indéfiniment.
   window.addEventListener('resize', function () {
     if (!barRef) return;
-    setReserved(measure()); // la bannière change de hauteur selon la largeur
+    setReserved(measure());
   });
 
   function build() {
