@@ -31,30 +31,32 @@ CANDIDATE_KEYS = [
 
 SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
-# --- Règles de DÉVELOPPEMENT (accès ouvert) -------------------------------
-DEV_RULES = """rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // ⚠️ DÉVELOPPEMENT : accès ouvert. À restreindre en production.
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}
-"""
-
-# --- Règles PRODUCTION recommandées (décommenter après intégration Auth) --
-PROD_RULES = """rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Utilisateurs authentifiés uniquement
-    match /{document=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-  }
-}
-"""
+# ─────────────────────────────────────────────────────────────────────────────
+# SCRIPT DÉSARMÉ — NE PAS RÉUTILISER TEL QUEL.
+#
+# Ce script portait des règles codées en dur, dont un jeu de DÉVELOPPEMENT :
+#
+#     match /{document=**} { allow read, write: if true; }
+#
+# Appliqué sur le projet de production `gorex-concierge`, ce jeu aurait ouvert
+# TOUTE la base — dossiers clients, journal d'audit, fiches du personnel — à
+# quiconque connaît l'identifiant du projet, sans même de session. Le second
+# jeu (« PROD ») n'était guère mieux : il autorisait toute lecture et toute
+# écriture à n'importe quel compte connecté, donc un client aurait pu
+# s'octroyer le rôle « ceo » ou lire le journal d'audit.
+#
+# Les règles réelles — refus par défaut, contrôle par rôle, validation des
+# inscriptions client — vivent dans `deploy/firebase/firestore.rules` et sont
+# publiées par `deploy_firestore_rules.py`, qui lit ce fichier.
+#
+# Ce script refuse donc désormais de s'exécuter. Le code d'origine est conservé
+# ci-dessous pour mémoire, sans effet.
+# ─────────────────────────────────────────────────────────────────────────────
+_ARCHIVED_DEV_RULES_WARNING = (
+    "Jeu de developpement historiquement contenu dans ce script :\n"
+    "    match /{document=**} { allow read, write: if true; }\n"
+    "Il n'est plus jamais deploye."
+)
 
 
 def find_admin_key():
@@ -101,49 +103,24 @@ def api(method, url, token, body=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--show", action="store_true", help="Affiche les règles sans déployer")
-    args = parser.parse_args()
+    parser.parse_args()
 
     print("=" * 64)
     print("  GOREX — Règles de sécurité Firestore")
     print("=" * 64)
-
-    if args.show:
-        print("\n--- Règles de développement ---")
-        print(DEV_RULES)
-        print("--- Règles de production (référence) ---")
-        print(PROD_RULES)
-        return
-
-    key_path = find_admin_key()
-    if not key_path:
-        print("❌ Clé Admin SDK introuvable.")
-        sys.exit(1)
-
-    project_id = project_id_from_key(key_path)
-    print(f"\n✅ Projet : {project_id}")
-    print(f"✅ Clé    : {key_path}")
-
-    token = get_access_token(key_path)
-    print("✅ Jeton OAuth obtenu")
-
-    base = f"https://firebaserules.googleapis.com/v1/projects/{project_id}"
-
-    # 1) Créer un ruleset
-    ruleset = api("POST", f"{base}/rulesets", token, {
-        "source": {"files": [{"name": "firestore.rules", "content": DEV_RULES}]}
-    })
-    ruleset_name = ruleset["name"]
-    print(f"✅ Ruleset créé : {ruleset_name}")
-
-    # 2) Mettre à jour la release cloud.firestore
-    release_name = f"projects/{project_id}/releases/cloud.firestore"
-    api("PATCH", f"{base}/releases/cloud.firestore", token, {
-        "release": {"name": release_name, "rulesetName": ruleset_name}
-    })
-    print("✅ Règles de développement déployées sur cloud.firestore")
-
-    print("\n⚠️  Rappel : règles ouvertes = DÉVELOPPEMENT uniquement.")
-    print("   Passez aux règles PROD (dans ce script) avant la mise en production.")
+    print()
+    print("⚠️  SCRIPT DÉSARMÉ — AUCUN DÉPLOIEMENT EFFECTUÉ.")
+    print()
+    print(_ARCHIVED_DEV_RULES_WARNING)
+    print()
+    print("Le déploiement des règles passe exclusivement par :")
+    print("    deploy/firebase/deploy_firestore_rules.py")
+    print("qui publie le contenu de :")
+    print("    deploy/firebase/firestore.rules")
+    print()
+    print("Pour consulter les règles réellement en production :")
+    print("    python3 deploy/firebase/deploy_firestore_rules.py --show")
+    sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -31,19 +31,30 @@ CANDIDATE_KEYS = [
 SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
 # --- Règles PRODUCTION ----------------------------------------------------
-PROD_RULES = """rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // Toute la base : accessible uniquement aux sessions authentifiées.
-    // L'application ouvre une session Firebase anonyme (firebase_auth) au
-    // démarrage ; le backend Admin SDK conserve l'accès complet côté serveur.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-"""
+# ─────────────────────────────────────────────────────────────────────────────
+# SCRIPT DÉSARMÉ — NE PAS RÉUTILISER TEL QUEL.
+#
+# Ce script publiait un jeu de règles codé en dur :
+#
+#     match /{document=**} { allow read, write: if request.auth != null; }
+#
+# Appliqué sur `gorex-concierge`, il aurait accordé à N'IMPORTE QUEL compte
+# connecté — y compris un client tout juste inscrit et jamais validé — la
+# lecture et l'écriture de TOUTE la base : dossiers clients, journal d'audit,
+# fiches du personnel. Aucun contrôle par rôle, aucune restriction de champ.
+#
+# Les règles réelles — refus par défaut, contrôle par rôle, validation des
+# inscriptions client — vivent dans `deploy/firebase/firestore.rules` et sont
+# publiées par `deploy_firestore_rules.py`, qui lit ce fichier.
+#
+# Ce script refuse donc désormais de s'exécuter.
+# ─────────────────────────────────────────────────────────────────────────────
+_ARCHIVED_WARNING = (
+    "Jeu de regles historiquement contenu dans ce script :\n"
+    "    match /{document=**} { allow read, write: if request.auth != null; }\n"
+    "Il accordait a tout compte connecte l'acces total a la base.\n"
+    "Il n'est plus jamais deploye."
+)
 
 
 def find_admin_key():
@@ -90,42 +101,24 @@ def api(method, url, token, body=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--show", action="store_true")
-    args = parser.parse_args()
+    parser.parse_args()
 
     print("=" * 64)
     print("  GOREX — Règles Firestore PRODUCTION")
     print("=" * 64)
-
-    if args.show:
-        print(PROD_RULES)
-        return
-
-    key_path = find_admin_key()
-    if not key_path:
-        print("❌ Clé Admin SDK introuvable.")
-        sys.exit(1)
-
-    project_id = project_id_from_key(key_path)
-    print(f"\n✅ Projet : {project_id}")
-    print(f"✅ Clé    : {key_path}")
-
-    token = get_access_token(key_path)
-    print("✅ Jeton OAuth obtenu")
-
-    base = f"https://firebaserules.googleapis.com/v1/projects/{project_id}"
-
-    ruleset = api("POST", f"{base}/rulesets", token, {
-        "source": {"files": [{"name": "firestore.rules", "content": PROD_RULES}]}
-    })
-    ruleset_name = ruleset["name"]
-    print(f"✅ Ruleset créé : {ruleset_name}")
-
-    release_name = f"projects/{project_id}/releases/cloud.firestore"
-    api("PATCH", f"{base}/releases/cloud.firestore", token, {
-        "release": {"name": release_name, "rulesetName": ruleset_name}
-    })
-    print("✅ Règles PRODUCTION déployées sur cloud.firestore")
-    print("\n🔒 Accès désormais réservé aux sessions authentifiées (Firebase Auth).")
+    print()
+    print("⚠️  SCRIPT DÉSARMÉ — AUCUN DÉPLOIEMENT EFFECTUÉ.")
+    print()
+    print(_ARCHIVED_WARNING)
+    print()
+    print("Le déploiement des règles passe exclusivement par :")
+    print("    deploy/firebase/deploy_firestore_rules.py")
+    print("qui publie le contenu de :")
+    print("    deploy/firebase/firestore.rules")
+    print()
+    print("Pour consulter les règles réellement en production :")
+    print("    python3 deploy/firebase/deploy_firestore_rules.py --show")
+    sys.exit(1)
 
 
 if __name__ == "__main__":

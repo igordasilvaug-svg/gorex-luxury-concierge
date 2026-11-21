@@ -29,6 +29,62 @@ CANDIDATE_KEYS = [
 SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 RULES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "firestore.rules")
 
+# Marqueurs qui doivent obligatoirement figurer dans le fichier publie.
+# Ils garantissent qu'on ne reecrase pas les regles de production par une
+# version ancienne ou tronquee (voir l'historique : deux copies du depot
+# avaient diverge, l'une de 132 lignes sans aucun controle par role).
+REQUIRED_MARKERS = [
+    "isRealUser",
+    "myRole",
+    "isApprover",
+    "isApprovedClient",
+    "approvalStatus",
+]
+
+
+def check_rules_content(rules):
+    """Refuse tout fichier qui ne contient pas les protections attendues."""
+    missing = [m for m in REQUIRED_MARKERS if m not in rules]
+    if missing:
+        print("❌ REFUS DE DEPLOIEMENT : le fichier de regles est incomplet.")
+        print(f"   Fichier : {RULES_FILE}")
+        for m in missing:
+            print(f"   Marqueur absent : {m}")
+        print()
+        print("   Ce fichier ne protege pas les donnees attendues. Deployer")
+        print("   cette version affaiblirait la production.")
+        sys.exit(1)
+
+    # On analyse le code SEUL : les commentaires citent les anciennes regles
+    # fautives a titre pedagogique et ne doivent pas declencher d'alerte.
+    code_lines = [ln for ln in rules.splitlines()
+                  if not ln.strip().startswith("//")]
+
+    # 1) Aucune regle ne doit etre grande ouverte.
+    for i, ln in enumerate(code_lines):
+        if "if true" in ln:
+            print(f"❌ REFUS DE DEPLOIEMENT : regle ouverte ligne de code {i + 1} :")
+            print(f"   {ln.strip()}")
+            sys.exit(1)
+
+    # 2) Le fourre-tout final doit etre un refus explicite (`if false`).
+    catch_all = [i for i, ln in enumerate(code_lines)
+                 if 'match/{document=**}' in ln.replace(' ', '')]
+    if not catch_all:
+        print("❌ REFUS DE DEPLOIEMENT : aucune regle attrape-tout de refus.")
+        print("   Sans elle, une collection ajoutee plus tard serait non couverte.")
+        sys.exit(1)
+    for idx in catch_all:
+        bloc = " ".join(x.strip() for x in code_lines[idx:idx + 3])
+        if "if false" not in bloc:
+            print("❌ REFUS DE DEPLOIEMENT : le fourre-tout n'est pas un refus.")
+            print(f"   {bloc[:160]}")
+            sys.exit(1)
+
+    print(f"✅ Contenu verifie : {len(rules.splitlines())} lignes, "
+          f"{len(REQUIRED_MARKERS)} marqueurs de securite presents, "
+          f"aucune regle ouverte, fourre-tout en refus explicite.")
+
 
 def find_admin_key():
     for pattern in CANDIDATE_KEYS:
@@ -77,6 +133,7 @@ def main():
     print("=" * 64)
     print("  GOREX GROUP — Règles Firestore par rôle")
     print("=" * 64)
+    check_rules_content(rules)
     if args.show:
         print(rules)
         return

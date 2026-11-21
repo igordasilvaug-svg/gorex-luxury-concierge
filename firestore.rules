@@ -79,6 +79,19 @@ service cloud.firestore {
 
     function isClient() { return isRealUser() && myRole() == 'vipClient'; }
 
+    // Rôles habilités à DÉCIDER de l'ouverture d'un compte client.
+    //
+    // L'ouverture d'un accès est une décision commerciale et de confiance :
+    // elle est réservée à l'encadrement. Un concierge peut consulter et
+    // mettre à jour une fiche client, mais ne peut pas, à lui seul, ouvrir
+    // l'accès d'une personne inconnue aux services de la conciergerie.
+    function isApprover() {
+      return isRealUser()
+             && (myRole() == 'ceo'
+                 || myRole() == 'conciergeManager'
+                 || myRole() == 'seniorConcierge');
+    }
+
     // Identifiant de dossier du client connecté, lu en base (jamais dans le
     // jeton, qu'un utilisateur ne peut pas modifier mais qui peut être ancien).
     function myClientId() {
@@ -87,6 +100,35 @@ service cloud.firestore {
              : '';
     }
 
+    // Le dossier du client connecté est-il VALIDÉ par l'équipe ?
+    //
+    // FAILLE CORRIGÉE. La règle de `requests` n'exigeait que la concordance
+    // d'e-mail : un compte fraîchement inscrit, donc NON validé, pouvait
+    // déposer une demande de service par un appel direct à l'API. Le blocage
+    // n'existait que dans l'interface, ce qui n'est pas une protection.
+    //
+    // Le contrôle est fait EN BASE (get) et non depuis le jeton : une
+    // validation — ou une suspension — prend effet immédiatement, sans
+    // attendre l'expiration du jeton (1 h).
+    //
+    // NB : les règles n'ont pas d'opérateur ternaire. Si la fiche n'existe
+    // pas, `get()` échoue, la règle est évaluée à false et l'accès est
+    // refusé : c'est exactement le comportement voulu.
+    function approvedClientRecord() {
+      return get(/databases/$(database)/documents/clients/$(myClientId())).data;
+    }
+
+    // Un client ne peut consommer un service que si son dossier est validé
+    // ET actif. Ces conditions sont volontairement redondantes avec
+    // Client.hasServiceAccess côté application.
+    function isApprovedClient() {
+      return isClient()
+             && myClientId() != ''
+             && approvedClientRecord().approvalStatus == 'approved'
+             && approvedClientRecord().active == true;
+    }
+
+
     // Un document « appartient » au client connecté si son clientId correspond.
     function ownsClientData(d) {
       return isClient() && myClientId() != '' && d.clientId == myClientId();
@@ -94,6 +136,9 @@ service cloud.firestore {
 
     // ─────────────── Helpers de contrôle de champs ───────────────
 
+    // NB : les règles Firestore n'ont PAS d'opérateur ternaire. La version
+    // « resource != null ? … : … » casse l'évaluation (erreurs au journal) et
+    // a donc été écartée. Les règles de création n'appellent pas ces helpers.
     function changedKeys() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
@@ -191,14 +236,35 @@ service cloud.firestore {
       allow read: if isStaff()
                   || (isRealUser() && resource.data.email == request.auth.token.email);
 
+      // ── VALIDATION OBLIGATOIRE À L'INSCRIPTION ──
+      // Une personne qui s'inscrit elle-même ne peut déposer qu'un dossier
+      // EN ATTENTE : `approvalStatus` est imposé à 'pending' par la règle.
+      // Sans cette contrainte, elle pourrait écrire 'approved' directement
+      // via l'API REST et contourner entièrement la validation du personnel.
+      // Le personnel, lui, crée des fiches déjà validées.
       allow create: if isStaff()
                     || (isRealUser()
-                        && request.resource.data.email == request.auth.token.email);
+                        && request.resource.data.email == request.auth.token.email
+                        && request.resource.data.approvalStatus == 'pending'
+                        && request.resource.data.active == true);
 
+      // ── SÉPARATION DES DROITS SUR LA DÉCISION D'ACCÈS ──
+      // Le personnel met à jour une fiche client (coordonnées, palier,
+      // notes…), mais les DEUX champs qui ouvrent ou ferment l'accès aux
+      // services sont réservés à l'encadrement. Sans cette séparation, un
+      // concierge pouvait ouvrir l'accès d'un inconnu en une seule écriture.
       allow update: if isStaff()
-                    || (isRealUser()
-                        && resource.data.email == request.auth.token.email
-                        && onlyOwnContactFields());
+                    && !changedKeys().hasAny(['approvalStatus', 'active']);
+
+      allow update: if isApprover();
+
+      // Le titulaire ne peut modifier QUE ses coordonnées (voir
+      // onlyOwnContactFields) : `approvalStatus` et `active` restent hors de
+      // sa portée, donc une fois le dossier déposé il ne peut plus le
+      // valider lui-même.
+      allow update: if isRealUser()
+                    && resource.data.email == request.auth.token.email
+                    && onlyOwnContactFields();
 
       allow delete: if isCeo() || isConciergeManager();
     }
@@ -213,8 +279,12 @@ service cloud.firestore {
                   || (isRealUser()
                       && resource.data.clientEmail == request.auth.token.email);
 
+      // FAILLE CORRIGÉE : la seule concordance d'e-mail ne suffisait pas.
+      // Un compte inscrit mais NON validé pouvait déposer une demande par
+      // appel direct à l'API, en contournant l'écran d'attente. Il faut
+      // désormais que le dossier soit validé ET actif en base.
       allow create: if isStaff()
-                    || (isRealUser()
+                    || (isApprovedClient()
                         && request.resource.data.clientEmail == request.auth.token.email);
 
       allow update, delete: if isStaff();
@@ -224,7 +294,10 @@ service cloud.firestore {
 
     match /bookings/{doc} {
       allow read: if isStaff() || ownsClientData(resource.data);
-      allow create: if isStaff() || ownsClientData(request.resource.data);
+      // Même exigence que pour `requests` : consommer un service suppose un
+      // dossier validé ET actif, pas seulement un clientId qui correspond.
+      allow create: if isStaff()
+                    || (isApprovedClient() && ownsClientData(request.resource.data));
       allow update, delete: if isStaff();
     }
 
