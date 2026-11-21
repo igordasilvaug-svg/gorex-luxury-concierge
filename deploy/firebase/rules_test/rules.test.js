@@ -623,6 +623,84 @@ const check = async (label, fn, expect) => {
     'ALLOW',
   );
 
+  // ══════════════════════════════════════════════════════════════════════
+  // 49 à 52 : LA CHARGE UTILE EXACTE DE L'APPLICATION, NULLS COMPRIS
+  //
+  // ── POURQUOI CES QUATRE TESTS EXISTENT ────────────────────────────────
+  // Les tests précédents envoyaient des documents SANS les champs `null`
+  // (`decidedAt`, `decidedBy`, `activatedAt`, `note`). Or `Subscription.toMap()`
+  // les inclut explicitement à `null`, et `_encodeFields()` les transmet en
+  // `nullValue`. Tester une autre forme que celle réellement écrite ne prouve
+  // RIEN sur la production : la règle aurait pu accepter mes documents de test
+  // et refuser ceux de l'application, tous les voyants restant au vert.
+  //
+  // Ces tests écrivent donc EXACTEMENT ce que le code Dart écrit.
+  // ══════════════════════════════════════════════════════════════════════
+  const subPayloadApp = (extra = {}) => ({
+    id: 'sub-app',
+    clientId: 'gx-cli-2ok',
+    clientEmail: 'abonne@example.com',
+    tierId: 'tier_executive',
+    tierName: 'GOREX EXECUTIVE',
+    cycle: 'annual',
+    amount: 14400,
+    status: 'requested',
+    requestedAt: '2026-03-01T09:00:00.000Z',
+    // Champs nuls envoyés par l'application (copyWith/fromMap les tolèrent).
+    decidedAt: null,
+    decidedBy: null,
+    activatedAt: null,
+    note: null,
+    ...extra,
+  });
+
+  await check(
+    '49. charge utile REELLE de l app (nuls compris) -> acceptee',
+    () => setDoc(doc(cli2, 'subscriptions', 'sub-app-' + RUN2),
+      subPayloadApp({ id: 'sub-app-' + RUN2 })),
+    'ALLOW',
+  );
+
+  await check(
+    '50. charge utile REELLE mais status=active -> refusee',
+    () => setDoc(doc(cli2, 'subscriptions', 'sub-app-act-' + RUN2),
+      subPayloadApp({ id: 'sub-app-act-' + RUN2, status: 'active' })),
+    'DENY',
+  );
+
+  const mandPayloadApp = (extra = {}) => ({
+    id: 'mand-app',
+    clientId: 'gx-cli-2ok',
+    clientName: 'Client Abonne',
+    mandateReference: 'GRX-ABO-2026-0099',
+    iban: 'BE68539007547034',
+    bic: null,
+    accountHolder: 'Client Abonne',
+    type: 'core',
+    status: 'active',
+    signatureDate: '2026-03-01T09:00:00.000Z',
+    createdAt: '2026-03-01T09:00:00.000Z',
+    cancelledAt: null,
+    lastUsedAt: null,
+    preNotificationDays: 14,
+    notes: 'Signé par le client dans son espace personnel.',
+    ...extra,
+  });
+
+  await check(
+    '51. mandat : charge utile REELLE de l app (nuls compris) -> acceptee',
+    () => setDoc(doc(cli2, 'sepa_mandates', 'mand-app-' + RUN2),
+      mandPayloadApp({ id: 'mand-app-' + RUN2 })),
+    'ALLOW',
+  );
+
+  await check(
+    '52. mandat : charge utile REELLE sur le dossier d autrui -> refusee',
+    () => setDoc(doc(cli2, 'sepa_mandates', 'mand-app-oth-' + RUN2),
+      mandPayloadApp({ id: 'mand-app-oth-' + RUN2, clientId: 'gx-cli-1' })),
+    'DENY',
+  );
+
   await testEnv.cleanup();
 
   const ko = results.filter((r) => !r.ok);
