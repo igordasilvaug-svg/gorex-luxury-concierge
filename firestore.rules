@@ -241,8 +241,19 @@ service cloud.firestore {
       // EN ATTENTE : `approvalStatus` est imposé à 'pending' par la règle.
       // Sans cette contrainte, elle pourrait écrire 'approved' directement
       // via l'API REST et contourner entièrement la validation du personnel.
-      // Le personnel, lui, crée des fiches déjà validées.
-      allow create: if isStaff()
+      //
+      // DÉFAUT CORRIGÉ : la branche « personnel » autorisait n'importe quel
+      // rôle métier à créer une fiche DÉJÀ VALIDÉE. Un concierge — le rôle le
+      // moins élevé — ouvrait donc un accès complet en une seule écriture, ce
+      // qui vidait de son sens la règle de décision ci-dessous. Désormais :
+      //   • l'encadrement (isApprover) peut créer une fiche validée ;
+      //   • les autres membres du personnel ne créent que des fiches EN
+      //     ATTENTE, qui devront être validées par l'encadrement ;
+      //   • le public ne crée que sa propre fiche, en attente.
+      allow create: if isApprover()
+                    || (isStaff()
+                        && request.resource.data.approvalStatus == 'pending'
+                        && request.resource.data.active == true)
                     || (isRealUser()
                         && request.resource.data.email == request.auth.token.email
                         && request.resource.data.approvalStatus == 'pending'
@@ -267,6 +278,30 @@ service cloud.firestore {
                     && onlyOwnContactFields();
 
       allow delete: if isCeo() || isConciergeManager();
+    }
+
+    // ══════════════════════ RÉSERVATION DES NUMÉROS DE DOSSIER ═══════════════
+    //
+    // Un document par numéro attribué : `client_codes/GRX-VIP-0007`.
+    //
+    // POURQUOI UN DOCUMENT ET PAS UN COMPTEUR. Un compteur incrémenté serait
+    // lu puis réécrit : deux validateurs simultanés liraient la même valeur et
+    // écriraient le même numéro. Ici l'attribution repose sur la CRÉATION d'un
+    // document avec la précondition « n'existe pas encore »
+    // (`currentDocument.exists = false`) : c'est le serveur qui arbitre, et le
+    // second appelant reçoit ALREADY_EXISTS. Un numéro ne peut donc pas être
+    // attribué deux fois, même en concurrence parfaite.
+    //
+    // Lecture réservée au personnel : un client n'a aucune raison de parcourir
+    // la liste des numéros, qui révélerait le volume de la clientèle.
+    match /client_codes/{code} {
+      allow read: if isStaff();
+
+      // Création seule, par l'encadrement. Aucune mise à jour ni suppression :
+      // un numéro attribué doit rester attribué, sinon il redeviendrait
+      // disponible et pourrait être réutilisé pour un autre dossier.
+      allow create: if isApprover()
+                    && request.resource.data.code == code;
     }
 
     // ══════════════════════════ DEMANDES DE SERVICE ══════════════════════════
@@ -347,6 +382,54 @@ service cloud.firestore {
       allow write: if isFinanceRole();
     }
 
+    // ══════════════════════ ABONNEMENTS (CONTRATS) ══════════════════════
+    //
+    // POURQUOI UNE COLLECTION DÉDIÉE. Un contrat d'abonnement ne peut pas
+    // vivre dans `gorex_cloud` : ce document n'est lisible que par le CEO et
+    // le concierge manager, alors que le client doit pouvoir consulter SON
+    // propre contrat depuis n'importe quel appareil (exigence §1).
+    //
+    // MODÈLE DE SÉCURITÉ — trois propriétés, chacune indispensable :
+    //
+    //  1. LECTURE. Le client ne lit que ses propres abonnements, via
+    //     `ownsClientData(resource.data)`. Le personnel lit l'ensemble (il
+    //     doit pouvoir traiter les demandes et facturer).
+    //
+    //  2. CRÉATION PAR LE CLIENT, SOUS CONDITION STRICTE. Un client peut
+    //     déposer une demande, mais UNIQUEMENT :
+    //       • sur SON dossier (`request.resource.data.clientId == myClientId()`) ;
+    //       • avec le statut `requested` — il ne peut pas écrire `active`,
+    //         sinon il se rendrait facturable puis contesterait le prélèvement ;
+    //       • sans se déclarer accepté, actif ou décidé (`decidedAt`,
+    //         `decidedBy`, `activatedAt` absents du document créé).
+    //     Ces trois points sont vérifiés séparément : la condition d'état seul
+    //     ne suffirait pas, un client pourrait créer un document `requested`
+    //     en y glissant `decidedBy: 'ceo@gorex-group.eu'`.
+    //
+    //  3. MODIFICATION. Après création, le client ne peut PLUS RIEN changer :
+    //     une demande est un fait daté. Le personnel, lui, décide et active.
+    //     Un abonnement n'est jamais supprimé : il est `ended` (traçabilité
+    //     comptable — on ne fait pas disparaître un contrat).
+    match /subscriptions/{doc} {
+      allow read: if isFinanceRole()
+                  || isApprover()
+                  || ownsClientData(resource.data);
+
+      allow create: if isFinanceRole()
+                    || isApprover()
+                    || (isApprovedClient()
+                        && request.resource.data.clientId == myClientId()
+                        && request.resource.data.status == 'requested'
+                        && request.resource.data.get('decidedAt', null) == null
+                        && request.resource.data.get('decidedBy', null) == null
+                        && request.resource.data.get('activatedAt', null) == null);
+
+      // Le client n'a aucun droit d'écriture après création : seul le
+      // personnel décide, active, suspend ou clôt.
+      allow update: if isFinanceRole() || isApprover();
+      allow delete: if false;
+    }
+
     // ══════════════════════ SAUVEGARDE D'ÉTAT ══════════════════════
     //
     // Ce document contient une copie de l'ÉTAT APPLICATIF COMPLET. En lecture
@@ -360,15 +443,44 @@ service cloud.firestore {
     // ══════════════════════ DOMICILIATION SEPA ══════════════════════
     //
     // Ces documents contiennent des IBAN : données financières à caractère
-    // personnel. Règles volontairement strictes :
-    //   • lecture  : finance/CEO, ou le client PROPRIÉTAIRE du mandat ;
-    //   • écriture : finance/CEO uniquement.
+    // personnel.
     //
-    // Un client ne doit jamais pouvoir écrire son propre IBAN : il pourrait
-    // le remplacer par celui d'un tiers et détourner un prélèvement.
+    // ── CORRECTION D'UNE ERREUR DE RAISONNEMENT ─────────────────────────
+    // La version précédente interdisait TOUTE écriture client, avec ce
+    // motif : « un client pourrait remplacer l'IBAN par celui d'un tiers et
+    // détourner un prélèvement ». C'était faux : prélever sur un autre IBAN,
+    // c'est débiter un tiers au profit de Gorex, pas au profit du client.
+    // Le vrai risque — un mandat écrit sur le dossier d'un AUTRE client —
+    // est couvert par `clientId == myClientId()`.
+    //
+    // Conséquence de cette interdiction : le circuit était bloqué. Un mandat
+    // SEPA est signé par le DÉBITEUR ; seul le client peut donc le créer
+    // légitimement. Sans cette voie, aucun client ne pouvait jamais être
+    // facturé autrement que par une saisie manuelle de la finance.
+    //
+    // Conditions exigées pour la création par un client :
+    //   • mandat rattaché à SON dossier (`clientId == myClientId()`) ;
+    //   • dossier validé et actif (`isApprovedClient()`) ;
+    //   • statut `active` — le client signe, donc le mandat est valide ; il ne
+    //     peut pas en revanche écrire `cancelledAt` ni `lastUsedAt`, champs
+    //     qui appartiennent au cycle de facturation et non à la signature.
+    //
+    // La finance conserve le droit de révoquer ou suspendre (`update`).
     match /sepa_mandates/{doc} {
       allow read: if isFinanceRole() || ownsClientData(resource.data);
-      allow create, update: if isFinanceRole();
+
+      allow create: if isFinanceRole()
+                    || (isApprovedClient()
+                        && request.resource.data.clientId == myClientId()
+                        && request.resource.data.status == 'active'
+                        && request.resource.data.mandateReference is string
+                        && request.resource.data.iban is string
+                        && request.resource.data.accountHolder is string
+                        && request.resource.data.signatureDate is string
+                        && request.resource.data.get('cancelledAt', null) == null
+                        && request.resource.data.get('lastUsedAt', null) == null);
+
+      allow update: if isFinanceRole();
       // Un mandat n'est jamais supprimé : il est révoqué (traçabilité).
       allow delete: if false;
     }

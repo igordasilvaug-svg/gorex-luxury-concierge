@@ -210,7 +210,11 @@ class Client {
     confidentiality: ConfidentialityLevel.fromName(
       m['confidentiality'] as String,
     ),
-    subscriptionTierId: m['subscriptionTierId'] as String,
+    // `?? ''` : une fiche peut désormais n'avoir AUCUNE formule de référence
+    // (le candidat a répondu « à définir avec mon concierge »). Un cast direct
+    // `as String` ferait échouer le décodage de la fiche entière — donc
+    // empêcherait le client de se connecter — pour un champ facultatif.
+    subscriptionTierId: (m['subscriptionTierId'] as String?) ?? '',
     assignedConciergeId: m['assignedConciergeId'] as String?,
     preferredHotels: _list(m['preferredHotels']),
     preferredRestaurants: _list(m['preferredRestaurants']),

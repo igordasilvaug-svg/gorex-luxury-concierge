@@ -372,13 +372,25 @@ class _ClientFormScreenState extends State<ClientFormScreen> {
                 ),
 
                 _section('Abonnement & concierge'),
-                _label('Abonnement'),
+                // Le libellé disait « Abonnement », ce qui laissait croire que
+                // désigner une formule sur la fiche créait un contrat. Il n'en
+                // crée aucun : un abonnement est un document `subscriptions`
+                // distinct, avec demande, décision et mandat. Ce champ n'est
+                // que la formule de référence du dossier.
+                _label('Formule de référence'),
                 _dropdown<String>(
                   value: _tierId,
                   items: s.tiers.map((t) => t.id).toList(),
                   labelOf: (id) => s.tierById(id)?.name ?? id,
                   onChanged: (v) => setState(() => _tierId = v),
-                  validator: (v) => v == null ? 'Abonnement requis' : null,
+                  validator: (v) => v == null ? 'Formule requise' : null,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Référence commerciale du dossier. Aucun montant n\'est dû du '
+                  'fait de ce choix : l\'abonnement se forme séparément, par une '
+                  'demande du client puis une décision de Gorex Group.',
+                  style: AppTypography.caption.copyWith(fontSize: 10),
                 ),
                 const SizedBox(height: 14),
                 _label('Concierge dédié (optionnel)'),

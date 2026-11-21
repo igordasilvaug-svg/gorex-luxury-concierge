@@ -39,6 +39,17 @@ REQUIRED_MARKERS = [
     "isApprover",
     "isApprovedClient",
     "approvalStatus",
+    # Réservation atomique des numéros de dossier (mesurée sur la précondition
+    # `currentDocument.exists=false`). Sans ce bloc, deux validations
+    # simultanées pourraient attribuer le même numéro.
+    "match /client_codes/",
+    # Circuit d'abonnement : le client dépose une demande, mais ne peut jamais
+    # écrire lui-même un état facturable.
+    "match /subscriptions/",
+    "request.resource.data.status == 'requested'",
+    # Mandat SEPA signé par le débiteur (seul le titulaire peut signer).
+    "match /sepa_mandates/",
+    "request.resource.data.clientId == myClientId()",
 ]
 
 

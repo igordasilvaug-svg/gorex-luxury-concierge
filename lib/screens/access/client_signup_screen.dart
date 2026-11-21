@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_config.dart';
+import '../../core/billing/subscription_policy.dart';
 import '../../core/firebase/firebase_auth_service.dart';
 import '../../core/firebase/rest_auth_service.dart';
 import '../../core/firebase/firestore_service.dart';
@@ -46,6 +48,21 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
   bool _isBusiness = false;
   bool _busy = false;
   String? _error;
+
+  /// Formule souhaitée par le candidat, s'il en a désigné une.
+  ///
+  /// CHANGEMENT DE COMPORTEMENT, ET POURQUOI.
+  /// L'inscription attribuait jusqu'ici `state.tiers.first.id` — la première
+  /// formule de la grille — sans que le client ait rien choisi. Ce palier
+  /// s'affichait ensuite sur son profil comme s'il était abonné. Un palier
+  /// choisi par défaut par le logiciel n'est ni un choix du client, ni un
+  /// contrat.
+  ///
+  /// Désormais : le client choisit, ou ne choisit pas (`null`), et ce choix
+  /// est une INTENTION consignée sur la fiche — pas un abonnement. Le contrat
+  /// se forme dans l'espace client (demande → décision → mandat), et rien
+  /// n'est facturable sans l'ouverture commerciale décidée par Gorex Group.
+  String? _selectedTierId;
 
   @override
   void dispose() {
@@ -126,7 +143,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
       language: _languageLabel(_language),
       country: _country.text.trim(),
       city: _address.text.trim(),
-      subscriptionTierId: state.tiers.isNotEmpty ? state.tiers.first.id : '',
+      subscriptionTierId: _selectedTierId ?? '',
       isBusiness: _isBusiness,
       companyNumber: _companyNumber.text.trim().isEmpty
           ? null
@@ -351,6 +368,11 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
                   ],
                   const SizedBox(height: 16),
 
+                  // ── Formule souhaitée (intention, PAS un abonnement) ──
+                  const SectionLabel('FORMULE SOUHAITÉE'),
+                  _tierSelector(state),
+                  const SizedBox(height: 16),
+
                   // ── Mot de passe ──
                   const SectionLabel('SÉCURITÉ'),
                   _field(
@@ -450,6 +472,88 @@ class _ClientSignupScreenState extends State<ClientSignupScreen> {
           ],
           onChanged: (v) => setState(() => _language = v ?? 'fr'),
         ),
+      ],
+    );
+  }
+
+  /// Choix de la formule souhaitée.
+  ///
+  /// Ce choix est une INTENTION, pas une souscription : il ne crée aucun
+  /// abonnement, n'ouvre aucun droit et n'engage aucun montant. Le libellé
+  /// le dit explicitement, et l'option « à définir avec mon concierge » est
+  /// proposée par défaut — c'est l'état honnête d'un nouveau candidat qui n'a
+  /// encore rien décidé.
+  Widget _tierSelector(AppState state) {
+    final eur = NumberFormat.currency(
+      locale: 'fr_BE',
+      symbol: '€',
+      decimalDigits: 0,
+    );
+    final available = state.tiers.where((t) => t.active).toList()
+      ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+
+    if (available.isEmpty) {
+      return Text(
+        'La grille des formules est en cours de publication. Votre concierge '
+        'vous la présentera.',
+        style: AppTypography.caption,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Indiquez la formule qui vous intéresse. Ce n\'est pas une '
+          'souscription : aucun montant n\'est dû à l\'inscription, et votre '
+          'abonnement sera formalisé avec votre concierge.',
+          style: AppTypography.caption,
+        ),
+        const SizedBox(height: 10),
+
+        // Aucun choix par défaut : le candidat peut ne rien décider.
+        RadioListTile<String?>(
+          value: null,
+          // ignore: deprecated_member_use
+          groupValue: _selectedTierId,
+          // ignore: deprecated_member_use
+          onChanged: (v) => setState(() => _selectedTierId = v),
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'À définir avec mon concierge',
+            style: AppTypography.bodyMedium.copyWith(fontSize: 12.5),
+          ),
+        ),
+        for (final t in available)
+          RadioListTile<String?>(
+            value: t.id,
+            // ignore: deprecated_member_use
+            groupValue: _selectedTierId,
+            // ignore: deprecated_member_use
+            onChanged: (v) => setState(() => _selectedTierId = v),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              t.name,
+              style: AppTypography.bodyMedium.copyWith(fontSize: 12.5),
+            ),
+            subtitle: Text(
+              '${eur.format(t.annualPrice)} / an · ${t.requestsLabel}',
+              style: AppTypography.caption.copyWith(fontSize: 10.5),
+            ),
+          ),
+
+        if (!SubscriptionPolicy.subscriptionsOpen) ...[
+          const SizedBox(height: 6),
+          Text(
+            SubscriptionPolicy.closedNotice,
+            style: AppTypography.caption.copyWith(
+              fontSize: 10.5,
+              color: AppColors.greyLight,
+            ),
+          ),
+        ],
       ],
     );
   }

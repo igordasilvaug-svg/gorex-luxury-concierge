@@ -20,14 +20,22 @@ const {
   assertFails,
 } = require('@firebase/rules-unit-testing');
 const {
-  doc, getDoc, setDoc, updateDoc,
+  doc, getDoc, setDoc, updateDoc, deleteDoc,
 } = require('firebase/firestore');
 
 // Chemin relatif : le test vit dans deploy/firebase/rules_test/, les règles
 // dans deploy/firebase/. Le chemin absolu d'origine rendait le test
 // inutilisable hors de la machine qui l'avait écrit.
-const RULES_PATH = path.join(__dirname, '..', 'firestore.rules');
+//
+// `GOREX_RULES_PATH` permet de désigner explicitement le fichier testé :
+// l'émulateur refuse un fichier de règles hors de son dossier projet, donc le
+// lanceur `run_rules_tests.sh` copie les règles à côté de l'émulateur et
+// indique ici la copie. Sans cette variable, la copie divergerait du fichier
+// versionné sans que personne ne s'en aperçoive.
+const RULES_PATH = process.env.GOREX_RULES_PATH
+  || path.join(__dirname, '..', 'firestore.rules');
 const RULES = fs.readFileSync(RULES_PATH, 'utf8');
+console.log(`Règles testées : ${RULES_PATH} (${RULES.split('\n').length} lignes)`);
 
 const CLIENT_UID = 'cli1';
 const CLIENT_EMAIL = 'diag.client@example.com';
@@ -362,6 +370,257 @@ const check = async (label, fn, expect) => {
       await setDoc(doc(db, 'client_codes', p), codeBody(p));
     },
     'DENY',
+  );
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 26 à 39 : ABONNEMENTS (CONTRATS)
+  //
+  // Ce qui est vérifié ici est le cœur du circuit commercial : un client doit
+  // pouvoir DÉPOSER une demande, mais jamais se déclarer abonné, accepté ou
+  // facturable. Une seule de ces barrières qui cède, et le client peut
+  // s'auto-attribuer un contrat qu'il contestera ensuite.
+  // ══════════════════════════════════════════════════════════════════════
+
+  // Un client DISTINCT et réellement validé : `gx-cli-1` a été suspendu au
+  // test 18, il ne peut donc plus rien créer (c'est voulu).
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'user_profiles', 'cli2'), {
+      id: 'cli2', role: 'vipClient', clientId: 'gx-cli-2ok',
+      email: 'abonne@example.com', fullName: 'Client Abonne',
+    });
+    await setDoc(doc(db, 'clients', 'gx-cli-2ok'), {
+      id: 'gx-cli-2ok', code: 'GRX-VIP-0002', fullName: 'Client Abonne',
+      email: 'abonne@example.com', phone: '+32470002222',
+      language: 'fr', approvalStatus: 'approved', active: true,
+    });
+  });
+
+  const cli2 = testEnv
+    .authenticatedContext('cli2', tok('abonne@example.com'))
+    .firestore();
+  const fin2 = testEnv
+    .authenticatedContext('fin1', tok('fin@gorex-group.eu'))
+    .firestore();
+
+  const subBody = (extra = {}) => ({
+    id: 's1',
+    clientId: 'gx-cli-2ok',
+    clientEmail: 'abonne@example.com',
+    tierId: 'tier_essential',
+    tierName: 'GOREX ESSENTIAL',
+    cycle: 'annual',
+    amount: 4800,
+    status: 'requested',
+    requestedAt: '2026-01-01T00:00:00Z',
+    ...extra,
+  });
+
+  await check(
+    '26. client valide depose une demande d abonnement',
+    () => setDoc(doc(cli2, 'subscriptions', 'sub-ok-' + RUN2), subBody()),
+    'ALLOW',
+  );
+
+  await check(
+    '27. client s ecrit lui-meme status=active',
+    () => setDoc(doc(cli2, 'subscriptions', 'sub-active-' + RUN2),
+      subBody({ status: 'active' })),
+    'DENY',
+  );
+
+  await check(
+    '28. client s invente une decision favorable',
+    () => setDoc(doc(cli2, 'subscriptions', 'sub-dec-' + RUN2),
+      subBody({ decidedBy: 'ceo@gorex-group.eu', decidedAt: '2026-01-01T00:00:00Z' })),
+    'DENY',
+  );
+
+  await check(
+    '29. client depose un abonnement pour un AUTRE dossier',
+    () => setDoc(doc(cli2, 'subscriptions', 'sub-other-' + RUN2),
+      subBody({ clientId: 'gx-cli-1' })),
+    'DENY',
+  );
+
+  await check(
+    '30. client lit son propre abonnement',
+    () => getDoc(doc(cli2, 'subscriptions', 'sub-ok-' + RUN2)),
+    'ALLOW',
+  );
+
+  // Un abonnement appartenant à un AUTRE dossier, écrit hors règles : c'est
+  // la vraie situation de cloisonnement (et non un document inexistant, dont
+  // le refus ne prouverait rien des règles de lecture).
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'subscriptions', 'sub-autre-' + RUN2),
+      subBody({ id: 'sub-autre-' + RUN2, clientId: 'gx-cli-1',
+        clientEmail: 'diag.client@example.com' }));
+  });
+
+  await check(
+    '31. client lit l abonnement d un autre client',
+    () => getDoc(doc(cli2, 'subscriptions', 'sub-autre-' + RUN2)),
+    'DENY',
+  );
+
+  await check(
+    '32. client passe son abonnement en actif apres coup',
+    () => updateDoc(doc(cli2, 'subscriptions', 'sub-ok-' + RUN2), { status: 'active' }),
+    'DENY',
+  );
+
+  await check(
+    '33. client supprime son abonnement',
+    () => deleteDoc(doc(cli2, 'subscriptions', 'sub-ok-' + RUN2)),
+    'DENY',
+  );
+
+  await check(
+    '34. finance decide d un abonnement (accepte)',
+    () => updateDoc(doc(fin2, 'subscriptions', 'sub-ok-' + RUN2), {
+      status: 'approved',
+      decidedBy: 'fin@gorex-group.eu',
+      decidedAt: '2026-01-02T00:00:00Z',
+    }),
+    'ALLOW',
+  );
+
+  await check(
+    '35. finance active l abonnement',
+    () => updateDoc(doc(fin2, 'subscriptions', 'sub-ok-' + RUN2), {
+      status: 'active',
+      activatedAt: '2026-01-03T00:00:00Z',
+    }),
+    'ALLOW',
+  );
+
+  await check(
+    '36. senior concierge (approbateur) peut lire les abonnements',
+    () => getDoc(doc(testEnv.authenticatedContext('sen1', tok('sen@gorex-group.eu'))
+      .firestore(), 'subscriptions', 'sub-ok-' + RUN2)),
+    'ALLOW',
+  );
+
+  // Le client `gx-cli-1` est suspendu : la règle de création exige
+  // `isApprovedClient()`, donc elle doit refuser.
+  await check(
+    '37. client suspendu depose une demande d abonnement',
+    () => setDoc(doc(client, 'subscriptions', 'sub-susp-' + RUN2),
+      subBody({ clientId: 'gx-cli-1' })),
+    'DENY',
+  );
+
+  await check(
+    '38. anonyme lit un abonnement',
+    () => getDoc(doc(anon, 'subscriptions', 'sub-ok-' + RUN2)),
+    'DENY',
+  );
+
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'subscription_tiers', 'tier_test-' + RUN2), {
+      id: 'tier_test-' + RUN2, name: 'TEST', annualPrice: 1, monthlyPrice: 1,
+    });
+  });
+
+  await check(
+    '39. client lit la grille tarifaire',
+    () => getDoc(doc(cli2, 'subscription_tiers', 'tier_test-' + RUN2)),
+    'ALLOW',
+  );
+
+  await check(
+    '39b. client MODIFIE un tarif',
+    () => updateDoc(doc(cli2, 'subscription_tiers', 'tier_test-' + RUN2),
+      { annualPrice: 1 }),
+    'DENY',
+  );
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 40 à 48 : MANDAT SEPA SIGNÉ PAR LE DÉBITEUR
+  //
+  // Un mandat SEPA est signé par le débiteur, pas par le créancier. La règle
+  // précédente interdisait toute écriture client au motif qu'il pourrait
+  // « détourner un prélèvement », ce qui était faux : prélever sur l'IBAN
+  // d'un tiers débite le tiers au profit de Gorex. Le risque réel — écrire un
+  // mandat sur le dossier d'autrui — est ce qui est testé ici.
+  // ══════════════════════════════════════════════════════════════════════
+  const mandBody = (extra = {}) => ({
+    id: 'm1',
+    clientId: 'gx-cli-2ok',
+    clientName: 'Client Abonne',
+    mandateReference: 'GRX-ABO-2026-0001',
+    iban: 'BE68539007547034',
+    accountHolder: 'Client Abonne',
+    type: 'core',
+    status: 'active',
+    signatureDate: '2026-01-04T00:00:00Z',
+    createdAt: '2026-01-04T00:00:00Z',
+    preNotificationDays: 14,
+    ...extra,
+  });
+
+  await check(
+    '40. client valide signe son propre mandat',
+    () => setDoc(doc(cli2, 'sepa_mandates', 'mand-ok-' + RUN2), mandBody(
+      { id: 'mand-ok-' + RUN2 })),
+    'ALLOW',
+  );
+
+  await check(
+    '41. client signe un mandat sur le dossier d autrui',
+    () => setDoc(doc(cli2, 'sepa_mandates', 'mand-other-' + RUN2), mandBody(
+      { id: 'mand-other-' + RUN2, clientId: 'gx-cli-1' })),
+    'DENY',
+  );
+
+  await check(
+    '42. client se declare mandat deja revoque',
+    () => setDoc(doc(cli2, 'sepa_mandates', 'mand-cancel-' + RUN2), mandBody(
+      { id: 'mand-cancel-' + RUN2, cancelledAt: '2026-01-04T00:00:00Z' })),
+    'DENY',
+  );
+
+  await check(
+    '43. client lit son propre mandat',
+    () => getDoc(doc(cli2, 'sepa_mandates', 'mand-ok-' + RUN2)),
+    'ALLOW',
+  );
+
+  await check(
+    '44. client modifie son mandat apres signature',
+    () => updateDoc(doc(cli2, 'sepa_mandates', 'mand-ok-' + RUN2),
+      { iban: 'BE71096123456769' }),
+    'DENY',
+  );
+
+  await check(
+    '45. finance enregistre un mandat pour un client',
+    () => setDoc(doc(fin2, 'sepa_mandates', 'mand-fin-' + RUN2), mandBody(
+      { id: 'mand-fin-' + RUN2 })),
+    'ALLOW',
+  );
+
+  await check(
+    '46. client suspendu signe un mandat',
+    () => setDoc(doc(client, 'sepa_mandates', 'mand-susp-' + RUN2), mandBody(
+      { id: 'mand-susp-' + RUN2, clientId: 'gx-cli-1' })),
+    'DENY',
+  );
+
+  await check(
+    '47. client supprime son mandat',
+    () => deleteDoc(doc(cli2, 'sepa_mandates', 'mand-ok-' + RUN2)),
+    'DENY',
+  );
+
+  await check(
+    '48. finance revoque un mandat client',
+    () => updateDoc(doc(fin2, 'sepa_mandates', 'mand-ok-' + RUN2), {
+      status: 'cancelled',
+      cancelledAt: '2026-01-05T00:00:00Z',
+    }),
+    'ALLOW',
   );
 
   await testEnv.cleanup();
