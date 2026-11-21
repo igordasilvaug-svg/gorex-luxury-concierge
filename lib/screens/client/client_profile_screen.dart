@@ -142,9 +142,19 @@ class ClientProfileScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
+                  // ── DÉFAUT CORRIGÉ ───────────────────────────────────────
+                  // Ce texte était `SubscriptionPolicy.closedNotice` sans la
+                  // moindre condition. Depuis l'ouverture commerciale, un
+                  // client sans contrat lisait donc ici « la souscription
+                  // n'est pas encore ouverte », alors que l'écran suivant lui
+                  // proposait « DEMANDER CETTE FORMULE » avec les tarifs. Deux
+                  // affirmations incompatibles dans la même application.
+                  // Le message suit désormais l'état réel de l'interrupteur.
                   Text(
                     sub == null
-                        ? SubscriptionPolicy.closedNotice
+                        ? (SubscriptionPolicy.subscriptionsOpen
+                              ? SubscriptionPolicy.openNotice
+                              : SubscriptionPolicy.closedNotice)
                         : sub.status.description,
                     style: AppTypography.caption,
                   ),
@@ -156,9 +166,17 @@ class ClientProfileScreen extends StatelessWidget {
                   ],
                   if (sub == null) ...[
                     const Divider(height: 22),
+                    // Même contradiction que ci-dessus, corrigée de la même
+                    // façon : annoncer « dès l'ouverture officielle » alors que
+                    // l'ouverture a eu lieu envoie le client attendre un
+                    // événement déjà passé.
                     Text(
-                      'Les formules vous seront présentées avec leurs tarifs '
-                      'dès l\'ouverture officielle de la souscription.',
+                      SubscriptionPolicy.subscriptionsOpen
+                          ? 'Touchez cette carte ou « GÉRER MON ABONNEMENT » '
+                                'pour consulter les formules et leurs tarifs.'
+                          : 'Les formules vous seront présentées avec leurs '
+                                'tarifs dès l\'ouverture officielle de la '
+                                'souscription.',
                       style: AppTypography.caption.copyWith(
                         fontSize: 10,
                         color: AppColors.grey,

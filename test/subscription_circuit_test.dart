@@ -324,6 +324,60 @@ void main() {
       expect(find.textContaining('GOREX ESSENTIAL'), findsNothing);
     });
 
+    testWidgets(
+      "le profil ne contredit jamais l'écran des formules",
+      (tester) async {
+        // ── DÉFAUT RÉEL, TROUVÉ EN PRODUCTION ─────────────────────────────
+        // La carte du profil affichait `closedNotice` SANS CONDITION. Une fois
+        // l'interrupteur ouvert, un client lisait « la souscription n'est pas
+        // encore ouverte » sur son profil, puis « DEMANDER CETTE FORMULE »
+        // avec les tarifs un écran plus loin. L'application se contredisait.
+        //
+        // Ce test ne verrouille pas la valeur de l'interrupteur (c'est une
+        // décision commerciale, pas du code) : il verrouille la COHÉRENCE.
+        final s = _stateWithClient(tierId: 'tier_essential');
+        await tester.pumpWidget(_wrapProfile(s));
+        await tester.pumpAndSettle();
+
+        if (SubscriptionPolicy.subscriptionsOpen) {
+          expect(
+            find.textContaining('n\'est pas encore ouverte'),
+            findsNothing,
+            reason:
+                "L'offre est ouverte : le profil ne doit pas annoncer le "
+                'contraire de ce que propose l\'écran des formules.',
+          );
+          expect(find.textContaining(SubscriptionPolicy.openNotice), findsOneWidget);
+          expect(
+            find.textContaining('dès l\'ouverture officielle'),
+            findsNothing,
+            reason:
+                "L'ouverture a eu lieu : renvoyer le client à un événement "
+                'déjà passé est faux.',
+          );
+        } else {
+          expect(
+            find.textContaining(SubscriptionPolicy.closedNotice),
+            findsOneWidget,
+          );
+          expect(find.textContaining(SubscriptionPolicy.openNotice), findsNothing);
+        }
+      },
+    );
+
+    test("le message d'ouverture ne promet rien que le code n'autorise", () {
+      // Symétrique du test sur `closedNotice` : quand l'offre est ouverte, le
+      // texte affiché doit dire ce que le code fait vraiment — la demande est
+      // déposée, mais rien n'est dû avant l'acceptation de Gorex Group.
+      final n = SubscriptionPolicy.openNotice.toLowerCase();
+      expect(n, contains('déposer une demande'));
+      expect(n, contains('sans aucun montant dû'));
+      expect(n, contains('acceptation de gorex group'));
+      // Il ne doit jamais laisser croire que l'abonnement est actif.
+      expect(n, isNot(contains('abonnement actif')));
+      expect(n, isNot(contains('votre abonnement est')));
+    });
+
     testWidgets('avec un contrat réel, le montant affiché est celui convenu', (
       tester,
     ) async {

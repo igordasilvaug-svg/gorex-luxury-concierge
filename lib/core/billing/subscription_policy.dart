@@ -67,6 +67,23 @@ class SubscriptionPolicy {
   /// Libellé court affiché à la place de tout bouton de souscription.
   static const String closedBadge = 'Souscription non ouverte';
 
+  /// Message affiché au client lorsque l'offre EST ouverte et qu'il n'a pas
+  /// encore de contrat.
+  ///
+  /// ── POURQUOI CETTE CONSTANTE EXISTE ─────────────────────────────────────
+  /// La carte du Profil affichait `closedNotice` SANS CONDITION dès qu'aucun
+  /// abonnement n'existait. À l'ouverture de l'interrupteur, un client lisait
+  /// donc « la souscription n'est pas encore ouverte » sur son profil, puis,
+  /// un écran plus loin, « DEMANDER CETTE FORMULE » avec ses tarifs. Deux
+  /// affirmations contradictoires dans la même application : l'une des deux
+  /// mentait forcément. Ce texte-ci est celui qui dit vrai quand l'offre est
+  /// ouverte, et il ne promet rien que le code n'autorise : la demande est
+  /// bien déposée, mais rien n'est dû avant l'acceptation de Gorex Group.
+  static const String openNotice =
+      'Aucune formule souscrite à ce jour. Les formules Gorex sont ouvertes : '
+      'vous pouvez déposer une demande, sans aucun engagement et sans aucun '
+      'montant dû avant l\'acceptation de Gorex Group.';
+
   /// L'activation d'un abonnement (donc la facturation) est-elle possible ?
   ///
   /// Verrou unique : même si un abonnement était accepté par erreur alors que
