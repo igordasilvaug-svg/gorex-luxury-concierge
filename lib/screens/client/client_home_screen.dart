@@ -28,7 +28,9 @@ class ClientHomeScreen extends StatelessWidget {
             .where((a) => a.end.isAfter(DateTime.now()))
             .toList()
           ..sort((a, b) => a.start.compareTo(b.start));
-    final tier = s.tierById(client?.subscriptionTierId);
+    // Le palier attribué d'office n'est PAS un abonnement : on n'affiche une
+    // formule que si une demande ou un contrat existe réellement.
+    final sub = s.mySubscription;
     final concierge = s.userById(client?.assignedConciergeId);
 
     return SafeArea(
@@ -51,8 +53,18 @@ class ClientHomeScreen extends StatelessWidget {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  if (tier != null)
-                    StatusPill(label: tier.name, color: AppColors.champagne),
+                  if (sub != null)
+                    StatusPill(
+                      label: sub.tierName,
+                      color: sub.isBillable
+                          ? AppColors.champagne
+                          : AppColors.greyLight,
+                    )
+                  else
+                    const StatusPill(
+                      label: 'Aucun abonnement',
+                      color: AppColors.grey,
+                    ),
                   const SizedBox(width: 8),
                   ConfidentialityBadge(
                     level:

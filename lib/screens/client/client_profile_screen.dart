@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 
+import '../../core/billing/subscription_policy.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 
@@ -15,6 +15,7 @@ import '../about/about_screen.dart';
 import '../access/change_password_dialog.dart';
 import '../account/my_account_edit_screen.dart';
 import '../../widgets/language_selector.dart';
+import 'client_subscription_screen.dart';
 
 class ClientProfileScreen extends StatelessWidget {
   const ClientProfileScreen({super.key});
@@ -23,13 +24,11 @@ class ClientProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
     final client = s.currentClient;
-    final tier = s.tierById(client?.subscriptionTierId);
     final concierge = s.userById(client?.assignedConciergeId);
-    final eur = NumberFormat.currency(
-      locale: 'fr_BE',
-      symbol: '€',
-      decimalDigits: 0,
-    );
+    // Abonnement RÉEL du client (null = aucun contrat). Remplace l'ancien
+    // `tierById(...)`, qui affichait le palier attribué d'office comme s'il
+    // s'agissait d'un abonnement souscrit.
+    final sub = s.mySubscription;
 
     if (client == null) {
       return const EmptyState(
@@ -67,58 +66,118 @@ class ClientProfileScreen extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                if (tier != null)
-                  StatusPill(label: tier.name, color: AppColors.champagne),
+                // ── CE QUI ÉTAIT FAUX ────────────────────────────────────
+                // On affichait ici le palier du client (`tier.name`) quelle
+                // que soit sa situation. Tout nouvel inscrit recevait donc la
+                // mention « GOREX ESSENTIAL » comme s'il était abonné, alors
+                // qu'il n'avait rien demandé, rien signé et rien payé. Un
+                // palier attribué par défaut n'est PAS un abonnement.
+                //
+                // Désormais : seule une demande ou un contrat réel donne lieu
+                // à une pastille de formule. Sinon, on affiche l'état vrai.
+                if (sub != null)
+                  StatusPill(
+                    label: sub.tierName,
+                    color: sub.isBillable
+                        ? AppColors.champagne
+                        : AppColors.greyLight,
+                  )
+                else
+                  const StatusPill(
+                    label: 'Aucun abonnement',
+                    color: AppColors.grey,
+                  ),
                 const SizedBox(width: 8),
                 ConfidentialityBadge(level: client.confidentiality),
               ],
             ),
             const SizedBox(height: 20),
 
-            if (tier != null)
-              LuxuryCard(
-                highlighted: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.workspace_premium_outlined,
-                          size: 18,
-                          color: AppColors.champagne,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          tier.name,
-                          style: AppTypography.title.copyWith(
-                            letterSpacing: 1.5,
-                            color: AppColors.champagne,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(tier.tagline, style: AppTypography.caption),
-                    const Divider(height: 22),
-                    InfoRow(label: 'Demandes', value: tier.requestsLabel),
-                    const Divider(height: 1),
-                    InfoRow(label: 'Priorité', value: tier.priority),
-                    const Divider(height: 1),
-                    InfoRow(
-                      label: 'SLA réponse',
-                      value: '< ${tier.responseMinutes} min',
-                    ),
-                    const Divider(height: 1),
-                    InfoRow(label: 'Disponibilité', value: tier.availability),
-                    const Divider(height: 1),
-                    InfoRow(
-                      label: 'Contrat annuel',
-                      value: eur.format(tier.annualPrice),
-                    ),
-                  ],
+            // ── Fiche du contrat réel ────────────────────────────────────
+            // L'ancien bloc annonçait « Contrat annuel : 96 000 € » au titre
+            // du palier, sans qu'aucun contrat n'existe. C'était une
+            // affirmation commerciale faite à la place du client, et
+            // potentiellement opposable. Il n'apparaît plus que s'il existe
+            // un abonnement, avec son montant RÉELLEMENT convenu.
+            LuxuryCard(
+              highlighted: sub?.isBillable ?? false,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ClientSubscriptionScreen(),
                 ),
               ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        sub?.isBillable ?? false
+                            ? Icons.workspace_premium
+                            : Icons.workspace_premium_outlined,
+                        size: 18,
+                        color: sub?.isBillable ?? false
+                            ? AppColors.champagne
+                            : AppColors.greyLight,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          sub == null
+                              ? 'Aucun abonnement en cours'
+                              : (sub.tierName.isEmpty ? 'Formule' : sub.tierName),
+                          style: AppTypography.title.copyWith(
+                            letterSpacing: 1.2,
+                            color: sub?.isBillable ?? false
+                                ? AppColors.champagne
+                                : AppColors.offWhite,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color: AppColors.grey,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    sub == null
+                        ? SubscriptionPolicy.closedNotice
+                        : sub.status.description,
+                    style: AppTypography.caption,
+                  ),
+                  if (sub != null) ...[
+                    const Divider(height: 22),
+                    InfoRow(label: 'Montant', value: sub.amountLabel),
+                    const Divider(height: 1),
+                    InfoRow(label: 'État', value: sub.status.label),
+                  ],
+                  if (sub == null) ...[
+                    const Divider(height: 22),
+                    Text(
+                      'Les formules vous seront présentées avec leurs tarifs '
+                      'dès l\'ouverture officielle de la souscription.',
+                      style: AppTypography.caption.copyWith(
+                        fontSize: 10,
+                        color: AppColors.grey,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ClientSubscriptionScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.workspace_premium_outlined, size: 15),
+              label: const Text('GÉRER MON ABONNEMENT'),
+            ),
             const SizedBox(height: 18),
 
             if (concierge != null)

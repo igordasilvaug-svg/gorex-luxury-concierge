@@ -11,6 +11,7 @@ import '../core/firebase/firebase_auth_service.dart';
 import '../core/firebase/rest_auth_service.dart';
 import '../core/firebase/firestore_service.dart';
 import '../core/billing/peppol_service.dart';
+import '../core/billing/subscription_policy.dart';
 import '../core/billing/peppol_ubl_generator.dart';
 import '../core/billing/reconciliation_service.dart';
 import '../core/billing/reminder_service.dart';
@@ -23,6 +24,7 @@ import '../models/app_user.dart';
 import '../models/client.dart';
 import '../models/company_profile.dart';
 import '../models/sepa_mandate.dart';
+import '../models/subscription.dart';
 import '../models/communication.dart';
 import '../models/crm_agenda.dart';
 import '../models/enums.dart';
@@ -144,6 +146,15 @@ class AppState extends ChangeNotifier {
   List<Appointment> appointments = [];
   List<Prospect> prospects = [];
   List<SubscriptionTier> tiers = [];
+
+  /// Demandes et contrats d'abonnement.
+  ///
+  /// Distincts de `Client.subscriptionTierId` : ce dernier dit quelle formule
+  /// est APPLIQUÉE au dossier, celui-ci porte le CONTRAT (demande, décision,
+  /// date d'effet, montant convenu). Un abonnement n'est facturable qu'à
+  /// l'état `active`, c'est-à-dire après acceptation ET signature du mandat.
+  List<Subscription> subscriptions = [];
+
   List<AuditEntry> auditLog = [];
 
   bool _ready = false;
@@ -191,6 +202,7 @@ class AppState extends ChangeNotifier {
       await loadOperationalFromCloud();
       await loadProvidersFromCloud();
       await loadCompanyFromCloud();
+      await loadTiersFromCloud();
     }
 
     // Mandats et prélèvements SEPA : stockage séparé de l'état principal
@@ -200,6 +212,8 @@ class AppState extends ChangeNotifier {
     // Les mandats vivent aussi dans Firestore : on récupère ceux saisis
     // depuis un autre appareil.
     await syncSepaFromCloud();
+    // Les abonnements aussi (règle « un client ne lit que SON contrat »).
+    await syncSubscriptionsFromCloud();
 
     _ready = true;
     notifyListeners();
@@ -354,6 +368,7 @@ class AppState extends ChangeNotifier {
     users = _mapList(m['users'], AppUser.fromMap);
     clients = _mapList(m['clients'], Client.fromMap);
     tiers = _mapList(m['tiers'], SubscriptionTier.fromMap);
+    subscriptions = _mapList(m['subscriptions'], Subscription.fromMap);
     // ── MIGRATION CIBLÉE UNIQUEMENT ─────────────────────────────────────
     // Une version intermédiaire avait vidé la grille d'abonnements. Les
     // navigateurs l'ayant déjà chargée conservent `tiers: []` en mémoire :
@@ -480,6 +495,7 @@ class AppState extends ChangeNotifier {
         'users': users.map(_userMapForStorage).toList(),
         'clients': clients.map((e) => e.toMap()).toList(),
         'tiers': tiers.map((e) => e.toMap()).toList(),
+        'subscriptions': subscriptions.map((e) => e.toMap()).toList(),
         'requests': requests.map((e) => e.toMap()).toList(),
         'providers': providers.map((e) => e.toMap()).toList(),
         'bookings': bookings.map((e) => e.toMap()).toList(),
@@ -514,6 +530,11 @@ class AppState extends ChangeNotifier {
     'users': users.map((e) => e.toMap()).toList(),
     'clients': clients.map((e) => e.toMap()).toList(),
     'tiers': tiers.map((e) => e.toMap()).toList(),
+    // Les abonnements sont inclus dans la sauvegarde, mais la source de
+    // verite reste la collection `subscriptions` (chaque client ne lit que
+    // la sienne). Cette copie sert uniquement au stockage local et aux
+    // sauvegardes, jamais aux decisions de facturation.
+    'subscriptions': subscriptions.map((e) => e.toMap()).toList(),
     'requests': requests.map((e) => e.toMap()).toList(),
     'providers': providers.map((e) => e.toMap()).toList(),
     'bookings': bookings.map((e) => e.toMap()).toList(),
@@ -888,6 +909,8 @@ class AppState extends ChangeNotifier {
     await loadOperationalFromCloud();
     await loadProvidersFromCloud();
     await loadCompanyFromCloud();
+    await loadTiersFromCloud();
+    await syncSubscriptionsFromCloud();
     await syncSepaFromCloud();
     notifyListeners();
     return true;
@@ -1054,6 +1077,8 @@ class AppState extends ChangeNotifier {
     await loadOperationalFromCloud();
     await loadProvidersFromCloud();
     await loadCompanyFromCloud();
+    await loadTiersFromCloud();
+    await syncSubscriptionsFromCloud();
     await syncSepaFromCloud();
     notifyListeners();
     return true;
@@ -2495,6 +2520,263 @@ class AppState extends ChangeNotifier {
   /// Vrai si le client a une domiciliation utilisable pour un prélèvement.
   bool canDebitClient(String clientId) => mandateForClient(clientId)?.usable ?? false;
 
+  // ─────────────────────── ABONNEMENTS (CONTRATS) ───────────────────────
+  //
+  // Un abonnement vit dans une collection DÉDIÉE (`subscriptions`), et non
+  // dans l'état global `gorex_cloud` : ce dernier n'est lisible que par le
+  // CEO et le concierge manager, alors que le client doit pouvoir consulter
+  // SON contrat. Comme pour le SEPA, chaque client ne lit que ses documents.
+
+  /// Demande d'abonnement du client connecté (la plus récente), s'il y en a.
+  Subscription? get mySubscription {
+    final email = currentUser?.email;
+    if (email == null) return null;
+    final mine = subscriptions.where((s) => s.clientEmail == email).toList();
+    if (mine.isEmpty) return null;
+    mine.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
+    return mine.first;
+  }
+
+  /// Abonnements en attente de décision, du plus ancien au plus récent.
+  List<Subscription> get pendingSubscriptions {
+    final out =
+        subscriptions.where((s) => s.status == SubscriptionStatus.requested).toList();
+    out.sort((a, b) => a.requestedAt.compareTo(b.requestedAt));
+    return out;
+  }
+
+  /// Abonnement d'un client donné (le plus récent).
+  Subscription? subscriptionForClient(String clientId) {
+    final mine = subscriptions.where((s) => s.clientId == clientId).toList();
+    if (mine.isEmpty) return null;
+    mine.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
+    return mine.first;
+  }
+
+  /// Enregistre une DEMANDE d'abonnement formulée par le client.
+  ///
+  /// Elle ne donne aucun droit : le statut est `requested` et le montant est
+  /// celui de la grille au moment de la demande, figé ici pour qu'une
+  /// modification ultérieure des tarifs ne réécrive pas un contrat en cours.
+  Future<Subscription> requestSubscription({
+    required String clientId,
+    required String tierId,
+    required BillingCycle cycle,
+  }) async {
+    // ── OFFRE FERMÉE ────────────────────────────────────────────────────
+    // Tant que les conditions commerciales et légales ne sont pas arrêtées,
+    // aucune demande ne peut être enregistrée. REFUS EXPLICITE plutôt que
+    // bouton masqué : masquer l'interface ne protège de rien, un appel direct
+    // contournerait tout. Voir `SubscriptionPolicy`.
+    if (!SubscriptionPolicy.subscriptionsOpen) {
+      throw const CloudWriteException(
+        'Les formules d\'abonnement ne sont pas encore ouvertes à la '
+        'souscription',
+      );
+    }
+    final client = clients.firstWhere(
+      (c) => c.id == clientId,
+      orElse: () => throw const CloudWriteException('Client introuvable'),
+    );
+    final tier = tierById(tierId);
+    if (tier == null) {
+      throw const CloudWriteException('Formule inconnue');
+    }
+
+    final sub = Subscription(
+      id: 'sub_${DateTime.now().microsecondsSinceEpoch}',
+      clientId: clientId,
+      clientEmail: client.email,
+      tierId: tier.id,
+      tierName: tier.name,
+      cycle: cycle,
+      amount: cycle == BillingCycle.annual ? tier.annualPrice : tier.monthlyPrice,
+      status: SubscriptionStatus.requested,
+      requestedAt: DateTime.now(),
+    );
+
+    // Serveur d'abord : une demande qui ne vivrait que dans le navigateur du
+    // client serait invisible pour l'équipe, donc sans effet.
+    final ok = await _pushToCloud('subscriptions', sub.toMap(), docId: sub.id);
+    if (!ok) throw const CloudWriteException('Demande d\'abonnement');
+
+    subscriptions.insert(0, sub);
+    log('Demande d\'abonnement', client.email, detail: '${tier.name} — ${sub.amountLabel}');
+    await _persist();
+    notifyListeners();
+    return sub;
+  }
+
+  /// Décision de Gorex Group sur une demande d'abonnement.
+  ///
+  /// `approve = true` accepte la demande ; le contrat est formé mais reste
+  /// NON FACTURABLE tant que le mandat SEPA n'est pas actif (voir
+  /// [activateSubscriptionIfReady]). `approve = false` refuse.
+  Future<void> decideSubscription(
+    String subscriptionId, {
+    required bool approve,
+    String? note,
+  }) async {
+    if (!can('finance')) {
+      throw const CloudWriteException(
+        'Seul le CEO ou le service financier peut décider d\'un abonnement',
+      );
+    }
+    final i = subscriptions.indexWhere((s) => s.id == subscriptionId);
+    if (i < 0) return;
+    final before = subscriptions[i];
+
+    final updated = before.copyWith(
+      status: approve
+          ? SubscriptionStatus.approved
+          : SubscriptionStatus.ended,
+      decidedAt: DateTime.now(),
+      decidedBy: currentUser?.email,
+      note: note?.trim().isEmpty ?? true ? before.note : note!.trim(),
+    );
+    subscriptions[i] = updated;
+    notifyListeners();
+
+    final ok = await _pushToCloud('subscriptions', updated.toMap(), docId: updated.id);
+    if (!ok) {
+      subscriptions[i] = before;
+      notifyListeners();
+      throw const CloudWriteException('Décision d\'abonnement');
+    }
+    log(
+      approve ? 'Abonnement accepté' : 'Abonnement refusé',
+      updated.clientEmail,
+      detail: '${updated.tierName} — ${updated.amountLabel}',
+    );
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Passe un abonnement accepté en `active` si — et seulement si — un mandat
+  /// SEPA actif existe pour ce client.
+  ///
+  /// C'est le verrou qui empêche de facturer sans base contractuelle : sans
+  /// mandat, on ne prélève pas, donc on ne facture pas.
+  Future<bool> activateSubscriptionIfReady(String clientId) async {
+    // ── SECOND VERROU, INDÉPENDANT DU PREMIER ───────────────────────────
+    // Même si une demande et une décision avaient été enregistrées avant la
+    // fermeture de l'offre, un abonnement ne devient JAMAIS facturable tant
+    // que l'ouverture commerciale n'est pas décidée. C'est ce qui garantit
+    // qu'aucun prélèvement SEPA ne peut partir par inadvertance.
+    if (!SubscriptionPolicy.canActivateBilling) return false;
+
+    final sub = subscriptionForClient(clientId);
+    if (sub == null || sub.status != SubscriptionStatus.approved) return false;
+    if (!canDebitClient(clientId)) return false;
+
+    final updated = sub.copyWith(
+      status: SubscriptionStatus.active,
+      activatedAt: DateTime.now(),
+    );
+    final i = subscriptions.indexWhere((s) => s.id == sub.id);
+    subscriptions[i] = updated;
+    notifyListeners();
+
+    final ok = await _pushToCloud('subscriptions', updated.toMap(), docId: updated.id);
+    if (!ok) {
+      subscriptions[i] = sub;
+      notifyListeners();
+      throw const CloudWriteException('Activation de l\'abonnement');
+    }
+    log('Abonnement actif', updated.clientEmail, detail: updated.amountLabel);
+    await _persist();
+    notifyListeners();
+    return true;
+  }
+
+  /// Recharge les abonnements depuis Firestore.
+  ///
+  /// Un client ne peut lire que SES documents (règle Firestore) : la méthode
+  /// est donc appelée aussi bien par l'espace client que par l'espace
+  /// d'encadrement, chacun recevant ce qu'il a le droit de voir.
+  Future<void> syncSubscriptionsFromCloud() async {
+    final token = restIdToken;
+    if (token == null || token.isEmpty) return;
+    try {
+      // La règle Firestore n'autorise un client qu'à lire SES propres
+      // abonnements : une lecture de collection non filtrée se ferait refuser
+      // (403). On filtre donc explicitement, pour le client uniquement — le
+      // personnel reçoit la collection entière.
+      final email = currentUser?.email;
+      final isClientOnly = currentUser?.role == UserRole.vipClient;
+      final rows = (isClientOnly && email != null && email.isNotEmpty)
+          ? await RestAuthService.queryCollection(
+              'subscriptions',
+              token,
+              field: 'clientEmail',
+              value: email,
+              limit: 50,
+            )
+          : await RestAuthService.fetchCollection(
+              'subscriptions',
+              token,
+              limit: 200,
+            );
+      if (rows.isEmpty) return;
+      final byId = <String, Subscription>{for (final s in subscriptions) s.id: s};
+      for (final r in rows) {
+        final s = Subscription.fromMap(r);
+        if (s.id.isEmpty) continue;
+        byId[s.id] = s;
+      }
+      subscriptions = byId.values.toList();
+      await _persist();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[State] abonnements (REST) : $e');
+    }
+  }
+
+  /// Charge la grille tarifaire officielle depuis Firestore
+  /// (`subscription_tiers`).
+  ///
+  /// ── POURQUOI CE CHARGEMENT EXISTE ────────────────────────────────────
+  /// La grille n'existait QUE dans le navigateur : `SeedData.tiers()` en dur,
+  /// puis le `localStorage` de chaque appareil. Conséquence : si la direction
+  /// modifiait un tarif depuis son ordinateur, un client sur son téléphone
+  /// continuait de voir l'ancien prix — et pouvait demander une formule au
+  /// montant périmé. Inacceptable pour un document contractuel.
+  ///
+  /// Le code écrivait déjà dans `subscription_tiers` (voir `_pushToCloud` sur
+  /// l'écran Abonnements) mais ne relisait jamais. C'est ce trou que comble
+  /// cette méthode.
+  ///
+  /// La base fait foi : dès qu'une lecture réussit et renvoie au moins une
+  /// formule active, elle remplace la grille locale. En cas d'échec (hors
+  /// ligne, droits, réseau), la grille locale est CONSERVÉE — jamais écrasée
+  /// par du vide, sinon l'écran d'abonnement deviendrait inutilisable.
+  Future<void> loadTiersFromCloud() async {
+    final token = restIdToken;
+    if (token == null || token.isEmpty) return;
+    try {
+      final rows = await RestAuthService.fetchCollection(
+        'subscription_tiers',
+        token,
+        limit: 50,
+      );
+      if (rows.isEmpty) return;
+      final loaded = <SubscriptionTier>[];
+      for (final r in rows) {
+        final t = SubscriptionTier.fromMap(r);
+        // Un document sans identifiant ou sans nom ne peut pas être proposé.
+        if (t.id.isEmpty || t.name.trim().isEmpty) continue;
+        loaded.add(t);
+      }
+      if (loaded.isEmpty) return;
+      loaded.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+      tiers = loaded;
+      await _persist();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[State] formules (REST) : $e');
+    }
+  }
+
   /// Charge les coordonnées officielles de la société depuis Firestore.
   ///
   /// ── POURQUOI CE CHARGEMENT EXISTE ────────────────────────────────────
@@ -2725,6 +3007,115 @@ class AppState extends ChangeNotifier {
         'Mandat enregistré localement mais non synchronisé',
       );
     }
+    return mandate;
+  }
+
+  /// Signe un mandat de domiciliation depuis l'espace CLIENT.
+  ///
+  /// ── POURQUOI CETTE MÉTHODE EXISTE ────────────────────────────────────
+  /// Jusqu'ici, la seule voie d'enregistrement ([registerMandate]) exigeait
+  /// `can('finance')`, donc un membre du personnel. Or un mandat SEPA est
+  /// signé par le DÉBITEUR : le faire saisir par le créancier revient à
+  /// signer à la place du client. Sans cette méthode, aucun client ne pouvait
+  /// jamais fournir de moyen de paiement, et la facturation restait
+  /// impossible autrement qu'à la main.
+  ///
+  /// Différences assumées avec [registerMandate] :
+  ///   • le dossier concerné est IMPOSÉ (`currentClient`) : un client ne peut
+  ///     pas signer un mandat sur le dossier d'un tiers ;
+  ///   • l'acceptation est horodatée et l'auteur consigné (`notes`), ce qui
+  ///     constitue la preuve du consentement ;
+  ///   • le mandat est créé `active` (le client vient de signer) mais reste
+  ///     sans effet tant qu'aucun abonnement n'est activé — l'activation est
+  ///     verrouillée par `SubscriptionPolicy`.
+  Future<SepaMandate> signMandateAsClient({
+    required String accountHolder,
+    required String iban,
+    String? bic,
+    required bool acceptedTerms,
+  }) async {
+    final client = currentClient;
+    if (client == null) {
+      throw const CloudWriteException('Aucun dossier client associé à ce compte');
+    }
+    if (!client.hasServiceAccess) {
+      throw const CloudWriteException(
+        'Votre dossier doit être validé par Gorex Group avant de signer un '
+        'mandat de paiement',
+      );
+    }
+    if (!acceptedTerms) {
+      throw const CloudWriteException(
+        'Le mandat ne peut être enregistré sans votre accord explicite',
+      );
+    }
+
+    final normalizedIban = SepaValidator.normalizeIban(iban);
+    final check = SepaValidator.validateIban(normalizedIban);
+    if (!check.valid) {
+      throw CloudWriteException('IBAN refusé : ${check.error}');
+    }
+    if (accountHolder.trim().length < 2) {
+      throw const CloudWriteException('Indiquez le titulaire du compte');
+    }
+
+    final now = DateTime.now();
+    final mandate = SepaMandate(
+      id: 'mand_${now.microsecondsSinceEpoch}',
+      clientId: client.id,
+      clientName: client.fullName,
+      mandateReference: nextMandateReference(),
+      iban: normalizedIban,
+      bic: (bic == null || bic.trim().isEmpty)
+          ? null
+          : SepaValidator.normalizeBic(bic),
+      accountHolder: accountHolder.trim(),
+      type: SepaMandateType.core,
+      status: SepaMandateStatus.active,
+      signatureDate: now,
+      createdAt: now,
+      notes: 'Signé par le client dans son espace personnel le '
+          '${now.toIso8601String()} (compte ${client.email}).',
+    );
+
+    final issues = mandate.validate();
+    if (issues.isNotEmpty) {
+      throw CloudWriteException('Mandat refusé : ${issues.join(' · ')}');
+    }
+
+    // Le serveur d'abord : un mandat qui ne vivrait que dans le navigateur du
+    // client serait invisible pour la finance, donc inutilisable.
+    final ok = await _pushToCloud(
+      'sepa_mandates',
+      mandate.toMap(),
+      docId: mandate.id,
+    );
+    if (!ok) {
+      throw const CloudWriteException(
+        'Le mandat n\'a pas pu être enregistré sur le serveur. '
+        'Vérifiez votre connexion et réessayez.',
+      );
+    }
+
+    // Remplace le mandat précédent éventuel (révoqué, jamais supprimé).
+    final previous = mandateForClient(client.id);
+    if (previous != null && previous.id != mandate.id) {
+      final i = sepaMandates.indexWhere((e) => e.id == previous.id);
+      if (i >= 0) {
+        sepaMandates[i] = sepaMandates[i].copyWith(
+          status: SepaMandateStatus.cancelled,
+          cancelledAt: now,
+        );
+      }
+    }
+    sepaMandates.add(mandate);
+    await _persistSepa();
+    await _logAudit(
+      'Mandat SEPA signé par le client',
+      client.email,
+      detail: mandate.maskedIban,
+    );
+    notifyListeners();
     return mandate;
   }
 
