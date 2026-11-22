@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/billing/peppol_service.dart';
 import '../../core/billing/vat_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -95,13 +96,23 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
   }
 
   Future<void> _test() async {
-    final s = context.read<AppState>();
-    await s.updatePeppol(_collect());
+    // ── TESTER N'ENREGISTRE PAS ─────────────────────────────────────────
+    // Cette méthode appelait `updatePeppol(_collect())` avant de tester :
+    // une clé FAUSSE était donc enregistrée en base (et dans le document
+    // secret) avant même de savoir si elle fonctionne. Le test porte
+    // désormais sur la saisie en cours, sans rien persister : on n'enregistre
+    // que ce qui a été validé, et seulement via le bouton « Enregistrer ».
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _testing = true);
-    final res = await s.testPeppolConnection();
+    final res = await PeppolService.testConnection(_collect());
     if (!mounted) return;
     setState(() => _testing = false);
-    _snack(res.message, ok: res.success);
+    _snack(
+      res.success
+          ? '${res.message} (configuration non enregistrée)'
+          : res.message,
+      ok: res.success,
+    );
   }
 
   void _syncFromCompany() {
@@ -271,11 +282,25 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
                   hint: 'https://votre-domaine/gorex/peppol-webhook',
                   keyboard: TextInputType.url,
                 ),
+                // ── AVERTISSEMENT HONNÊTE ──────────────────────────────
+                // L'application sait TRAITER une notification
+                // (`AppState.ingestPeppolWebhook`), mais aucun serveur ne
+                // l'écoute : le site est un Worker Cloudflare qui ne sert que
+                // des fichiers statiques et refuse les requêtes POST (405).
+                // Déclarer une URL ici ne produirait donc aucune réception.
+                // Il faut un point d'entrée serveur (Cloud Functions) pour
+                // cela, non déployé à ce jour.
                 Text(
-                  'Déclarez cette URL chez votre Access Point pour recevoir les '
-                  'changements de statut (accepté / distribué / rejeté) en temps '
-                  'réel. Sans webhook, utilisez le rafraîchissement manuel.',
-                  style: AppTypography.caption.copyWith(fontSize: 10.5),
+                  'Réception NON active : l\'application sait traiter une '
+                  'notification de statut, mais aucun serveur n\'écoute encore '
+                  'cette URL — le site ne répond qu\'en lecture. Déclarer une '
+                  'adresse ici ne produira donc aucune mise à jour automatique. '
+                  'En attendant, utilisez le rafraîchissement manuel depuis '
+                  'l\'écran Finance (bouton « Rafraîchir le statut »).',
+                  style: AppTypography.caption.copyWith(
+                    fontSize: 10.5,
+                    color: AppColors.statusWaiting,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 SwitchListTile(
@@ -422,9 +447,12 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
               }
               if (numeric) {
                 final t = (v ?? '').trim();
-                if (t.isNotEmpty && int.tryParse(t) == null) {
-                  return 'Nombre entier attendu';
-                }
+                // Obligatoire dès que la transmission est activée : sans lui
+                // l'envoi est refusé (l'API exige un entier). Mieux vaut le
+                // dire ici que de laisser l'utilisateur découvrir l'échec au
+                // moment de transmettre une facture réelle.
+                if (t.isEmpty) return 'Identifiant requis';
+                if (int.tryParse(t) == null) return 'Nombre entier attendu';
               }
               return null;
             },

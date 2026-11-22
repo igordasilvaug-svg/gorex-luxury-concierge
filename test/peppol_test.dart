@@ -461,6 +461,50 @@ void main() {
       }
     });
 
+    test('updatePeppol refuse d\'activer sans entité légale numérique', () async {
+      final s = await _ready();
+      s.authenticate('ceo@gorex.com', 'gorex2025');
+
+      // Configuration complète MAIS entité légale = un nom de personne :
+      // c'est exactement ce qui était en base de production.
+      await expectLater(
+        () => s.updatePeppol(
+          const PeppolConfig(
+            enabled: true,
+            apiKey: 'k',
+            senderPeppolId: '0208:1009679037',
+            senderLegalEntityId: 'Da Silva Augustin Igor',
+          ),
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+      // Rien n'a été enregistré : l'état reste sur la configuration d'origine.
+      expect(s.peppol.enabled, isFalse);
+
+      // Une configuration VALIDE passe.
+      await s.updatePeppol(
+        const PeppolConfig(
+          enabled: true,
+          apiKey: 'k',
+          senderPeppolId: '0208:1009679037',
+          senderLegalEntityId: '1',
+        ),
+      );
+      expect(s.peppol.enabled, isTrue);
+      expect(s.peppol.legalEntityId, 1);
+    });
+
+    test('une configuration incomplète reste enregistrable (désactivée)', () async {
+      final s = await _ready();
+      s.authenticate('ceo@gorex.com', 'gorex2025');
+      // Transmission non activée : on peut sauvegarder un brouillon de config
+      // sans clé ni identifiant. Le garde-fou ne doit pas bloquer ce cas.
+      await s.updatePeppol(
+        const PeppolConfig(enabled: false, apiBaseUrl: 'https://x'),
+      );
+      expect(s.peppol.enabled, isFalse);
+    });
+
     test('peppol config persists webhook + autoRefresh', () async {
       final s = await _ready();
       s.authenticate('ceo@gorex.com', 'gorex2025');
@@ -484,6 +528,47 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(tester.takeException(), isNull);
       expect(find.text('Access Point Peppol'), findsWidgets);
+    });
+
+    testWidgets('annonce que la réception par webhook n\'est pas active', (
+      tester,
+    ) async {
+      // L'application sait traiter une notification, mais aucun serveur ne
+      // l'écoute (le site est statique : les POST répondent 405). Demander au
+      // client de déclarer une URL reviendrait à lui faire croire à une
+      // réception qui n'existe pas.
+      final s = await _ready();
+      s.authenticate('ceo@gorex.com', 'gorex2025');
+      await tester.pumpWidget(_host(s, const PeppolSettingsScreen()));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final texte = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data ?? '')
+          .join(' ');
+
+      expect(texte, contains('NON active'));
+      expect(texte, contains('aucun serveur'));
+      expect(texte, contains('rafraîchissement manuel'));
+      // La consigne trompeuse a disparu.
+      expect(texte, isNot(contains('Déclarez cette URL')));
+    });
+
+    testWidgets('n\'annonce plus d\'envoi « simulé »', (tester) async {
+      final s = await _ready();
+      s.authenticate('ceo@gorex.com', 'gorex2025');
+      await tester.pumpWidget(_host(s, const PeppolSettingsScreen()));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final texte = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data ?? '')
+          .join(' ');
+
+      // Un envoi qui n'envoie rien n'est pas une « simulation ».
+      expect(texte, isNot(contains('envoi simulé')));
+      expect(texte, isNot(contains('mode démonstration')));
+      expect(texte, contains('Aucune transmission'));
     });
   });
 }

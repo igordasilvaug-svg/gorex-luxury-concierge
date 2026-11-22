@@ -3897,10 +3897,6 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  /// Teste la connexion à l'Access Point Peppol.
-  Future<PeppolSendResult> testPeppolConnection() =>
-      PeppolService.testConnection(peppol);
-
   /// Met à jour la configuration de l'Access Point Peppol.
   ///
   /// ── DEUX ÉCRITURES, DEUX DESTINATAIRES ────────────────────────────────
@@ -3910,6 +3906,19 @@ class AppState extends ChangeNotifier {
   /// seul rôle finance. Sans cette séparation, la clé serait servie au
   /// navigateur de tout utilisateur connecté, clients VIP compris.
   Future<void> updatePeppol(PeppolConfig config) async {
+    // ── ON N'ACTIVE PAS UNE TRANSMISSION QUI ÉCHOUERA ─────────────────
+    // Activer la transmission sans identifiant d'entité légale numérique
+    // produit une configuration qui a l'air prête mais dont chaque envoi est
+    // refusé. On refuse donc l'enregistrement : une configuration incomplète
+    // doit rester désactivée, pas silencieusement cassée.
+    if (config.enabled &&
+        config.isConfigured &&
+        config.legalEntityId == null) {
+      throw ArgumentError(
+        'Identifiant d\'entité légale requis (nombre entier) pour activer '
+        'la transmission Peppol.',
+      );
+    }
     peppol = config;
     log('Configuration Peppol', config.enabled ? 'Activée' : 'Désactivée');
     await _persist();
