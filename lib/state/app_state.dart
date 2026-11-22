@@ -3770,9 +3770,12 @@ class AppState extends ChangeNotifier {
       // envoyer », ce qui est la vérité. Seul un accusé réel (référence
       // fournisseur) autorise le passage à « Envoyé ».
       log(
-        'Peppol (simulation)',
+        // Pas « simulation » : le journal d'audit est définitif, et ce mot y
+        // laisserait croire qu'une transmission a eu lieu en mode démonstration.
+        // Il ne s'est rien passé du tout : aucun document n'est parti.
+        'Peppol non configuré',
         d.reference,
-        detail: 'Aucun envoi réel — Access Point non configuré',
+        detail: 'Aucun envoi : aucun document transmis (Access Point non configuré)',
       );
     } else if (result.success) {
       financeDocs[i] = d.copyWith(

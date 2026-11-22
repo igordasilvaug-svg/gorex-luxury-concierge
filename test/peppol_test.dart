@@ -322,6 +322,15 @@ void main() {
       expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.ready);
       expect(s.financeById(doc.id)!.status, isNot(InvoiceStatus.sent));
       expect(s.financeById(doc.id)!.peppolProviderReference, isNull);
+
+      // Le journal d'audit est DÉFINITIF : il ne doit pas laisser croire
+      // qu'une transmission a eu lieu « en simulation ». Rien n'est parti.
+      final trace = s.auditLog.firstWhere(
+        (e) => e.target == doc.reference && e.action.toLowerCase().contains('peppol'),
+      );
+      expect(trace.action.toLowerCase(), isNot(contains('simul')));
+      expect(trace.detail?.toLowerCase() ?? '', isNot(contains('simul')));
+      expect(trace.detail ?? '', contains('Aucun envoi'));
     });
 
     test('configured but unreachable Access Point → failure + failed status',
