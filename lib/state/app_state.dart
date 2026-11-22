@@ -2917,6 +2917,34 @@ class AppState extends ChangeNotifier {
       // Le décodeur REST ajoute `id` / `uid` : ces clés ne font pas partie du
       // modèle et sont ignorées par `CompanyProfile.fromMap`.
       company = CompanyProfile.fromMap(row);
+
+      // ── LA CONFIGURATION PEPPOL VIT DANS LE MÊME DOCUMENT ─────────────
+      // DÉFAUT CORRIGÉ. `updatePeppol()` écrit bien `company/gorex-group`
+      // (sous-clé `peppol`), mais RIEN ne la relisait : `CompanyProfile` ne
+      // possède aucune propriété Peppol, et cette méthode ne lisait que les
+      // coordonnées de la société. L'écran « Access Point Peppol » affichait
+      // donc les valeurs par défaut du modèle — une URL d'API et un schéma
+      // corrects par hasard, mais un identifiant émetteur VIDE alors que la
+      // base contenait `0208:1009679037`.
+      //
+      // Conséquence concrète : le CEO voyait un formulaire vierge et pouvait,
+      // en croyant « corriger », enregistrer des valeurs fausses par-dessus
+      // les vraies. Sur un second appareil, la configuration était invisible.
+      //
+      // On ne touche à rien si la sous-clé est absente : une configuration
+      // jamais enregistrée ne doit pas écraser l'état local.
+      final rawPeppol = row['peppol'];
+      if (rawPeppol is Map) {
+        final loaded = PeppolConfig.fromMap(
+          Map<String, dynamic>.from(rawPeppol),
+        );
+        // La clé d'API n'est JAMAIS publiée dans `company/` (c'est un secret).
+        // `fromMap` la lirait donc vide : on conserve celle déjà en mémoire,
+        // que `loadPeppolSecretFromCloud()` viendra confirmer depuis
+        // `company_secrets/`.
+        peppol = loaded.copyWith(apiKey: peppol.apiKey);
+      }
+
       await _persist();
       notifyListeners();
     } catch (e) {
