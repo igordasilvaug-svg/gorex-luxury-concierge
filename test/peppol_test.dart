@@ -153,7 +153,7 @@ void main() {
       expect(base.copyWith(enabled: true, apiKey: '').isConfigured, isFalse);
     });
 
-    test('toMap / fromMap round-trip', () {
+    test('toMap ne divulgue JAMAIS la clé d\'API (secret)', () {
       const c = PeppolConfig(
         enabled: true,
         apiBaseUrl: 'https://x',
@@ -162,11 +162,44 @@ void main() {
         senderLegalEntityId: '7',
         timeoutSeconds: 12,
       );
-      final back = PeppolConfig.fromMap(c.toMap());
+      final pub = c.toMap();
+
+      // `company/gorex-group` est lisible par TOUT utilisateur connecté
+      // (clients VIP compris) : la clé ne doit pas y figurer.
+      expect(pub.containsKey('apiKey'), isFalse);
+      expect(pub.values, isNot(contains('secret')));
+
+      // Elle vit dans la carte secrète, écrite ailleurs.
+      expect(c.toSecretMap(), {'apiKey': 'secret'});
+
+      // La partie publique reste complète et relisible.
+      final back = PeppolConfig.fromMap(pub);
       expect(back.enabled, isTrue);
-      expect(back.apiKey, 'secret');
       expect(back.senderLegalEntityId, '7');
       expect(back.timeoutSeconds, 12);
+      expect(back.apiKey, isEmpty); // absente de la carte publique
+    });
+
+    test('mergeSecretMap hydrate la clé sans jamais l\'effacer', () {
+      const base = PeppolConfig(apiKey: 'existante');
+      // Une lecture vide (autre rôle, réseau) ne doit pas effacer la clé.
+      expect(base.mergeSecretMap(null).apiKey, 'existante');
+      expect(base.mergeSecretMap({}).apiKey, 'existante');
+      expect(base.mergeSecretMap({'apiKey': ''}).apiKey, 'existante');
+      // Une lecture fructueuse la remplace.
+      expect(base.mergeSecretMap({'apiKey': 'nouvelle'}).apiKey, 'nouvelle');
+    });
+
+    test('legalEntityId refuse une valeur non numérique', () {
+      // C'est un NOMBRE chez l'Access Point, pas un nom de personne.
+      expect(const PeppolConfig(senderLegalEntityId: '7').legalEntityId, 7);
+      expect(const PeppolConfig(senderLegalEntityId: ' 42 ').legalEntityId, 42);
+      expect(
+        const PeppolConfig(senderLegalEntityId: 'Da Silva Augustin Igor')
+            .legalEntityId,
+        isNull,
+      );
+      expect(const PeppolConfig(senderLegalEntityId: '').legalEntityId, isNull);
     });
   });
 
@@ -186,7 +219,7 @@ void main() {
       expect(raw['raw_document_data'], isNotEmpty);
     });
 
-    test('unconfigured Access Point → simulated success', () async {
+    test('Access Point non configuré → AUCUN envoi, statut inchangé', () async {
       final s = await _ready();
       s.authenticate('ceo@gorex.com', 'gorex2025');
       final client = s.clientById('c_001')!;
@@ -201,10 +234,17 @@ void main() {
           lines: const [FinanceLine(description: 'X', unitPrice: 100)],
         ),
       );
+      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.ready);
+
       final res = await s.sendViaPeppol(doc.id);
-      expect(res.success, isTrue);
+
+      // Rien n'a été transmis : ce n'est pas un succès.
+      expect(res.success, isFalse);
       expect(res.simulated, isTrue);
-      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.sent);
+      // Et surtout : la pièce comptable ne doit pas mentir.
+      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.ready);
+      expect(s.financeById(doc.id)!.status, isNot(InvoiceStatus.sent));
+      expect(s.financeById(doc.id)!.peppolProviderReference, isNull);
     });
 
     test('configured but unreachable Access Point → failure + failed status',
@@ -217,6 +257,9 @@ void main() {
           apiBaseUrl: 'http://127.0.0.1:1',
           apiKey: 'x',
           senderPeppolId: '0208:0403203462',
+          // Identifiant numérique requis : sans lui l'envoi est refusé AVANT
+          // la requête réseau, et le test ne mesurerait plus la panne réseau.
+          senderLegalEntityId: '1',
           timeoutSeconds: 3,
         ),
       );
@@ -315,7 +358,7 @@ void main() {
   });
 
   group('AppState — suivi asynchrone Peppol', () {
-    test('refreshPeppolStatus simulates progression sent → delivered', () async {
+    test('refreshPeppolStatus n\'invente AUCUNE distribution', () async {
       final s = await _ready();
       s.authenticate('ceo@gorex.com', 'gorex2025');
       final client = s.clientById('c_001')!;
@@ -330,12 +373,16 @@ void main() {
           lines: const [FinanceLine(description: 'X', unitPrice: 100)],
         ),
       );
-      await s.sendViaPeppol(doc.id); // simulated → sent
-      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.sent);
+      await s.sendViaPeppol(doc.id); // non configuré → aucun envoi
+      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.ready);
+
       final st = await s.refreshPeppolStatus(doc.id);
-      expect(st, PeppolStatus.delivered);
-      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.delivered);
-      expect(s.financeById(doc.id)!.peppolLastUpdate, isNotNull);
+
+      // Sans référence fournisseur, aucune requête n'a eu lieu : le statut
+      // ne peut pas progresser vers « Distribué ».
+      expect(st, PeppolStatus.ready);
+      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.ready);
+      expect(s.financeById(doc.id)!.peppolProviderReference, isNull);
     });
 
     test('ingestPeppolWebhook updates status by provider reference', () async {
@@ -347,6 +394,7 @@ void main() {
           apiBaseUrl: 'http://127.0.0.1:1',
           apiKey: 'x',
           senderPeppolId: '0208:0403203462',
+          senderLegalEntityId: '1',
           timeoutSeconds: 2,
         ),
       );
@@ -383,10 +431,11 @@ void main() {
       expect(ok, isFalse);
     });
 
-    test('refreshAllPeppolStatuses reports updated count', () async {
+    test('refreshAllPeppolStatuses ne fabrique aucun statut', () async {
       final s = await _ready();
       s.authenticate('ceo@gorex.com', 'gorex2025');
       final client = s.clientById('c_001')!;
+      final ids = <String>[];
       for (var k = 0; k < 2; k++) {
         final doc = await s.createFinanceDoc(
           FinanceDocument(
@@ -399,10 +448,17 @@ void main() {
             lines: const [FinanceLine(description: 'X', unitPrice: 100)],
           ),
         );
-        await s.sendViaPeppol(doc.id);
+        ids.add(doc.id);
+        await s.sendViaPeppol(doc.id); // aucun envoi (non configuré)
       }
+      // Aucune facture n'est réellement partie : le rafraîchissement ne peut
+      // donc rien avoir à mettre à jour. Il renvoyait auparavant 2, en
+      // faisant passer chaque facture à « Distribué » sans aucun envoi.
       final updated = await s.refreshAllPeppolStatuses();
-      expect(updated, greaterThanOrEqualTo(2));
+      expect(updated, 0);
+      for (final id in ids) {
+        expect(s.financeById(id)!.peppolStatus, PeppolStatus.ready);
+      }
     });
 
     test('peppol config persists webhook + autoRefresh', () async {

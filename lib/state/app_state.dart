@@ -202,6 +202,7 @@ class AppState extends ChangeNotifier {
       await loadOperationalFromCloud();
       await loadProvidersFromCloud();
       await loadCompanyFromCloud();
+      await loadPeppolSecretFromCloud();
       await loadTiersFromCloud();
     }
 
@@ -915,6 +916,7 @@ class AppState extends ChangeNotifier {
     await loadOperationalFromCloud();
     await loadProvidersFromCloud();
     await loadCompanyFromCloud();
+    await loadPeppolSecretFromCloud();
     await loadTiersFromCloud();
     await syncSubscriptionsFromCloud();
     await syncSepaFromCloud();
@@ -1144,6 +1146,7 @@ class AppState extends ChangeNotifier {
     await loadOperationalFromCloud();
     await loadProvidersFromCloud();
     await loadCompanyFromCloud();
+    await loadPeppolSecretFromCloud();
     await loadTiersFromCloud();
     await syncSubscriptionsFromCloud();
     await syncSepaFromCloud();
@@ -3757,7 +3760,21 @@ class AppState extends ChangeNotifier {
       company: company,
       config: peppol,
     );
-    if (result.success) {
+    if (result.simulated) {
+      // ── AUCUNE TRACE D'ENVOI POUR UNE SIMULATION ──────────────────────
+      // Avant cette correction, un envoi simulé (Access Point non
+      // configuré) écrivait `peppolStatus = sent` et faisait passer la
+      // facture de « brouillon » à « émise ». La pièce comptable affirmait
+      // donc avoir été transmise à Peppol alors qu'aucune requête n'était
+      // partie. Le statut reste donc INCHANGÉ : la facture demeure « Prêt à
+      // envoyer », ce qui est la vérité. Seul un accusé réel (référence
+      // fournisseur) autorise le passage à « Envoyé ».
+      log(
+        'Peppol (simulation)',
+        d.reference,
+        detail: 'Aucun envoi réel — Access Point non configuré',
+      );
+    } else if (result.success) {
       financeDocs[i] = d.copyWith(
         peppolStatus: PeppolStatus.sent,
         status: d.status == InvoiceStatus.draft ? InvoiceStatus.sent : d.status,
@@ -3767,9 +3784,7 @@ class AppState extends ChangeNotifier {
       log(
         'Envoi Peppol',
         d.reference,
-        detail: result.simulated
-            ? 'Simulation (Access Point non configuré)'
-            : 'Transmis · ${result.providerReference ?? 'OK'}',
+        detail: 'Transmis · ${result.providerReference ?? 'OK'}',
       );
     } else {
       financeDocs[i] = d.copyWith(
@@ -3791,17 +3806,11 @@ class AppState extends ChangeNotifier {
     final d = financeDocs[i];
     final ref = d.peppolProviderReference;
     if (ref == null || ref.isEmpty) {
-      // En mode simulation, on simule la progression sent → delivered.
-      if (!peppol.isConfigured && d.peppolStatus == PeppolStatus.sent) {
-        financeDocs[i] = d.copyWith(
-          peppolStatus: PeppolStatus.delivered,
-          peppolLastUpdate: DateTime.now(),
-        );
-        log('Peppol (simulation)', d.reference, detail: 'Statut → Distribué');
-        await _persist();
-        notifyListeners();
-        return PeppolStatus.delivered;
-      }
+      // Aucune référence fournisseur = aucun envoi réel n'a eu lieu. On ne
+      // fabrique donc AUCUNE progression de statut : une facture ne peut pas
+      // devenir « Distribuée » sans qu'un Access Point l'ait confirmée.
+      // (Avant cette correction, un document en mode simulation passait de
+      // « Envoyé » à « Distribué » sans qu'aucune requête ne parte.)
       return d.peppolStatus;
     }
     final status = await PeppolService.getSubmissionStatus(
@@ -3893,6 +3902,13 @@ class AppState extends ChangeNotifier {
       PeppolService.testConnection(peppol);
 
   /// Met à jour la configuration de l'Access Point Peppol.
+  ///
+  /// ── DEUX ÉCRITURES, DEUX DESTINATAIRES ────────────────────────────────
+  /// La configuration « publique » (URL, identifiants, options) va dans
+  /// `company/gorex-group`. Le SECRET (la clé d'API) va dans
+  /// `company_secrets/gorex-group`, dont les règles réservent la lecture au
+  /// seul rôle finance. Sans cette séparation, la clé serait servie au
+  /// navigateur de tout utilisateur connecté, clients VIP compris.
   Future<void> updatePeppol(PeppolConfig config) async {
     peppol = config;
     log('Configuration Peppol', config.enabled ? 'Activée' : 'Désactivée');
@@ -3902,18 +3918,77 @@ class AppState extends ChangeNotifier {
       'peppol': config.toMap(),
     }, docId: _companyDocId);
     if (!ok) throw const CloudWriteException('Configuration Peppol');
+
+    // Le secret n'est écrit que s'il y a quelque chose à écrire : inutile
+    // d'écraser une clé existante avec une chaîne vide quand l'utilisateur
+    // modifie un autre champ (le champ est masqué à la saisie).
+    if (config.apiKey.trim().isNotEmpty) {
+      final secretOk = await _pushToCloud(
+        'company_secrets',
+        config.toSecretMap(),
+        docId: _companyDocId,
+      );
+      if (!secretOk) {
+        throw const CloudWriteException('Clé d\'API Peppol');
+      }
+    }
   }
 
-  /// Simule la confirmation de distribution Peppol (accusé du destinataire).
-  Future<void> markPeppolDelivered(String docId) async {
+  /// Relit la clé d'API Peppol depuis `company_secrets/`.
+  ///
+  /// Réservée au rôle finance par les règles Firestore : pour les autres
+  /// rôles la lecture échoue, ce qui est le comportement attendu — un
+  /// utilisateur qui n'a pas à facturer n'a pas à détenir la clé.
+  /// Un échec de lecture conserve la valeur locale au lieu de l'effacer.
+  Future<void> loadPeppolSecretFromCloud() async {
+    final token = restIdToken;
+    if (token == null || token.isEmpty) return;
+    try {
+      final row = await RestAuthService.fetchDocument(
+        'company_secrets/$_companyDocId',
+        token,
+      );
+      if (row == null || row.isEmpty) return;
+      final merged = peppol.mergeSecretMap(row);
+      if (identical(merged, peppol) || merged.apiKey == peppol.apiKey) return;
+      peppol = merged;
+      await _persist();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[State] clé Peppol (REST) : $e');
+    }
+  }
+
+  /// Enregistre une confirmation de distribution reçue du destinataire.
+  ///
+  /// ── CE N'EST PAS UNE SIMULATION ───────────────────────────────────────
+  /// Cette méthode traduisait auparavant une « simulation » : elle forçait le
+  /// statut à `delivered` sans condition. Une facture pouvait donc être
+  /// présentée comme distribuée via Peppol sans qu'aucun document n'ait
+  /// jamais quitté l'application.
+  ///
+  /// Elle exige désormais une **référence fournisseur réelle** : la preuve
+  /// qu'un envoi a bien eu lieu. Elle sert alors à consigner un accusé reçu
+  /// par un autre canal (e-mail du destinataire, portail de l'Access Point)
+  /// quand le webhook n'est pas encore branché. Sans référence, elle refuse.
+  Future<bool> markPeppolDelivered(String docId) async {
     final i = financeDocs.indexWhere((e) => e.id == docId);
-    if (i < 0) return;
-    financeDocs[i] = financeDocs[i].copyWith(
-      peppolStatus: PeppolStatus.delivered,
-    );
-    log('Peppol distribué', financeDocs[i].reference);
+    if (i < 0) return false;
+    final d = financeDocs[i];
+    final ref = (d.peppolProviderReference ?? '').trim();
+    if (ref.isEmpty) {
+      log(
+        'Peppol refusé',
+        d.reference,
+        detail: 'Accusé impossible : aucun envoi réel enregistré',
+      );
+      return false;
+    }
+    financeDocs[i] = d.copyWith(peppolStatus: PeppolStatus.delivered);
+    log('Peppol distribué', d.reference, detail: 'Accusé saisi · $ref');
     await _persist();
     notifyListeners();
+    return true;
   }
 
   /// Met à jour les coordonnées officielles de Gorex Group (facturation).

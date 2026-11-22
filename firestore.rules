@@ -406,9 +406,43 @@ service cloud.firestore {
     match /bank_transactions/{doc} { allow read, write: if isFinanceRole(); }
 
     // Paramètres de facturation (identité légale, TVA, Peppol).
+    //
+    // GARDE-FOU ANTI-FUITE. `company/{doc}` est lisible par tout utilisateur
+    // connecté. On refuse donc toute écriture qui tenterait d'y déposer une
+    // clé d'API non vide dans `peppol.apiKey` : c'est le seul endroit prévu
+    // pour le secret, et il est public. Cette règle protège même contre une
+    // version ANCIENNE de l'application restée en cache, qui écrirait encore
+    // la clé ici (`PeppolConfig.toMap()` l'incluait auparavant).
+    //
+    // La condition ne porte que sur une valeur NON VIDE : les autres écritures
+    // du document (coordonnées, TVA…) restent autorisées même si un champ
+    // `apiKey` vide subsiste d'une ancienne version.
     match /company/{doc} {
       allow read: if isRealUser();
-      allow write: if isFinanceRole();
+      allow write: if isFinanceRole()
+                   && !('peppol' in request.resource.data
+                        && request.resource.data.peppol is map
+                        && 'apiKey' in request.resource.data.peppol
+                        && request.resource.data.peppol.apiKey is string
+                        && request.resource.data.peppol.apiKey != '');
+    }
+
+    // ── SECRETS DE FACTURATION (clé d'API de l'Access Point Peppol) ──────
+    //
+    // POURQUOI UNE COLLECTION SÉPARÉE. La clé d'API Peppol était stockée dans
+    // le champ `peppol.apiKey` de `company/gorex-group`. Or `company/{doc}` est
+    // lisible par tout utilisateur connecté (`isRealUser()`), clients VIP
+    // compris — et l'écran de profil client lit déjà ce document pour afficher
+    // le téléphone de la conciergerie. Le jour où une vraie clé y aurait été
+    // saisie, elle aurait été servie au navigateur de chaque client.
+    //
+    // Cette collection isole donc les secrets de facturation :
+    //   • lecture et écriture réservées au rôle finance (et au CEO) ;
+    //   • AUCUN autre rôle n'y a accès, pas même un manager ;
+    //   • les règles restent « deny by default » : un document non prévu ici
+    //     n'est pas lisible.
+    match /company_secrets/{doc} {
+      allow read, write: if isFinanceRole();
     }
 
     match /subscription_tiers/{doc} {

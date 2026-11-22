@@ -147,8 +147,8 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
                   'Reliez l\'application à un Access Point Peppol agréé '
                   '(Storecove, Tickstar, Unifiedpost…) pour transmettre '
                   'réellement vos factures au format UBL / Peppol BIS '
-                  'Billing 3.0. Sans configuration, l\'envoi reste en mode '
-                  'démonstration.',
+                  'Billing 3.0. Sans configuration, aucune facture n\'est '
+                  'transmise : seul le document UBL est généré localement.',
                   style: AppTypography.caption,
                 ),
                 const SizedBox(height: 18),
@@ -166,7 +166,7 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
                   subtitle: Text(
                     _enabled
                         ? 'Les factures seront transmises via l\'Access Point.'
-                        : 'Mode démonstration (envoi simulé).',
+                        : 'Aucune transmission (l\'access point est désactivé).',
                     style: AppTypography.caption.copyWith(fontSize: 10.5),
                   ),
                   onChanged: (v) => setState(() => _enabled = v),
@@ -235,6 +235,10 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
                   _legalEntityId,
                   hint: 'ex. 1',
                   keyboard: TextInputType.number,
+                  // L'API de l'Access Point attend un ENTIER. Une valeur non
+                  // numérique faisait auparavant transmettre la facture sous
+                  // l'entité n°1 (repli silencieux) : on bloque à la saisie.
+                  numeric: true,
                 ),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -361,7 +365,9 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
                   Text(
                     configured
                         ? 'Les factures éligibles seront transmises réellement.'
-                        : 'Les envois Peppol sont simulés localement.',
+                        : 'Aucune transmission n\'a lieu. Les factures restent '
+                              '« Prêt à envoyer » et le document UBL est '
+                              'seulement généré localement.',
                     style: AppTypography.caption.copyWith(fontSize: 10.5),
                   ),
                 ],
@@ -393,6 +399,7 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
     TextEditingController controller, {
     String? hint,
     TextInputType? keyboard,
+    bool numeric = false,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -412,6 +419,12 @@ class _PeppolSettingsScreenState extends State<PeppolSettingsScreen> {
               }
               if (label.contains('Peppol') && (v == null || v.trim().isEmpty)) {
                 return 'Identifiant requis';
+              }
+              if (numeric) {
+                final t = (v ?? '').trim();
+                if (t.isNotEmpty && int.tryParse(t) == null) {
+                  return 'Nombre entier attendu';
+                }
               }
               return null;
             },

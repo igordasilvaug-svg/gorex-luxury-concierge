@@ -6,8 +6,30 @@
 //
 // Note CSP : Flutter Web (CanvasKit / Skwasm) charge le moteur de rendu depuis
 // https://www.gstatic.com. Les directives autorisent donc gstatic en script-src
-// et connect-src, et l'exécution WASM (wasm-unsafe-eval). Aucune origine tierce
-// n'est autorisée en dehors de gstatic.
+// et connect-src, et l'exécution WASM (wasm-unsafe-eval).
+//
+// Deux familles d'origines tierces sont ouvertes en connect-src, et deux
+// seulement : Firebase/Firestore, et l'Access Point Peppol
+// (`PEPPOL_ORIGINS`, voir plus bas). Tout le reste est fermé.
+
+// ── ORIGINES DES ACCESS POINTS PEPPOL (facturation électronique) ─────────
+//
+// L'application transmet les factures UBL à un Access Point Peppol agréé
+// depuis le NAVIGATEUR (voir `lib/core/billing/peppol_service.dart`). Sans
+// autorisation explicite dans `connect-src`, la Content Security Policy
+// bloque la requête : l'envoi échoue avec une erreur réseau opaque, même
+// avec une clé d'API valide.
+//
+// La liste reste FERMÉE — pas de `https://*`. Ajouter un fournisseur se fait
+// ici, en une ligne, et la modification est alors visible en revue.
+//
+//   Storecove (Datajust B.V.)  → https://api.storecove.com   [intégré]
+//
+// Si vous choisissez Tickstar, Unifiedpost, e-invoice.be ou un autre
+// prestataire, ajoutez SON origine d'API. Pour Storecove, l'URL par défaut de
+// l'application (`https://api.storecove.com/api/v2`) est déjà couverte : seule
+// l'origine compte en CSP, pas le chemin.
+const PEPPOL_ORIGINS = ['https://api.storecove.com'];
 
 const SECURITY_HEADERS = {
   // Empêche le reniflage de type MIME
@@ -70,7 +92,7 @@ const SECURITY_HEADERS = {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https://www.gstatic.com https://www.google.com",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "connect-src 'self' https://www.gstatic.com https://fonts.gstatic.com https://firestore.googleapis.com https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://www.google.com https://www.recaptcha.net",
+    "connect-src 'self' https://www.gstatic.com https://fonts.gstatic.com https://firestore.googleapis.com https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://www.google.com https://www.recaptcha.net " + PEPPOL_ORIGINS.join(' '),
     "worker-src 'self' blob:",
     "child-src 'self' blob:",
     "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://www.google.com https://recaptcha.google.com https://www.recaptcha.net",

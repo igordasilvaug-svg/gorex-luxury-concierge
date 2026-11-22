@@ -251,7 +251,7 @@ void main() {
       expect(reloaded.peppolEnabled, isTrue);
     });
 
-    test('sendViaPeppol then markPeppolDelivered transitions status', () async {
+    test('aucun envoi simulé ne produit un statut « envoyé »', () async {
       final s = await _ready();
       s.authenticate('ceo@gorex.com', 'gorex2025');
       final client = s.clientById('c_001')!;
@@ -267,9 +267,45 @@ void main() {
         ),
       );
       expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.ready);
-      await s.sendViaPeppol(doc.id);
-      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.sent);
-      await s.markPeppolDelivered(doc.id);
+
+      // Access Point non configuré : rien ne part.
+      final res = await s.sendViaPeppol(doc.id);
+      expect(res.success, isFalse);
+      expect(res.simulated, isTrue);
+
+      // La pièce comptable ne doit pas prétendre avoir été transmise.
+      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.ready);
+
+      // Et sans envoi réel, aucun accusé ne peut être consigné.
+      final marked = await s.markPeppolDelivered(doc.id);
+      expect(marked, isFalse);
+      expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.ready);
+    });
+
+    test('un accusé n\'est possible qu\'après un envoi réel', () async {
+      final s = await _ready();
+      s.authenticate('ceo@gorex.com', 'gorex2025');
+      final client = s.clientById('c_001')!;
+      final doc = await s.createFinanceDoc(
+        FinanceDocument(
+          id: '',
+          reference: '',
+          type: FinanceDocType.invoice,
+          clientId: client.id,
+          clientName: client.fullName,
+          date: DateTime.now(),
+          lines: [const FinanceLine(description: 'X', unitPrice: 100)],
+        ),
+      );
+      // On simule un envoi réel enregistré (référence de l'Access Point).
+      await s.updateFinanceDoc(
+        s.financeById(doc.id)!.copyWith(
+          peppolStatus: PeppolStatus.sent,
+          peppolProviderReference: 'SUB-REEL-1',
+        ),
+      );
+      final marked = await s.markPeppolDelivered(doc.id);
+      expect(marked, isTrue);
       expect(s.financeById(doc.id)!.peppolStatus, PeppolStatus.delivered);
     });
 

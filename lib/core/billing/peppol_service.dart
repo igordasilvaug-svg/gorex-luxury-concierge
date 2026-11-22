@@ -36,14 +36,20 @@ class PeppolService {
   PeppolService._();
 
   /// Construit le corps JSON compatible Storecove à partir du UBL.
+  ///
+  /// [legalEntityId] doit être l'identifiant **numérique** de l'entité légale
+  /// chez l'Access Point. Il est désormais fourni par l'appelant après
+  /// validation (voir [PeppolConfig.legalEntityId]) : plus de repli muet sur
+  /// une valeur arbitraire.
   static Map<String, dynamic> buildStorecovePayload({
     required PeppolConfig config,
     required String ublXml,
     required String filename,
     required bool isInvoice,
+    int? legalEntityId,
   }) {
     return {
-      'legal_entity_id': int.tryParse(config.senderLegalEntityId) ?? 1,
+      'legal_entity_id': legalEntityId ?? config.legalEntityId ?? 1,
       'document': {
         'document_type': isInvoice ? 'invoice' : 'invoice',
         'raw_document': {
@@ -72,12 +78,36 @@ class PeppolService {
     );
 
     if (!config.isConfigured) {
+      // ── UN ENVOI QUI N'ENVOIE RIEN N'EST PAS UN SUCCÈS ────────────────
+      // Cette branche renvoyait `success: true` avec `simulated: true`. Un
+      // appelant qui ne testait que `success` (c'était le cas de
+      // `sendViaPeppol`) concluait à une transmission réussie. Le drapeau
+      // `simulated` reste positionné pour que l'appelant puisse afficher un
+      // message adapté, mais le résultat est un ÉCHEC : rien n'a été transmis.
       return PeppolSendResult(
-        success: true,
+        success: false,
         simulated: true,
         message:
-            'Envoi simulé (Access Point non configuré). Document UBL prêt '
-            '(${ubl.filename}, ${ubl.xml.length} octets).',
+            'Aucun envoi : Access Point non configuré. Le document UBL a été '
+            'généré localement (${ubl.filename}, ${ubl.xml.length} octets) mais '
+            'n\'a été transmis à personne. La facture reste « Prêt à envoyer ».',
+      );
+    }
+
+    // ── L'ENTITÉ LÉGALE DOIT ÊTRE UN NOMBRE ───────────────────────────
+    // `senderLegalEntityId` identifie NOTRE organisation chez l'Access
+    // Point. Le code retombait silencieusement sur `1` quand la valeur
+    // n'était pas numérique : la facture partait alors sous une entité qui
+    // n'est pas la nôtre, sans que rien ne le signale. On refuse net.
+    final legalEntityId = config.legalEntityId;
+    if (legalEntityId == null) {
+      return PeppolSendResult(
+        success: false,
+        message:
+            'Transmission impossible : l\'identifiant d\'entité légale de '
+            'l\'Access Point doit être un nombre (valeur actuelle : '
+            '« ${config.senderLegalEntityId} »). Corrigez-le dans les '
+            'paramètres Peppol.',
       );
     }
 
@@ -89,6 +119,7 @@ class PeppolService {
       ublXml: ubl.xml,
       filename: ubl.filename,
       isInvoice: document.type == FinanceDocType.invoice,
+      legalEntityId: legalEntityId,
     );
 
     try {

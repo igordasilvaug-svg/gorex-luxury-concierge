@@ -480,8 +480,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
               ],
               if (d.peppolStatus != PeppolStatus.notApplicable) ...[
                 const SizedBox(height: 10),
-                if (d.peppolStatus == PeppolStatus.ready ||
-                    d.peppolStatus == PeppolStatus.failed)
+                if ((d.peppolStatus == PeppolStatus.ready ||
+                        d.peppolStatus == PeppolStatus.failed) &&
+                    s.peppol.isConfigured)
                   OutlinedButton.icon(
                     onPressed: () async {
                       Navigator.pop(ctx);
@@ -501,22 +502,54 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     label: Text(
                       d.peppolStatus == PeppolStatus.failed
                           ? 'RÉESSAYER LA TRANSMISSION PEPPOL'
-                          : (s.peppol.isConfigured
-                                ? 'TRANSMETTRE VIA PEPPOL (RÉEL)'
-                                : 'TRANSMETTRE VIA PEPPOL (SIMULATION)'),
+                          : 'TRANSMETTRE VIA PEPPOL',
                     ),
                   ),
-                if (d.peppolStatus == PeppolStatus.sent)
+                // Aucun bouton d'envoi tant que l'Access Point n'est pas
+                // configuré : il n'y a rien à envoyer, et un bouton actif
+                // laisserait croire le contraire. (Auparavant il affichait
+                // « SIMULATION » et marquait malgré tout la facture comme
+                // envoyée.)
+                if ((d.peppolStatus == PeppolStatus.ready ||
+                        d.peppolStatus == PeppolStatus.failed) &&
+                    !s.peppol.isConfigured)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          size: 15,
+                          color: AppColors.statusWaiting,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Access Point non configuré : aucune transmission '
+                            'possible. La facture ne sera pas marquée comme '
+                            'envoyée.',
+                            style: AppTypography.caption.copyWith(fontSize: 10.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (d.peppolStatus == PeppolStatus.sent &&
+                    (d.peppolProviderReference ?? '').isNotEmpty)
                   OutlinedButton.icon(
                     onPressed: () async {
                       Navigator.pop(ctx);
-                      await s.markPeppolDelivered(d.id);
+                      final ok = await s.markPeppolDelivered(d.id);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
+                          SnackBar(
                             content: Text(
-                              'Accusé Peppol enregistré (distribué).',
+                              ok
+                                  ? 'Accusé Peppol enregistré (distribué).'
+                                  : 'Aucun envoi réel enregistré : accusé '
+                                        'impossible.',
                             ),
+                            backgroundColor: ok ? null : AppColors.urgent,
                           ),
                         );
                       }
