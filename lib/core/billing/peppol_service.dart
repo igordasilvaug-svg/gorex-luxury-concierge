@@ -259,18 +259,47 @@ class PeppolService {
     return PeppolStatus.sent;
   }
 
-  /// Teste la connexion à l'Access Point (liste des entités légales).
+  /// Teste la connexion à l'Access Point et la validité de la clé d'API.
+  ///
+  /// ── POURQUOI CETTE MÉTHODE A CHANGÉ DE ROUTE ─────────────────────────
+  /// Elle interrogeait `GET /legal_entities` (liste des entités). Cette route
+  /// N'EXISTE PAS chez Storecove : mesuré le 2026-11-22, elle répond 404
+  /// AVEC ou SANS en-tête d'autorisation, alors qu'une route inexistante se
+  /// distingue nettement d'une route protégée :
+  ///
+  ///   GET /legal_entities      → 404 sans auth, 404 avec clé  ⇒ n'existe pas
+  ///   GET /legal_entities/{id} → 401 sans auth, 401 avec clé  ⇒ existe
+  ///
+  /// Conséquence : le test échouait TOUJOURS, même avec une clé parfaite,
+  /// et affichait « Connexion refusée (HTTP 404) » — un faux négatif qui
+  /// aurait fait croire à une clé invalide.
+  ///
+  /// On interroge désormais `GET /legal_entities/{id}`, qui existe et dont la
+  /// réponse distingue les cas :
+  ///   200 → clé acceptée et entité accessible ;
+  ///   401 → clé refusée ;
+  ///   403 → clé acceptée mais sans accès à cette entité ;
+  ///   404 → entité inexistante (ou appartenant à un autre compte).
   static Future<PeppolSendResult> testConnection(PeppolConfig config) async {
-    if (!config.isConfigured) {
+    final base = config.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    if (base.isEmpty || config.apiKey.trim().isEmpty) {
+      return const PeppolSendResult(
+        success: false,
+        message: 'URL de l\'API et clé d\'API sont nécessaires pour tester.',
+      );
+    }
+
+    final entityId = config.legalEntityId;
+    if (entityId == null) {
       return const PeppolSendResult(
         success: false,
         message:
-            'Configuration incomplète (URL, clé API ou identifiant manquant).',
+            'Identifiant d\'entité légale requis (nombre entier) : c\'est lui '
+            'qui permet de vérifier la clé auprès de l\'Access Point.',
       );
     }
-    final uri = Uri.parse(
-      '${config.apiBaseUrl.replaceAll(RegExp(r'/+$'), '')}/legal_entities',
-    );
+
+    final uri = Uri.parse('$base/legal_entities/$entityId');
     try {
       final resp = await http
           .get(
@@ -281,14 +310,28 @@ class PeppolService {
             },
           )
           .timeout(Duration(seconds: config.timeoutSeconds));
-      final ok = resp.statusCode >= 200 && resp.statusCode < 300;
-      return PeppolSendResult(
-        success: ok,
-        statusCode: resp.statusCode,
-        message: ok
-            ? 'Connexion à l\'Access Point réussie.'
-            : 'Connexion refusée (HTTP ${resp.statusCode}).',
-      );
+
+      final code = resp.statusCode;
+      if (code >= 200 && code < 300) {
+        return PeppolSendResult(
+          success: true,
+          statusCode: code,
+          message:
+              'Connexion réussie : la clé est acceptée et l\'entité légale '
+              '$entityId est accessible.',
+        );
+      }
+      final message = switch (code) {
+        401 => 'Clé d\'API refusée par l\'Access Point (HTTP 401).',
+        403 =>
+          'Clé acceptée, mais aucun accès à l\'entité légale $entityId '
+              '(HTTP 403). Vérifiez l\'identifiant.',
+        404 =>
+          'Entité légale $entityId introuvable chez ce fournisseur (HTTP 404). '
+              'Vérifiez l\'identifiant, ou l\'URL de base.',
+        _ => 'Connexion refusée (HTTP $code).',
+      };
+      return PeppolSendResult(success: false, statusCode: code, message: message);
     } on TimeoutException {
       return const PeppolSendResult(
         success: false,

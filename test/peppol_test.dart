@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -217,6 +219,81 @@ void main() {
       final raw = doc['raw_document'] as Map;
       expect(raw['raw_document_type'], 'xml');
       expect(raw['raw_document_data'], isNotEmpty);
+    });
+
+    // ── Test de connexion ────────────────────────────────────────────────
+    // `testConnection` interrogeait `GET /legal_entities`, route qui N'EXISTE
+    // PAS (404 mesuré avec ET sans clé) : il ne pouvait donc jamais réussir,
+    // même avec une clé parfaite. Il interroge désormais la seule route de
+    // lecture existante, `GET /legal_entities/{id}`.
+    group('testConnection', () {
+      test('refuse de tester sans URL ni clé', () async {
+        final res = await PeppolService.testConnection(
+          const PeppolConfig(senderLegalEntityId: '7'),
+        );
+        expect(res.success, isFalse);
+        expect(res.message, contains('nécessaires pour tester'));
+      });
+
+      test('exige un identifiant d\'entité numérique pour tester', () async {
+        // Sans identifiant, aucune route ne permet de vérifier la clé
+        // (la liste des entités n'est pas exposée par l'API).
+        final res = await PeppolService.testConnection(
+          const PeppolConfig(
+            apiBaseUrl: 'https://api.storecove.com/api/v2',
+            apiKey: 'une-cle-quelconque',
+            senderLegalEntityId: 'Da Silva Augustin Igor',
+          ),
+        );
+        expect(res.success, isFalse);
+        expect(res.message, contains('Identifiant d\'entité légale requis'));
+      });
+
+      test('une réponse non-2xx n\'est jamais un succès', () async {
+        // Le harnais de test intercepte les requêtes HTTP (le vrai réseau
+        // renverrait ici une erreur de connexion). Ce qui compte : quel que
+        // soit le code, une réponse non-2xx ne doit JAMAIS passer pour une
+        // connexion valide — sinon une clé refusée (401) serait annoncée
+        // comme acceptée.
+        final res = await PeppolService.testConnection(
+          const PeppolConfig(
+            apiBaseUrl: 'http://127.0.0.1:1',
+            apiKey: 'une-cle-quelconque',
+            senderLegalEntityId: '7',
+            timeoutSeconds: 2,
+          ),
+        );
+        expect(res.success, isFalse);
+        if (res.statusCode != null) {
+          expect(res.statusCode! >= 300, isTrue);
+        }
+      });
+
+      test('plus AUCUN appel à la route inexistante /legal_entities', () {
+        // Garde-fou : le 2026-11-22, `GET /api/v2/legal_entities` répondait
+        // 404 avec ET sans clé (route absente), tandis que
+        // `GET /api/v2/legal_entities/{id}` répondait 401 (route existante).
+        // Toute réapparition d'un appel nu à `/legal_entities` réintroduirait
+        // un test de connexion qui ne peut jamais réussir.
+        final source = File('lib/core/billing/peppol_service.dart')
+            .readAsStringSync();
+        final nu = RegExp(r"legal_entities(?![/\w])");
+        final lignes = source.split('\n');
+        for (var i = 0; i < lignes.length; i++) {
+          final ligne = lignes[i];
+          if (ligne.trimLeft().startsWith('///') ||
+              ligne.trimLeft().startsWith('//')) {
+            continue; // commentaire documentant la mesure : autorisé
+          }
+          expect(
+            nu.hasMatch(ligne),
+            isFalse,
+            reason: 'ligne ${i + 1} appelle /legal_entities sans identifiant : '
+                '$ligne',
+          );
+        }
+        expect(source, contains(r'legal_entities/$entityId'));
+      });
     });
 
     test('Access Point non configuré → AUCUN envoi, statut inchangé', () async {
